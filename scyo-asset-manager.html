@@ -175,6 +175,29 @@
 
     @media print{header,.cat-nav,.toolbar,.no-print{display:none!important;}body{background:white;}}
 
+    /* MUSIC LIBRARY */
+    .lib-view-btn{padding:.45rem 1rem;border:1.5px solid var(--grey-200);border-radius:var(--radius);background:white;font-family:'Inter',sans-serif;font-size:.82rem;font-weight:600;color:var(--grey-600);cursor:pointer;}
+    .lib-view-btn.active{background:var(--navy);color:white;border-color:var(--navy);}
+    .lib-cat-tab{padding:.6rem 1.1rem;border:none;border-bottom:2.5px solid transparent;background:none;font-family:'Inter',sans-serif;font-size:.82rem;font-weight:600;color:var(--grey-500);cursor:pointer;transition:color .15s;}
+    .lib-cat-tab.active{color:var(--navy);border-bottom-color:var(--gold);}
+    .lib-piece-row{display:grid;grid-template-columns:1fr 180px 60px 80px 160px 60px;align-items:center;padding:.65rem 1.25rem;border-bottom:1px solid var(--grey-100);cursor:pointer;transition:background .1s;}
+    .lib-piece-row:hover{background:var(--grey-50);}
+    .lib-piece-title{font-weight:600;color:var(--navy);font-size:.88rem;}
+    .lib-piece-title a{color:var(--navy);text-decoration:none;border-bottom:1px dashed var(--grey-300);}
+    .lib-piece-title a:hover{border-bottom-color:var(--navy);}
+    .lib-piece-meta{font-size:.8rem;color:var(--grey-500);}
+    .lib-piece-stat{font-size:.78rem;color:var(--grey-500);text-align:center;}
+    .lib-not-owned{display:inline-block;font-size:.68rem;font-weight:700;padding:.1rem .35rem;border-radius:3px;background:#fff3cd;color:#856404;text-transform:uppercase;margin-left:.4rem;}
+    .lib-table-header{display:grid;grid-template-columns:1fr 180px 60px 80px 160px 60px;padding:.4rem 1.25rem;background:var(--grey-50);border-bottom:2px solid var(--grey-200);}
+    .lib-table-header span{font-size:.72rem;font-weight:700;color:var(--grey-500);text-transform:uppercase;letter-spacing:.04em;}
+    .lib-year-block{margin-bottom:2rem;}
+    .lib-year-title{font-size:1.1rem;font-weight:800;color:var(--navy);padding:.75rem 1.25rem;border-bottom:2px solid var(--grey-200);background:var(--grey-50);}
+    .lib-event-block{padding:.75rem 1.25rem;border-bottom:1px solid var(--grey-100);}
+    .lib-event-title{font-size:.82rem;font-weight:700;color:var(--grey-600);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.4rem;}
+    .lib-event-ensemble{font-size:.82rem;color:var(--grey-800);margin:.2rem 0;}
+    .lib-rehearsed-block{padding:.75rem 1.25rem;background:#fafbfc;border-top:1.5px dashed var(--grey-200);}
+    .lib-rehearsed-title{font-size:.78rem;font-weight:700;color:var(--grey-400);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.4rem;}
+
     /* EQUIPMENT VIEW */
     .eq-toolbar{background:white;border-bottom:1px solid var(--grey-200);padding:.6rem 1.25rem;display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;}
     .eq-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem;padding:1.25rem;}
@@ -290,6 +313,27 @@
       <thead id="perc-thead"></thead>
       <tbody id="perc-tbody"></tbody>
     </table>
+  </div>
+
+  <!-- MUSIC LIBRARY VIEW -->
+  <div id="lib-toolbar" style="display:none;background:white;border-bottom:1px solid var(--grey-200);padding:.6rem 1.25rem;display:none;align-items:center;gap:.75rem;flex-wrap:wrap;">
+    <div style="display:flex;gap:.5rem;">
+      <button class="lib-view-btn active" id="lib-btn-catalogue" onclick="switchLibView('catalogue')">Catalogue</button>
+      <button class="lib-view-btn" id="lib-btn-history" onclick="switchLibView('history')">Performance History</button>
+    </div>
+    <div class="search-wrap" style="flex:1;min-width:180px;" id="lib-search-wrap">
+      <span class="si">🔍</span>
+      <input type="text" id="lib-search" placeholder="Search pieces..." oninput="renderLibCatalogue()"/>
+    </div>
+    <button class="btn btn-primary" id="lib-add-btn" onclick="openAddLibModal()">+ Add Piece</button>
+  </div>
+  <div id="lib-view" style="display:none;flex:1;overflow:auto;min-height:0;">
+    <!-- Catalogue sub-tabs -->
+    <div id="lib-cat-tabs" style="background:white;border-bottom:1px solid var(--grey-200);padding:0 1.25rem;display:flex;gap:0;">
+      ${['Band','Strings','Orchestra','Jazz Band'].map(c=>`<button class="lib-cat-tab" data-cat="${c}" onclick="switchLibCat('${c}')">${c}</button>`).join('')}
+    </div>
+    <div id="lib-catalogue" style="display:block;"></div>
+    <div id="lib-history" style="display:none;padding:1.25rem;"></div>
   </div>
 
   <!-- EQUIPMENT VIEW -->
@@ -447,7 +491,6 @@
   </div>
 </div>
 
-<div id="toast"></div>
 
 <!-- EQUIPMENT ITEM MODAL -->
 <div class="modal-backdrop eq-modal" id="eq-item-modal">
@@ -510,6 +553,56 @@
       </div>
       <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="submitAddLocation()">Add Location</button>
     </div>
+  </div>
+</div>
+
+<!-- ADD/EDIT LIBRARY PIECE MODAL -->
+<div class="modal-backdrop" id="lib-piece-modal">
+  <div class="modal" style="max-width:600px;">
+    <div class="modal-header">
+      <span class="modal-title" id="lib-piece-modal-title">Add Piece</span>
+      <button class="btn-close" onclick="closeModal('lib-piece-modal')">✕</button>
+    </div>
+    <div style="padding:1.25rem;overflow-y:auto;max-height:80vh;" id="lib-piece-form"></div>
+  </div>
+</div>
+
+<!-- LIBRARY PIECE DETAIL MODAL -->
+<div class="modal-backdrop eq-modal" id="lib-detail-modal">
+  <div class="modal" style="max-width:780px;">
+    <div class="modal-header">
+      <span class="modal-title" id="lib-detail-title">Piece</span>
+      <button class="btn-close" onclick="closeModal('lib-detail-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-fields" id="lib-detail-fields" style="overflow-y:auto;"></div>
+      <div style="width:280px;padding:1.25rem;overflow-y:auto;background:var(--grey-50);border-left:1px solid var(--grey-100);">
+        <div class="hist-title">Usage History</div>
+        <div id="lib-detail-history"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- LOG BORROW MODAL -->
+<div class="modal-backdrop" id="lib-borrow-modal">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header">
+      <span class="modal-title">Log Borrow</span>
+      <button class="btn-close" onclick="closeModal('lib-borrow-modal')">✕</button>
+    </div>
+    <div style="padding:1.25rem;" id="lib-borrow-form"></div>
+  </div>
+</div>
+
+<!-- LOG PERFORMANCE MODAL -->
+<div class="modal-backdrop" id="lib-perf-modal">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header">
+      <span class="modal-title">Log Performance</span>
+      <button class="btn-close" onclick="closeModal('lib-perf-modal')">✕</button>
+    </div>
+    <div style="padding:1.25rem;" id="lib-perf-form"></div>
   </div>
 </div>
 
@@ -580,14 +673,9 @@ function getCatTables(){
 async function loadCategoryData(){
   const cat=allCategories.find(c=>c.id===currentCatId);
   const prefix=(cat?.prefix||'INS').toUpperCase();
-  if(prefix==='EQP'){
-    await loadEquipmentData();
-    return;
-  }
-  if(prefix==='PRC'){
-    await loadPercData();
-    return;
-  }
+  if(prefix==='EQP'){await loadEquipmentData();return;}
+  if(prefix==='PRC'){await loadPercData();return;}
+  if(prefix==='LIB'){await loadLibData();return;}
   const{assets:aTable,log:lTable}=getCatTables();
   const[{data:assets},{data:log}]=await Promise.all([
     db.from(aTable).select('*').order('created_at'),
@@ -1596,6 +1684,262 @@ async function deletePercType(typeId){
   document.getElementById(id).addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal(id);});
 });
 
+// ── MUSIC LIBRARY ─────────────────────────────────────────────
+let libPieces=[],libBorrows=[],libPerformances=[],libEnsembles=[];
+let libActiveCat='Band',libActiveView='catalogue',libEditPieceId=null,libDetailPieceId=null;
+
+function showLibView(){
+  document.querySelector('.toolbar').style.display='none';
+  document.querySelector('main').style.display='none';
+  document.getElementById('perc-toolbar').style.display='none';
+  document.getElementById('perc-view').style.display='none';
+  document.getElementById('eq-toolbar').style.display='none';
+  document.getElementById('eq-view').style.display='none';
+  document.getElementById('lib-toolbar').style.display='flex';
+  document.getElementById('lib-view').style.display='block';
+}
+
+async function loadLibData(){
+  const[{data:pieces},{data:borrows},{data:perfs},{data:ensembles}]=await Promise.all([
+    db.from('library_pieces').select('*').order('title'),
+    db.from('library_borrows').select('*').order('date',{ascending:false}),
+    db.from('library_performances').select('*').order('date',{ascending:false}),
+    db.from('library_ensembles').select('*').order('sort_order')
+  ]);
+  libPieces=pieces||[];libBorrows=borrows||[];libPerformances=perfs||[];libEnsembles=ensembles||[];
+  showLibView();
+  renderLibCatTabs();
+  renderLibCatalogue();
+}
+
+function switchLibView(view){
+  libActiveView=view;
+  document.getElementById('lib-catalogue').style.display=view==='catalogue'?'block':'none';
+  document.getElementById('lib-history').style.display=view==='history'?'block':'none';
+  document.getElementById('lib-search-wrap').style.display=view==='catalogue'?'flex':'none';
+  document.getElementById('lib-add-btn').style.display=view==='catalogue'?'':'none';
+  document.querySelectorAll('.lib-view-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById(`lib-btn-${view}`).classList.add('active');
+  document.getElementById('lib-cat-tabs').style.display=view==='catalogue'?'flex':'none';
+  if(view==='history')renderLibHistory();
+}
+
+function switchLibCat(cat){
+  libActiveCat=cat;
+  renderLibCatTabs();
+  renderLibCatalogue();
+}
+
+function renderLibCatTabs(){
+  document.querySelectorAll('.lib-cat-tab').forEach(b=>{
+    b.classList.toggle('active',b.dataset.cat===libActiveCat);
+  });
+}
+
+function renderLibCatalogue(){
+  const q=(document.getElementById('lib-search')?.value||'').toLowerCase();
+  const filtered=libPieces.filter(p=>{
+    if(p.category!==libActiveCat)return false;
+    if(q&&!p.title.toLowerCase().includes(q)&&!(p.composer||'').toLowerCase().includes(q))return false;
+    return true;
+  });
+  const container=document.getElementById('lib-catalogue');
+  const header=`<div class="lib-table-header"><span>Title</span><span>Composer</span><span>Level</span><span>Purchased</span><span>Usage</span><span></span></div>`;
+  if(!filtered.length){container.innerHTML=header+`<div style="text-align:center;padding:3rem;color:var(--grey-400);">No pieces in ${libActiveCat} yet.</div>`;return;}
+  container.innerHTML=header+filtered.map(p=>{
+    const borrows=libBorrows.filter(b=>b.piece_id===p.id).length;
+    const perfs=libPerformances.filter(pf=>pf.piece_id===p.id).length;
+    const titleHtml=p.external_link?`<a href="${esc(p.external_link)}" target="_blank" onclick="event.stopPropagation()">${esc(p.title)}</a>`:esc(p.title);
+    return`<div class="lib-piece-row" onclick="openLibDetail('${p.id}')">
+      <div class="lib-piece-title">${titleHtml}${!p.owned?'<span class="lib-not-owned">Not owned</span>':''}</div>
+      <div class="lib-piece-meta">${esc(p.composer||'—')}</div>
+      <div class="lib-piece-stat">${p.level||'—'}</div>
+      <div class="lib-piece-stat">${p.date_purchased?p.date_purchased.slice(0,7):'—'}</div>
+      <div class="lib-piece-stat">${borrows>0?`Borrowed ${borrows}x, incl. ${perfs} perf.`:'Not used'}</div>
+      <div style="text-align:right;"><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openEditLibPiece('${p.id}')">Edit</button></div>
+    </div>`;
+  }).join('');
+}
+
+function renderLibHistory(){
+  const container=document.getElementById('lib-history');
+  const years=[...new Set(libPerformances.map(p=>new Date(p.date).getFullYear()))].sort((a,b)=>b-a);
+  if(!years.length){container.innerHTML='<div style="color:var(--grey-400);padding:2rem;">No performance history yet.</div>';return;}
+  container.innerHTML=years.map(year=>{
+    const yearPerfs=libPerformances.filter(p=>new Date(p.date).getFullYear()===year);
+    const yearBorrows=libBorrows.filter(b=>new Date(b.date).getFullYear()===year);
+    const eventMap={};
+    yearPerfs.forEach(p=>{
+      const key=`${p.date}|${p.event_type}|${p.workshop_name||''}`;
+      if(!eventMap[key])eventMap[key]={date:p.date,event_type:p.event_type,workshop_name:p.workshop_name,ensembles:{}};
+      const ens=libEnsembles.find(e=>e.id===p.ensemble_id);
+      const ensName=ens?.name||'Unknown';
+      const piece=libPieces.find(pc=>pc.id===p.piece_id);
+      if(!eventMap[key].ensembles[ensName])eventMap[key].ensembles[ensName]=[];
+      eventMap[key].ensembles[ensName].push(piece?.title||'Unknown');
+    });
+    const eventBlocks=Object.values(eventMap).sort((a,b)=>a.date.localeCompare(b.date)).map(ev=>{
+      const eventLabel=ev.event_type==='Workshop'?`Workshop — ${ev.workshop_name||''}`:ev.event_type;
+      const ensLines=Object.entries(ev.ensembles).map(([ens,titles])=>`<div class="lib-event-ensemble"><strong>${esc(ens)}:</strong> ${titles.map(t=>esc(t)).join(', ')}</div>`).join('');
+      return`<div class="lib-event-block"><div class="lib-event-title">${esc(eventLabel)} <span style="font-weight:400;color:var(--grey-400);">· ${new Date(ev.date+'T00:00:00').toLocaleDateString('en-AU',{month:'short',day:'numeric'})}</span></div>${ensLines}</div>`;
+    }).join('');
+    const performedPieceIds=new Set(yearPerfs.map(p=>p.piece_id));
+    const rehearsedPieceIds=[...new Set(yearBorrows.filter(b=>!performedPieceIds.has(b.piece_id)).map(b=>b.piece_id))];
+    const rehearsedBlock=rehearsedPieceIds.length?`<div class="lib-rehearsed-block"><div class="lib-rehearsed-title">Rehearsed but not performed</div><div style="font-size:.82rem;color:var(--grey-600);">${rehearsedPieceIds.map(id=>esc(libPieces.find(pc=>pc.id===id)?.title||'Unknown')).join(', ')}</div></div>`:'';
+    return`<div class="lib-year-block"><div class="lib-year-title">${year}</div>${eventBlocks}${rehearsedBlock}</div>`;
+  }).join('');
+}
+
+function openAddLibModal(){
+  libEditPieceId=null;
+  document.getElementById('lib-piece-modal-title').textContent='Add Piece';
+  renderLibPieceForm();
+  document.getElementById('lib-piece-modal').classList.add('open');
+}
+
+function openEditLibPiece(pieceId){
+  libEditPieceId=pieceId;
+  document.getElementById('lib-piece-modal-title').textContent='Edit Piece';
+  renderLibPieceForm(libPieces.find(p=>p.id===pieceId));
+  document.getElementById('lib-piece-modal').classList.add('open');
+}
+
+function renderLibPieceForm(p=null){
+  document.getElementById('lib-piece-form').innerHTML=`
+    <div class="fg"><label>Title *</label><input type="text" id="lib-title" value="${esc(p?.title||'')}" placeholder="Title"/></div>
+    <div class="fg"><label>Composer</label><input type="text" id="lib-composer" value="${esc(p?.composer||'')}" placeholder="Composer / Arranger"/></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
+      <div class="fg"><label>Category *</label><select id="lib-category">${['Band','Strings','Orchestra','Jazz Band'].map(c=>`<option ${p?.category===c?'selected':''}>${c}</option>`).join('')}</select></div>
+      <div class="fg"><label>Level</label><input type="number" id="lib-level" value="${p?.level||''}" placeholder="e.g. 2.5" min="0" max="6" step="0.5"/></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
+      <div class="fg"><label>Date Purchased</label><input type="date" id="lib-date-purchased" value="${p?.date_purchased||''}"/></div>
+      <div class="fg" style="display:flex;align-items:center;gap:.5rem;padding-top:1.4rem;">
+        <input type="checkbox" id="lib-owned" ${p===null||p?.owned?'checked':''} style="width:auto;padding:0;border:none;"/>
+        <label style="text-transform:none;letter-spacing:0;font-size:.875rem;margin:0;cursor:pointer;" for="lib-owned">We own this piece</label>
+      </div>
+    </div>
+    <div class="fg"><label>External Link</label><input type="url" id="lib-link" value="${esc(p?.external_link||'')}" placeholder="https://..."/></div>
+    <div class="fg"><label>Notes</label><textarea id="lib-notes" style="height:70px;resize:vertical;">${esc(p?.notes||'')}</textarea></div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:.75rem;" onclick="submitLibPiece()">Save</button>
+  `;
+}
+
+async function submitLibPiece(){
+  const title=document.getElementById('lib-title').value.trim();
+  const composer=document.getElementById('lib-composer').value.trim();
+  const category=document.getElementById('lib-category').value;
+  const level=document.getElementById('lib-level').value;
+  const datePurchased=document.getElementById('lib-date-purchased').value;
+  const owned=document.getElementById('lib-owned').checked;
+  const link=document.getElementById('lib-link').value.trim();
+  const notes=document.getElementById('lib-notes').value.trim();
+  if(!title){showToast('Title required');return;}
+  if(!category){showToast('Category required');return;}
+  const payload={title,composer:composer||null,category,level:level?parseFloat(level):null,date_purchased:datePurchased||null,owned,external_link:link||null,notes:notes||null};
+  if(libEditPieceId){await db.from('library_pieces').update(payload).eq('id',libEditPieceId);}
+  else{await db.from('library_pieces').insert(payload);}
+  closeModal('lib-piece-modal');
+  await loadLibData();
+  showToast(libEditPieceId?'Piece updated ✓':'Piece added ✓');
+}
+
+function openLibDetail(pieceId){
+  libDetailPieceId=pieceId;
+  const p=libPieces.find(pc=>pc.id===pieceId);
+  if(!p)return;
+  document.getElementById('lib-detail-title').textContent=p.title;
+  const borrows=libBorrows.filter(b=>b.piece_id===pieceId);
+  const perfs=libPerformances.filter(pf=>pf.piece_id===pieceId);
+  document.getElementById('lib-detail-fields').innerHTML=`
+    <div class="field-row"><div class="field-label">Title</div><div class="field-val">${p.external_link?`<a href="${esc(p.external_link)}" target="_blank" style="color:var(--navy);">${esc(p.title)}</a>`:esc(p.title)}</div></div>
+    <div class="field-row"><div class="field-label">Composer</div><div class="field-val">${esc(p.composer||'—')}</div></div>
+    <div class="field-row"><div class="field-label">Category</div><div class="field-val">${esc(p.category)}</div></div>
+    <div class="field-row"><div class="field-label">Level</div><div class="field-val">${p.level||'—'}</div></div>
+    <div class="field-row"><div class="field-label">Owned</div><div class="field-val">${p.owned?'Yes':'No — not in library'}</div></div>
+    <div class="field-row"><div class="field-label">Date Purchased</div><div class="field-val">${p.date_purchased||'—'}</div></div>
+    <div class="field-row"><div class="field-label">Notes</div><div class="field-val">${esc(p.notes||'—')}</div></div>
+    <div class="field-row"><div class="field-label">Usage</div><div class="field-val">Borrowed ${borrows.length}x, including ${perfs.length} performance${perfs.length!==1?'s':''}</div></div>
+    <div style="display:flex;gap:.5rem;margin-top:1rem;padding-top:1rem;border-top:1px solid var(--grey-100);">
+      <button class="btn btn-ghost btn-sm" onclick="openLibBorrowModal('${pieceId}')">+ Log Borrow</button>
+      <button class="btn btn-ghost btn-sm" onclick="openLibPerfModal('${pieceId}')">+ Log Performance</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('lib-detail-modal');openEditLibPiece('${pieceId}')">Edit</button>
+    </div>
+  `;
+  const allEvents=[
+    ...borrows.map(b=>({type:'borrow',date:b.date,ensemble_id:b.ensemble_id})),
+    ...perfs.map(pf=>({type:'perf',date:pf.date,ensemble_id:pf.ensemble_id,event_type:pf.event_type,workshop_name:pf.workshop_name}))
+  ].sort((a,b)=>b.date.localeCompare(a.date));
+  document.getElementById('lib-detail-history').innerHTML=allEvents.length?allEvents.map(ev=>{
+    const ens=libEnsembles.find(e=>e.id===ev.ensemble_id);
+    const label=ev.type==='borrow'?'Borrowed':`Performed — ${ev.event_type==='Workshop'?`Workshop: ${ev.workshop_name||''}`:ev.event_type}`;
+    return`<div class="hist-entry"><div class="hist-field">${label}</div><div class="hist-val">${esc(ens?.name||'Unknown')}</div><div class="hist-meta">${ev.date}</div></div>`;
+  }).join(''):'<div style="color:var(--grey-400);font-size:.82rem;">No usage history.</div>';
+  document.getElementById('lib-detail-modal').classList.add('open');
+}
+
+function openLibBorrowModal(pieceId){
+  libDetailPieceId=pieceId;
+  const p=libPieces.find(pc=>pc.id===pieceId);
+  document.getElementById('lib-borrow-form').innerHTML=`
+    <div style="font-size:.85rem;font-weight:600;color:var(--navy);margin-bottom:.75rem;">${esc(p?.title||'')}</div>
+    <div class="fg"><label>Ensemble *</label><select id="lib-borrow-ensemble"><option value="">Select ensemble…</option>${libEnsembles.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('')}</select></div>
+    <div class="fg"><label>Date *</label><input type="date" id="lib-borrow-date" value="${new Date().toISOString().slice(0,10)}"/></div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="submitLibBorrow()">Log Borrow</button>
+  `;
+  document.getElementById('lib-borrow-modal').classList.add('open');
+}
+
+async function submitLibBorrow(){
+  const ensembleId=document.getElementById('lib-borrow-ensemble').value;
+  const date=document.getElementById('lib-borrow-date').value;
+  if(!ensembleId){showToast('Select an ensemble');return;}
+  if(!date){showToast('Date required');return;}
+  await db.from('library_borrows').insert({piece_id:libDetailPieceId,ensemble_id:ensembleId,date});
+  closeModal('lib-borrow-modal');
+  await loadLibData();openLibDetail(libDetailPieceId);
+  showToast('Borrow logged ✓');
+}
+
+function openLibPerfModal(pieceId){
+  libDetailPieceId=pieceId;
+  const p=libPieces.find(pc=>pc.id===pieceId);
+  document.getElementById('lib-perf-form').innerHTML=`
+    <div style="font-size:.85rem;font-weight:600;color:var(--navy);margin-bottom:.75rem;">${esc(p?.title||'')}</div>
+    <div class="fg"><label>Ensemble *</label><select id="lib-perf-ensemble"><option value="">Select ensemble…</option>${libEnsembles.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('')}</select></div>
+    <div class="fg"><label>Date *</label><input type="date" id="lib-perf-date" value="${new Date().toISOString().slice(0,10)}"/></div>
+    <div class="fg"><label>Event Type *</label><select id="lib-perf-event-type" onchange="toggleWorkshopName()"><option value="">Select…</option><option>Camp</option><option>Concert</option><option>Gala</option><option>Workshop</option></select></div>
+    <div class="fg" id="lib-workshop-name-wrap" style="display:none;"><label>Workshop Name *</label><input type="text" id="lib-workshop-name" placeholder="e.g. String Workshop"/></div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="submitLibPerformance()">Log Performance</button>
+  `;
+  document.getElementById('lib-perf-modal').classList.add('open');
+}
+
+function toggleWorkshopName(){
+  const type=document.getElementById('lib-perf-event-type')?.value;
+  const wrap=document.getElementById('lib-workshop-name-wrap');
+  if(wrap)wrap.style.display=type==='Workshop'?'block':'none';
+}
+
+async function submitLibPerformance(){
+  const ensembleId=document.getElementById('lib-perf-ensemble').value;
+  const date=document.getElementById('lib-perf-date').value;
+  const eventType=document.getElementById('lib-perf-event-type').value;
+  const workshopName=document.getElementById('lib-workshop-name')?.value.trim()||null;
+  if(!ensembleId){showToast('Select an ensemble');return;}
+  if(!date){showToast('Date required');return;}
+  if(!eventType){showToast('Event type required');return;}
+  if(eventType==='Workshop'&&!workshopName){showToast('Workshop name required');return;}
+  await db.from('library_performances').insert({piece_id:libDetailPieceId,ensemble_id:ensembleId,date,event_type:eventType,workshop_name:workshopName});
+  closeModal('lib-perf-modal');
+  await loadLibData();openLibDetail(libDetailPieceId);
+  showToast('Performance logged ✓');
+}
+
+['lib-piece-modal','lib-detail-modal','lib-borrow-modal','lib-perf-modal'].forEach(id=>{
+  document.getElementById(id)?.addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal(id);});
+});
+
 initAuth();
 let eqItems=[],eqLocations=[],eqStock=[],eqLog=[];
 let _adjItemId=null,_adjLocId=null,_adjLocName='',_adjCurrentQty=0;
@@ -1606,6 +1950,8 @@ function showStandardView(){
   document.getElementById('eq-view').style.display='none';
   document.getElementById('perc-toolbar').style.display='none';
   document.getElementById('perc-view').style.display='none';
+  document.getElementById('lib-toolbar').style.display='none';
+  document.getElementById('lib-view').style.display='none';
   document.querySelector('.toolbar').style.display='';
   document.querySelector('main').style.display='';
   ['eq-item-modal','eq-add-modal','eq-loc-modal','perc-add-modal','perc-item-modal','perc-types-modal'].forEach(id=>closeModal(id));
@@ -1616,6 +1962,8 @@ function showEquipmentView(){
   document.querySelector('main').style.display='none';
   document.getElementById('perc-toolbar').style.display='none';
   document.getElementById('perc-view').style.display='none';
+  document.getElementById('lib-toolbar').style.display='none';
+  document.getElementById('lib-view').style.display='none';
   document.getElementById('eq-toolbar').style.display='flex';
   document.getElementById('eq-view').style.display='block';
   ['perc-add-modal','perc-item-modal','perc-types-modal','edit-modal','add-modal'].forEach(id=>closeModal(id));
