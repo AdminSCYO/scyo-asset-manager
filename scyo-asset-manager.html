@@ -5,8 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>SCYO Assets</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
     :root{
@@ -863,7 +861,7 @@ async function submitAddAsset(){
   const existing=allAssets.find(a=>a.display_id===displayId);
   if(existing){showToast('ID already exists');return;}
 
-  const{error}=await db.from(getCatTables().assets).insert({display_id:displayId,qr_code:`${location.origin}${location.pathname}?asset=${displayId}`});
+  const{error}=await db.from(getCatTables().assets).insert({display_id:displayId});
   if(error){showToast('Error: '+error.message);return;}
 
   // Build status value from dropdown
