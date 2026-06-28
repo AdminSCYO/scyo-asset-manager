@@ -1751,8 +1751,8 @@ function showLibView(){
   document.getElementById('perc-view').style.display='none';
   document.getElementById('eq-toolbar').style.display='none';
   document.getElementById('eq-view').style.display='none';
-  document.getElementById('lib-toolbar').style.display='flex';
-  document.getElementById('lib-view').style.display='block';
+  document.getElementById('lib-toolbar').style.cssText='display:flex;background:white;border-bottom:1px solid var(--grey-200);padding:.6rem 1.25rem;align-items:center;gap:.75rem;flex-wrap:wrap;';
+  document.getElementById('lib-view').style.cssText='display:flex;flex:1;flex-direction:column;overflow:auto;min-height:0;';
 }
 
 async function loadLibData(){
