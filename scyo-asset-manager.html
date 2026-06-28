@@ -469,13 +469,19 @@
 
 
 <!-- ADD/EDIT LIBRARY PIECE MODAL -->
-<div class="modal-backdrop" id="lib-piece-modal">
-  <div class="modal" style="max-width:600px;">
+<div class="modal-backdrop wide-modal" id="lib-piece-modal">
+  <div class="modal" style="max-width:780px;">
     <div class="modal-header">
       <span class="modal-title" id="lib-piece-modal-title">Add Piece</span>
       <button class="btn-close" onclick="closeModal('lib-piece-modal')">✕</button>
     </div>
-    <div style="padding:1.25rem;overflow-y:auto;max-height:80vh;" id="lib-piece-form"></div>
+    <div class="modal-body">
+      <div class="modal-fields" style="overflow-y:auto;" id="lib-piece-form"></div>
+      <div id="lib-piece-history-panel" style="width:280px;padding:1.25rem;overflow-y:auto;background:var(--grey-50);border-left:1px solid var(--grey-100);display:none;">
+        <div class="hist-title">History</div>
+        <div id="lib-piece-history"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1856,9 +1862,51 @@ function renderLibHistory(){
   }).join('');
 }
 
+function renderLibPieceHistory(pieceId){
+  const borrows=libBorrows.filter(b=>b.piece_id===pieceId);
+  const perfs=libPerformances.filter(pf=>pf.piece_id===pieceId);
+  const allEvents=[
+    ...borrows.map(b=>({type:'borrow',id:b.id,date:b.date,ensemble_id:b.ensemble_id})),
+    ...perfs.map(pf=>({type:'perf',id:pf.id,date:pf.date,ensemble_id:pf.ensemble_id,event_type:pf.event_type,workshop_name:pf.workshop_name}))
+  ].sort((a,b)=>b.date.localeCompare(a.date));
+  document.getElementById('lib-piece-history').innerHTML=allEvents.length?allEvents.map(ev=>{
+    const ens=libEnsembles.find(e=>e.id===ev.ensemble_id);
+    const label=ev.type==='borrow'?'Borrowed':`Performed — ${ev.event_type==='Workshop'?`Workshop: ${ev.workshop_name||''}`:ev.event_type}`;
+    const editBtn=ev.type==='borrow'
+      ?`<button class="btn btn-ghost btn-sm" style="padding:.1rem .4rem;font-size:.7rem;" onclick="openEditBorrow('${ev.id}')">Edit</button>`
+      :`<button class="btn btn-ghost btn-sm" style="padding:.1rem .4rem;font-size:.7rem;" onclick="openEditPerf('${ev.id}')">Edit</button>`;
+    const delBtn=ev.type==='borrow'
+      ?`<button class="btn btn-ghost btn-sm" style="padding:.1rem .4rem;font-size:.7rem;color:var(--danger);" onclick="deleteLibBorrowFromEdit('${ev.id}')">✕</button>`
+      :`<button class="btn btn-ghost btn-sm" style="padding:.1rem .4rem;font-size:.7rem;color:var(--danger);" onclick="deleteLibPerfFromEdit('${ev.id}')">✕</button>`;
+    return`<div class="hist-entry">
+      <div class="hist-field">${label}</div>
+      <div class="hist-val">${esc(ens?.name||'Unknown')}</div>
+      <div class="hist-meta" style="display:flex;justify-content:space-between;align-items:center;">${ev.date}<span style="display:flex;gap:.2rem;">${editBtn}${delBtn}</span></div>
+    </div>`;
+  }).join(''):'<div style="color:var(--grey-400);font-size:.82rem;">No history yet.</div>';
+}
+
+async function deleteLibBorrowFromEdit(id){
+  if(!confirm('Delete this borrow record?'))return;
+  await db.from('library_borrows').delete().eq('id',id);
+  await loadLibData();
+  renderLibPieceHistory(libEditPieceId);
+  showToast('Deleted ✓');
+}
+
+async function deleteLibPerfFromEdit(id){
+  if(!confirm('Delete this performance record?'))return;
+  await db.from('library_performances').delete().eq('id',id);
+  await loadLibData();
+  renderLibPieceHistory(libEditPieceId);
+  showToast('Deleted ✓');
+}
+
 function openAddLibModal(){
   libEditPieceId=null;
   document.getElementById('lib-piece-modal-title').textContent='Add Piece';
+  const panel=document.getElementById('lib-piece-history-panel');
+  if(panel)panel.style.display='none';
   renderLibPieceForm();
   document.getElementById('lib-piece-modal').classList.add('open');
 }
@@ -1867,6 +1915,10 @@ function openEditLibPiece(pieceId){
   libEditPieceId=pieceId;
   document.getElementById('lib-piece-modal-title').textContent='Edit Piece';
   renderLibPieceForm(libPieces.find(p=>p.id===pieceId));
+  // Show history panel
+  const panel=document.getElementById('lib-piece-history-panel');
+  if(panel)panel.style.display='block';
+  renderLibPieceHistory(pieceId);
   document.getElementById('lib-piece-modal').classList.add('open');
 }
 
@@ -2052,7 +2104,8 @@ async function submitLibBorrow(){
   if(!date){showToast('Date required');return;}
   await db.from('library_borrows').insert({piece_id:libDetailPieceId,ensemble_id:ensembleId,date});
   closeModal('lib-borrow-modal');
-  await loadLibData();openLibDetail(libDetailPieceId);
+  await loadLibData();
+  if(libEditPieceId===libDetailPieceId)renderLibPieceHistory(libEditPieceId);
   showToast('Borrow logged ✓');
 }
 
@@ -2092,7 +2145,8 @@ async function submitLibPerformance(){
   if(eventType==='Workshop'&&!workshopName){showToast('Workshop name required');return;}
   await db.from('library_performances').insert({piece_id:libDetailPieceId,ensemble_id:ensembleId,date,event_type:eventType,workshop_name:workshopName});
   closeModal('lib-perf-modal');
-  await loadLibData();openLibDetail(libDetailPieceId);
+  await loadLibData();
+  if(libEditPieceId===libDetailPieceId)renderLibPieceHistory(libEditPieceId);
   showToast('Performance logged ✓');
 }
 
@@ -2241,6 +2295,7 @@ function addBulkBorrowRow(){
         oninput="filterBulkPieces(${id})"
         onfocus="showBulkDropdown(${id})"
         onkeydown="bulkKeyNav(event,${id})"/>
+      <span id="bulk-cat-${id}" style="display:none;position:absolute;right:.6rem;top:50%;transform:translateY(-50%);font-size:.72rem;color:var(--grey-400);font-style:italic;pointer-events:none;"></span>
       <div class="bulk-piece-dropdown" id="bulk-dropdown-${id}"></div>
     </div>
     <button onclick="removeBulkRow(${id})" style="background:none;border:none;color:var(--grey-400);cursor:pointer;font-size:1rem;padding:.2rem .4rem;flex-shrink:0;">✕</button>
@@ -2261,7 +2316,9 @@ function filterBulkPieces(id){
   const q=document.getElementById(`bulk-input-${id}`)?.value.toLowerCase()||'';
   delete bulkBorrowSelectedPieces[id];
   const input=document.getElementById(`bulk-input-${id}`);
-  if(input)input.classList.remove('bulk-piece-selected');
+  if(input){input.classList.remove('bulk-piece-selected');input.style.paddingRight='';}
+  const catLabel=document.getElementById(`bulk-cat-${id}`);
+  if(catLabel)catLabel.style.display='none';
   showBulkDropdown(id,q);
 }
 
@@ -2281,9 +2338,12 @@ function selectBulkPiece(id,pieceId){
   if(!piece)return;
   bulkBorrowSelectedPieces[id]=piece;
   const input=document.getElementById(`bulk-input-${id}`);
-  if(input){input.value=piece.title;input.classList.add('bulk-piece-selected');}
+  if(input){input.value=piece.title;input.classList.add('bulk-piece-selected');input.style.paddingRight='80px';}
   const dd=document.getElementById(`bulk-dropdown-${id}`);
   if(dd)dd.style.display='none';
+  // Show category label next to input
+  const catLabel=document.getElementById(`bulk-cat-${id}`);
+  if(catLabel){catLabel.textContent=piece.category;catLabel.style.display='inline';}
 }
 
 function bulkKeyNav(event,id){
