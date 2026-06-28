@@ -355,10 +355,19 @@ function renderCatNav(){
   `).join('');
 }
 
+// Returns the correct asset/log table names for the current category
+function getCatTables(){
+  const cat=allCategories.find(c=>c.id===currentCatId);
+  const prefix=(cat?.prefix||'INS').toUpperCase();
+  if(prefix==='PRC')return{assets:'perc_assets',log:'perc_log'};
+  return{assets:'ins_assets',log:'ins_log'};
+}
+
 async function loadCategoryData(){
+  const{assets:aTable,log:lTable}=getCatTables();
   const[{data:assets},{data:log}]=await Promise.all([
-    db.from('ins_assets').select('*').eq('category_id',currentCatId).order('created_at'),
-    db.from('ins_log').select('*').order('timestamp',{ascending:false})
+    db.from(aTable).select('*').order('created_at'),
+    db.from(lTable).select('*').order('timestamp',{ascending:false})
   ]);
   allAssets=assets||[];
   allLog=log||[];
@@ -588,12 +597,12 @@ async function saveFieldOnBlur(el,assetId){
   const orig=el.dataset.orig;
   if(newVal===orig)return;
   const fieldName=el.dataset.field;
-  await db.from('ins_log').insert({asset_id:assetId,user_email:currentUser.email,field:fieldName,data:newVal});
+  await db.from(getCatTables().log).insert({asset_id:assetId,user_email:currentUser.email,field:fieldName,data:newVal});
   el.dataset.orig=newVal;
   el.classList.remove('changed');
   showToast(`${fieldName} updated ✓`);
   // Reload log and refresh history in modal
-  const{data:log}=await db.from('ins_log').select('*').order('timestamp',{ascending:false});
+  const{data:log}=await db.from(getCatTables().log).select('*').order('timestamp',{ascending:false});
   allLog=log||[];
   // Refresh history panel
   const history=getAssetHistory(assetId);
@@ -642,9 +651,9 @@ async function saveInlineStatus(assetId){
 async function _writeStatus(assetId,data){
   const state=getAssetState(assetId);
   if((state['Status']||'In Storage')===data)return;
-  await db.from('ins_log').insert({asset_id:assetId,user_email:currentUser.email,field:'Status',data});
+  await db.from(getCatTables().log).insert({asset_id:assetId,user_email:currentUser.email,field:'Status',data});
   showToast('Status updated ✓');
-  const{data:log}=await db.from('ins_log').select('*').order('timestamp',{ascending:false});
+  const{data:log}=await db.from(getCatTables().log).select('*').order('timestamp',{ascending:false});
   allLog=log||[];
   const history=getAssetHistory(assetId);
   const histEl=document.getElementById('edit-history');
@@ -708,7 +717,7 @@ async function submitAddAsset(){
   const existing=allAssets.find(a=>a.display_id===displayId);
   if(existing){showToast('ID already exists');return;}
 
-  const{error}=await db.from('ins_assets').insert({display_id:displayId,category_id:currentCatId,qr_code:`${location.origin}${location.pathname}?asset=${displayId}`});
+  const{error}=await db.from(getCatTables().assets).insert({display_id:displayId,qr_code:`${location.origin}${location.pathname}?asset=${displayId}`});
   if(error){showToast('Error: '+error.message);return;}
 
   // Build status value from dropdown
@@ -727,7 +736,7 @@ async function submitAddAsset(){
   }).filter(e=>e.data);
 
   logEntries.push({asset_id:displayId,user_email:currentUser.email,field:'Status',data:statusData});
-  if(logEntries.length)await db.from('ins_log').insert(logEntries);
+  if(logEntries.length)await db.from(getCatTables().log).insert(logEntries);
 
   closeModal('add-modal');
   showToast('Asset added ✓');
