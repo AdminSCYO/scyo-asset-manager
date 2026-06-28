@@ -29,6 +29,10 @@
     /* APP */
     #app{display:none;height:100vh;flex-direction:column;overflow:hidden;}
     #app.visible{display:flex;}
+    #perc-view{display:none;flex:1;overflow:auto;min-height:0;}
+    #perc-view.visible{display:block;}
+    #eq-view{display:none;flex:1;overflow:auto;padding:1.25rem;}
+    #eq-view.visible{display:block;}
 
     /* HEADER */
     header{background:var(--navy);display:flex;align-items:center;justify-content:space-between;padding:.6rem 1.25rem;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.25);}
@@ -172,8 +176,6 @@
     @media print{header,.cat-nav,.toolbar,.no-print{display:none!important;}body{background:white;}}
 
     /* EQUIPMENT VIEW */
-    #eq-view{display:none;flex:1;overflow:auto;padding:1.25rem;}
-    #eq-view.visible{display:block;}
     .eq-toolbar{background:white;border-bottom:1px solid var(--grey-200);padding:.6rem 1.25rem;display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;}
     .eq-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem;padding:1.25rem;}
     .eq-card{background:white;border-radius:var(--radius);border:1.5px solid var(--grey-200);padding:1rem;cursor:pointer;transition:border-color .15s,box-shadow .15s;}
@@ -283,7 +285,7 @@
     </div>
     <button class="btn btn-primary" onclick="openAddPercModal()">+ Add Asset</button>
   </div>
-  <div id="perc-view" style="display:none;flex:1;overflow:auto;min-height:0;">
+  <div id="perc-view">
     <table id="perc-table" style="width:100%;border-collapse:collapse;">
       <thead id="perc-thead"></thead>
       <tbody id="perc-tbody"></tbody>
@@ -1270,7 +1272,7 @@ function showPercView(){
   document.getElementById('eq-toolbar').style.display='none';
   document.getElementById('eq-view').classList.remove('visible');
   document.getElementById('perc-toolbar').style.display='flex';
-  document.getElementById('perc-view').style.display='block';
+  document.getElementById('perc-view').classList.add('visible');
   ['perc-add-modal','perc-item-modal','perc-types-modal'].forEach(id=>closeModal(id));
 }
 
@@ -1610,7 +1612,7 @@ function showEquipmentView(){
   document.querySelector('.toolbar').style.display='none';
   document.querySelector('main').style.display='none';
   document.getElementById('perc-toolbar').style.display='none';
-  document.getElementById('perc-view').style.display='none';
+  document.getElementById('perc-view').classList.remove('visible');
   document.getElementById('eq-toolbar').style.display='flex';
   document.getElementById('eq-view').classList.add('visible');
   ['perc-add-modal','perc-item-modal','perc-types-modal','edit-modal','add-modal'].forEach(id=>closeModal(id));
