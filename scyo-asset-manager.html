@@ -270,12 +270,12 @@
       <button class="btn-close" onclick="closeModal('add-modal')">✕</button>
     </div>
     <div style="padding:1.25rem;overflow-y:auto;max-height:70vh;">
-      <div class="fg">
-        <label>Asset ID *</label>
-        <input type="text" id="add-id" placeholder="e.g. INS-bassoon-001"/>
-        <div style="font-size:.72rem;color:var(--grey-400);margin-top:.3rem;">Format: INS-[type]-[number]</div>
-      </div>
       <div id="add-fields"></div>
+      <div class="fg" id="add-id-wrap">
+        <label>Asset ID *</label>
+        <input type="text" id="add-id" placeholder="Auto-generated from Item name"/>
+        <div style="font-size:.72rem;color:var(--grey-400);margin-top:.3rem;" id="add-id-hint"></div>
+      </div>
       <button class="btn btn-primary" style="width:100%;justify-content:center;padding:.75rem;margin-top:.5rem;" onclick="submitAddAsset()">Add Asset</button>
     </div>
   </div>
@@ -670,31 +670,63 @@ async function _writeStatus(assetId,data){
 // ── ADD ASSET ─────────────────────────────────────────────────
 function openAddModal(){
   document.getElementById('add-id').value='';
-  document.getElementById('add-fields').innerHTML=fields.map(f=>{
-    if(f.name==='Status'){
+  document.getElementById('add-id-hint').textContent='';
+  const cat=allCategories.find(c=>c.id===currentCatId);
+  const prefix=(cat?.prefix||'INS').toUpperCase();
+
+  // Item field first (pulled out of the loop so we can wire up auto-ID)
+  const itemField=fields.find(f=>f.name==='Item');
+  const otherFields=fields.filter(f=>f.name!=='Item');
+
+  document.getElementById('add-fields').innerHTML=`
+    ${itemField?`<div class="fg">
+      <label>ITEM${itemField.required?'<span style="color:var(--danger);margin-left:2px;">*</span>':''}</label>
+      <input type="text" id="add-f-item" placeholder="Item" oninput="generateAssetId('${prefix}')"/>
+    </div>`:''}
+    ${otherFields.map(f=>{
+      if(f.name==='Status'){
+        return`<div class="fg">
+          <label>STATUS</label>
+          <select id="add-status-type" onchange="renderAddStatusDetail()" style="margin-bottom:.4rem;">
+            <option>Stored at</option>
+            <option>Loaned to</option>
+            <option>Retired</option>
+            <option>Missing</option>
+          </select>
+          <div id="add-status-detail">
+            <input type="text" id="add-status-val" placeholder="Location (e.g. SCYO Storage Room)"/>
+          </div>
+        </div>`;
+      }
       return`<div class="fg">
-        <label>STATUS</label>
-        <select id="add-status-type" onchange="renderAddStatusDetail()" style="margin-bottom:.4rem;">
-          <option>Stored at</option>
-          <option>Loaned to</option>
-          <option>Retired</option>
-          <option>Missing</option>
-        </select>
-        <div id="add-status-detail">
-          <input type="text" id="add-status-val" placeholder="Location (e.g. SCYO Storage Room)"/>
-        </div>
+        <label>${esc(f.name)}${f.required?'<span style="color:var(--danger);margin-left:2px;">*</span>':''}</label>
+        ${f.field_type==='dropdown'?`<select id="add-f-${f.id}"><option value="">Select...</option>${(f.field_options||[]).map(o=>`<option>${esc(o.value)}</option>`).join('')}</select>`:
+          f.field_type==='date'?`<input type="date" id="add-f-${f.id}"/>`:
+          f.field_type==='number'?`<input type="number" id="add-f-${f.id}" placeholder="${esc(f.name)}"/>`:
+          `<input type="text" id="add-f-${f.id}" placeholder="${esc(f.name)}"/>`}
       </div>`;
-    }
-    return`<div class="fg">
-      <label>${esc(f.name)}${f.required?'<span style="color:var(--danger);margin-left:2px;">*</span>':''}</label>
-      ${f.field_type==='dropdown'?`<select id="add-f-${f.id}"><option value="">Select...</option>${(f.field_options||[]).map(o=>`<option>${esc(o.value)}</option>`).join('')}</select>`:
-        f.field_type==='date'?`<input type="date" id="add-f-${f.id}"/>`:
-        f.field_type==='number'?`<input type="number" id="add-f-${f.id}" placeholder="${esc(f.name)}"/>`:
-        `<input type="text" id="add-f-${f.id}" placeholder="${esc(f.name)}"/>`}
-    </div>`;
-  }).join('');
+    }).join('')}
+  `;
   document.getElementById('add-modal').classList.add('open');
-  setTimeout(()=>document.getElementById('add-id').focus(),100);
+  setTimeout(()=>document.getElementById('add-f-item')?.focus(),100);
+}
+
+async function generateAssetId(prefix){
+  const itemVal=document.getElementById('add-f-item')?.value.trim()||'';
+  const hint=document.getElementById('add-id-hint');
+  if(!itemVal){document.getElementById('add-id').value='';hint.textContent='';return;}
+  const slug=itemVal.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+  const base=`${prefix}-${slug}-`;
+  // Find highest existing number for this base
+  const existing=allAssets.filter(a=>a.display_id.startsWith(base));
+  let next=1;
+  existing.forEach(a=>{
+    const n=parseInt(a.display_id.replace(base,''),10);
+    if(!isNaN(n)&&n>=next)next=n+1;
+  });
+  const generated=`${base}${String(next).padStart(3,'0')}`;
+  document.getElementById('add-id').value=generated;
+  hint.textContent=`Auto-generated — edit if needed`;
 }
 
 function renderAddStatusDetail(){
@@ -710,7 +742,9 @@ async function submitAddAsset(){
   const displayId=document.getElementById('add-id').value.trim();
   if(!displayId){showToast('Asset ID required');return;}
   // Check for required fields
-  for(const f of fields){
+  const itemField=fields.find(f=>f.name==='Item');
+  if(itemField?.required&&!document.getElementById('add-f-item')?.value.trim()){showToast('Item is required');return;}
+  for(const f of fields.filter(f=>f.name!=='Item')){
     if(f.required){const el=document.getElementById(`add-f-${f.id}`);if(!el?.value.trim()){showToast(`${f.name} is required`);return;}}
   }
   // Check if ID already exists
@@ -729,11 +763,13 @@ async function submitAddAsset(){
   else if(statusType==='Retired')statusData='Retired';
   else if(statusType==='Missing')statusData='Missing';
 
-  // Log all filled fields (skip Status — handled separately)
-  const logEntries=fields.filter(f=>f.name!=='Status').map(f=>{
+  // Log all filled fields (skip Status and Item — handled separately)
+  const itemVal=document.getElementById('add-f-item')?.value.trim()||'';
+  const logEntries=fields.filter(f=>f.name!=='Status'&&f.name!=='Item').map(f=>{
     const el=document.getElementById(`add-f-${f.id}`);
     return{asset_id:displayId,user_email:currentUser.email,field:f.name,data:el?.value.trim()||null};
   }).filter(e=>e.data);
+  if(itemVal)logEntries.push({asset_id:displayId,user_email:currentUser.email,field:'Item',data:itemVal});
 
   logEntries.push({asset_id:displayId,user_email:currentUser.email,field:'Status',data:statusData});
   if(logEntries.length)await db.from(getCatTables().log).insert(logEntries);
