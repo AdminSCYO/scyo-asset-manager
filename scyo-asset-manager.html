@@ -460,7 +460,6 @@
             Bulk item (group in table view)
           </label>
         </div>
-        <div class="fg"><label>Replacement Value/Unit</label><input type="number" id="perc-new-type-value" placeholder="0.00" min="0" step="0.01"/></div>
         <button class="btn btn-primary" onclick="submitAddPercType()">Add Type</button>
       </div>
     </div>
@@ -1629,7 +1628,7 @@ async function renderPercTypesList(){
     <div style="display:flex;align-items:center;gap:.75rem;padding:.6rem 0;border-bottom:1px solid var(--grey-100);">
       <div style="flex:1;">
         <div style="font-weight:600;font-size:.875rem;">${esc(t.name)}</div>
-        <div style="font-size:.75rem;color:var(--grey-400);">${t.is_bulk?'Bulk':'Individual'}${t.replacement_value_per_unit?` · $${parseFloat(t.replacement_value_per_unit).toLocaleString('en-AU',{minimumFractionDigits:2})}/unit`:''}</div>
+        <div style="font-size:.75rem;color:var(--grey-400);">${t.is_bulk?'Bulk':'Individual'}</div>
       </div>
       <label style="display:flex;align-items:center;gap:.35rem;font-size:.78rem;cursor:pointer;">
         <input type="checkbox" ${t.is_bulk?'checked':''} onchange="updatePercType('${t.id}','is_bulk',this.checked)" style="width:auto;padding:0;border:none;"/> Bulk
@@ -1645,12 +1644,10 @@ async function renderPercTypesList(){
 async function submitAddPercType(){
   const name=document.getElementById('perc-new-type-name').value.trim();
   const isBulk=document.getElementById('perc-new-type-bulk').checked;
-  const value=document.getElementById('perc-new-type-value').value;
   if(!name){showToast('Type name required');return;}
-  await db.from('perc_types').insert({name,is_bulk:isBulk,replacement_value_per_unit:value?parseFloat(value):null,sort_order:percTypes.length});
+  await db.from('perc_types').insert({name,is_bulk:isBulk,sort_order:percTypes.length});
   document.getElementById('perc-new-type-name').value='';
   document.getElementById('perc-new-type-bulk').checked=false;
-  document.getElementById('perc-new-type-value').value='';
   await renderPercTypesList();
   showToast('Type added ✓');
 }
