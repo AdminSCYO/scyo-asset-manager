@@ -1763,8 +1763,6 @@ async function loadLibData(){
     db.from('library_ensembles').select('*').order('sort_order')
   ]);
   libPieces=pieces||[];libBorrows=borrows||[];libPerformances=perfs||[];libEnsembles=ensembles||[];
-  const savedCat=sessionStorage.getItem('scyo-lib-cat');
-  if(savedCat&&['Band','Strings','Orchestra','Jazz Band'].includes(savedCat))libActiveCat=savedCat;
   showLibView();
   renderLibCatTabs();
   renderLibCatalogue();
@@ -1882,7 +1880,7 @@ function renderLibCatalogue(){
       ${show('composer')?`<td class="lib-piece-meta">${esc(p.composer||'—')}</td>`:''}
       ${show('level')?`<td class="lib-piece-stat">${fmtLevel(p.level)}</td>`:''}
       ${show('purchased')?`<td class="lib-piece-stat">${p.date_purchased?p.date_purchased.slice(0,7):'—'}</td>`:''}
-      ${show('usage')?`<td class="lib-piece-stat">${borrows>0?`Borrowed ${borrows}x, incl. ${perfs} perf.`:'Not used'}</td>`:''}
+      ${show('usage')?`<td class="lib-piece-stat">${borrows>0?'Borrowed '+borrows+'x, incl. '+perfs+' perf.':'Not used'}</td>`:''}
     </tr>`;
   }).join('');
 
