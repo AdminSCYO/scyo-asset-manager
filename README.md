@@ -1,0 +1,1 @@
+# scyo-asset-manager
