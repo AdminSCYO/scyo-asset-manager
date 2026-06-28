@@ -242,7 +242,7 @@
   <div class="toolbar">
     <div class="search-wrap">
       <span class="si">🔍</span>
-      <input type="text" id="search-input" placeholder="Search..." oninput="filterTable()"/>
+      <input type="text" id="search-input" placeholder="Search..." oninput="filterTable()" style="padding-left:2.2rem;"/>
     </div>
     <div class="filter-wrap" style="position:relative;">
       <button class="btn btn-ghost" id="status-picker-btn" onclick="toggleStatusPicker()">Status ▾</button>
@@ -277,7 +277,7 @@
   <div id="perc-toolbar" style="display:none;background:white;border-bottom:1px solid var(--grey-200);padding:.6rem 1.25rem;align-items:center;gap:.75rem;flex-wrap:wrap;">
     <div class="search-wrap" style="flex:1;min-width:180px;">
       <span class="si">🔍</span>
-      <input type="text" id="perc-search" placeholder="Search..." oninput="renderPercView()"/>
+      <input type="text" id="perc-search" placeholder="Search..." oninput="renderPercView()" style="padding-left:2.2rem;"/>
     </div>
     <button class="btn btn-primary" onclick="openAddPercModal()">+ Add Asset</button>
   </div>
