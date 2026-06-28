@@ -172,6 +172,38 @@
     .col-picker-wrap{position:relative;}
 
     @media print{header,.cat-nav,.toolbar,.no-print{display:none!important;}body{background:white;}}
+
+    /* EQUIPMENT VIEW */
+    #eq-view{display:none;flex:1;overflow:auto;padding:1.25rem;}
+    #eq-view.visible{display:block;}
+    .eq-toolbar{background:white;border-bottom:1px solid var(--grey-200);padding:.6rem 1.25rem;display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;}
+    .eq-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem;padding:1.25rem;}
+    .eq-card{background:white;border-radius:var(--radius);border:1.5px solid var(--grey-200);padding:1rem;cursor:pointer;transition:border-color .15s,box-shadow .15s;}
+    .eq-card:hover{border-color:var(--navy);box-shadow:var(--shadow);}
+    .eq-card.retired{opacity:.5;}
+    .eq-card-name{font-weight:700;font-size:.95rem;color:var(--navy);margin-bottom:.4rem;}
+    .eq-card-meta{font-size:.78rem;color:var(--grey-600);display:flex;gap:1rem;flex-wrap:wrap;}
+    .eq-card-qty{font-size:1.4rem;font-weight:900;color:var(--navy);margin:.4rem 0 .1rem;}
+    .eq-card-val{font-size:.75rem;color:var(--grey-400);}
+    .eq-empty{text-align:center;padding:3rem;color:var(--grey-400);grid-column:1/-1;}
+
+    /* EQUIPMENT MODAL */
+    .eq-modal .modal{max-width:780px;}
+    .eq-loc-table{width:100%;border-collapse:collapse;font-size:.85rem;margin-bottom:.75rem;}
+    .eq-loc-table th{background:var(--grey-50);border-bottom:2px solid var(--grey-200);padding:.5rem .75rem;text-align:left;font-weight:700;color:var(--grey-600);font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;}
+    .eq-loc-table td{padding:.5rem .75rem;border-bottom:1px solid var(--grey-100);}
+    .eq-qty-btn{background:var(--grey-100);border:none;border-radius:5px;padding:.3rem .65rem;font-size:.82rem;font-weight:600;cursor:pointer;color:var(--navy);font-family:'Inter',sans-serif;}
+    .eq-qty-btn:hover{background:var(--grey-200);}
+    .eq-total-row td{font-weight:700;color:var(--navy);background:var(--grey-50);}
+    .eq-section-title{font-size:.75rem;font-weight:700;color:var(--grey-600);text-transform:uppercase;letter-spacing:.04em;margin:.75rem 0 .4rem;}
+    .eq-hist-item{padding:.5rem 0;border-bottom:1px solid var(--grey-100);font-size:.82rem;}
+    .eq-hist-item:last-child{border-bottom:none;}
+    .eq-hist-action{font-weight:700;color:var(--navy);}
+    .eq-hist-note{color:var(--grey-800);margin:.1rem 0;}
+    .eq-hist-meta{font-size:.72rem;color:var(--grey-400);}
+
+    /* QTY ADJUST MODAL */
+    .adj-modal .modal{max-width:420px;}
   </style>
 </head>
 <body>
@@ -244,6 +276,21 @@
       </table>
     </div>
   </main>
+
+  <!-- EQUIPMENT VIEW -->
+  <div class="eq-toolbar" id="eq-toolbar" style="display:none;">
+    <div class="search-wrap" style="flex:1;min-width:180px;">
+      <span class="si">🔍</span>
+      <input type="text" id="eq-search" placeholder="Search equipment..." oninput="renderEquipmentGrid()"/>
+    </div>
+    <label style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;font-weight:500;color:var(--grey-600);cursor:pointer;">
+      <input type="checkbox" id="eq-show-retired" onchange="renderEquipmentGrid()" style="width:auto;padding:0;border:none;"/> Show retired
+    </label>
+    <button class="btn btn-primary" onclick="openAddEquipmentModal()">+ Add Item</button>
+  </div>
+  <div id="eq-view">
+    <div class="eq-grid" id="eq-grid"></div>
+  </div>
 </div>
 
 <!-- EDIT MODAL -->
@@ -299,6 +346,95 @@
       <button class="btn-close" onclick="closeModal('action-modal')">✕</button>
     </div>
     <div style="padding:1.25rem;overflow-y:auto;max-height:70vh;" id="action-modal-body"></div>
+  </div>
+</div>
+
+<!-- EQUIPMENT ITEM MODAL -->
+<div class="modal-backdrop eq-modal" id="eq-item-modal">
+  <div class="modal" style="max-width:780px;">
+    <div class="modal-header">
+      <span class="modal-title" id="eq-item-modal-title">Item</span>
+      <button class="btn-close" onclick="closeModal('eq-item-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-fields" id="eq-item-fields" style="overflow-y:auto;"></div>
+      <div class="modal-history" style="width:280px;padding:1.25rem;overflow-y:auto;background:var(--grey-50);border-left:1px solid var(--grey-100);">
+        <div class="hist-title">History</div>
+        <div id="eq-item-history"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD EQUIPMENT MODAL -->
+<div class="modal-backdrop" id="eq-add-modal">
+  <div class="modal" style="max-width:460px;">
+    <div class="modal-header">
+      <span class="modal-title">Add Equipment Item</span>
+      <button class="btn-close" onclick="closeModal('eq-add-modal')">✕</button>
+    </div>
+    <div style="padding:1.25rem;overflow-y:auto;max-height:70vh;">
+      <div class="fg">
+        <label>Item Name *</label>
+        <input type="text" id="eq-add-name" placeholder="e.g. Music Stand" oninput="generateEqId()"/>
+      </div>
+      <div class="fg">
+        <label>Item ID *</label>
+        <input type="text" id="eq-add-id" placeholder="Auto-generated"/>
+        <div style="font-size:.72rem;color:var(--grey-400);margin-top:.3rem;" id="eq-add-id-hint"></div>
+      </div>
+      <div class="fg">
+        <label>Replacement Value (Insurance) per unit</label>
+        <input type="number" id="eq-add-value" placeholder="0.00" min="0" step="0.01"/>
+      </div>
+      <div class="fg">
+        <label>Notes</label>
+        <textarea id="eq-add-notes" placeholder="General notes about this item..." style="height:80px;resize:vertical;"></textarea>
+      </div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;padding:.75rem;" onclick="submitAddEquipment()">Add Item</button>
+    </div>
+  </div>
+</div>
+
+<!-- QTY ADJUST MODAL -->
+<div class="modal-backdrop adj-modal" id="eq-adj-modal">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header">
+      <span class="modal-title" id="eq-adj-title">Adjust Quantity</span>
+      <button class="btn-close" onclick="closeModal('eq-adj-modal')">✕</button>
+    </div>
+    <div style="padding:1.25rem;">
+      <div class="fg">
+        <label>New Quantity *</label>
+        <input type="number" id="eq-adj-qty" min="0" placeholder="0"/>
+        <div style="font-size:.72rem;color:var(--grey-400);margin-top:.3rem;" id="eq-adj-current"></div>
+      </div>
+      <div class="fg">
+        <label>Reason * <span style="font-weight:400;text-transform:none;letter-spacing:0;">(required — e.g. "Purchased 5 new stands")</span></label>
+        <textarea id="eq-adj-note" placeholder="Explain why the quantity is changing..." style="height:80px;resize:vertical;"></textarea>
+      </div>
+      <div style="display:flex;gap:.5rem;">
+        <button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="submitQtyAdjust()">Save</button>
+        <button class="btn btn-ghost" style="flex:1;justify-content:center;" onclick="closeModal('eq-adj-modal')">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD LOCATION MODAL -->
+<div class="modal-backdrop" id="eq-loc-modal">
+  <div class="modal" style="max-width:380px;">
+    <div class="modal-header">
+      <span class="modal-title">Add Location</span>
+      <button class="btn-close" onclick="closeModal('eq-loc-modal')">✕</button>
+    </div>
+    <div style="padding:1.25rem;">
+      <div class="fg">
+        <label>Location Name *</label>
+        <input type="text" id="eq-loc-name" placeholder="e.g. SCYO Storage Room"/>
+      </div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="submitAddLocation()">Add Location</button>
+    </div>
   </div>
 </div>
 
@@ -367,6 +503,12 @@ function getCatTables(){
 }
 
 async function loadCategoryData(){
+  const cat=allCategories.find(c=>c.id===currentCatId);
+  const prefix=(cat?.prefix||'INS').toUpperCase();
+  if(prefix==='EQP'){
+    await loadEquipmentData();
+    return;
+  }
   const{assets:aTable,log:lTable}=getCatTables();
   const[{data:assets},{data:log}]=await Promise.all([
     db.from(aTable).select('*').order('created_at'),
@@ -374,8 +516,8 @@ async function loadCategoryData(){
   ]);
   allAssets=assets||[];
   allLog=log||[];
-  const cat=allCategories.find(c=>c.id===currentCatId);
   fields=cat?.category_fields||[];
+  showStandardView();
   renderTable();
   renderColPicker();
 }
@@ -1053,6 +1195,307 @@ function fmtDate(iso){if(!iso)return'';return new Date(iso).toLocaleDateString('
 let _tt;function showToast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),2800);}
 
 ['edit-modal','add-modal','settings-modal','action-modal'].forEach(id=>{
+  document.getElementById(id).addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal(id);});
+});
+
+// ── EQUIPMENT ─────────────────────────────────────────────────
+let eqItems=[],eqLocations=[],eqStock=[],eqLog=[];
+let _adjItemId=null,_adjLocId=null,_adjLocName='',_adjCurrentQty=0;
+let _openEqItemId=null;
+
+function showStandardView(){
+  document.getElementById('eq-toolbar').style.display='none';
+  document.getElementById('eq-view').classList.remove('visible');
+  document.querySelector('.toolbar').style.display='';
+  document.querySelector('main').style.display='';
+}
+
+function showEquipmentView(){
+  document.querySelector('.toolbar').style.display='none';
+  document.querySelector('main').style.display='none';
+  document.getElementById('eq-toolbar').style.display='flex';
+  document.getElementById('eq-view').classList.add('visible');
+}
+
+async function loadEquipmentData(){
+  const[{data:items},{data:locs},{data:stock},{data:log}]=await Promise.all([
+    db.from('eq_items').select('*').order('name'),
+    db.from('eq_locations').select('*').order('sort_order'),
+    db.from('eq_stock').select('*'),
+    db.from('eq_log').select('*').order('timestamp',{ascending:false})
+  ]);
+  eqItems=items||[];
+  eqLocations=locs||[];
+  eqStock=stock||[];
+  eqLog=log||[];
+  showEquipmentView();
+  renderEquipmentGrid();
+}
+
+function getItemTotalQty(itemId){
+  return eqStock.filter(s=>s.item_id===itemId).reduce((sum,s)=>sum+(s.qty||0),0);
+}
+
+function renderEquipmentGrid(){
+  const q=(document.getElementById('eq-search')?.value||'').toLowerCase();
+  const showRetired=document.getElementById('eq-show-retired')?.checked;
+  const filtered=eqItems.filter(item=>{
+    if(item.retired&&!showRetired)return false;
+    if(q&&!item.name.toLowerCase().includes(q)&&!item.display_id.toLowerCase().includes(q))return false;
+    return true;
+  });
+  const grid=document.getElementById('eq-grid');
+  if(!filtered.length){grid.innerHTML='<div class="eq-empty">No equipment found.</div>';return;}
+  grid.innerHTML=filtered.map(item=>{
+    const total=getItemTotalQty(item.id);
+    const totalVal=item.replacement_value_per_unit?'$'+(total*item.replacement_value_per_unit).toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';
+    return`<div class="eq-card${item.retired?' retired':''}" onclick="openEqItemModal('${item.id}')">
+      <div class="eq-card-name">${esc(item.name)}${item.retired?'<span style="font-size:.72rem;font-weight:400;color:var(--grey-400);margin-left:.5rem;">Retired</span>':''}</div>
+      <div style="font-size:.72rem;font-family:monospace;color:var(--grey-400);margin-bottom:.35rem;">${esc(item.display_id)}</div>
+      <div class="eq-card-qty">${total} <span style="font-size:.82rem;font-weight:500;color:var(--grey-400);">units</span></div>
+      <div class="eq-card-meta">
+        <span>Total value: ${totalVal}</span>
+        ${item.replacement_value_per_unit?`<span>$${parseFloat(item.replacement_value_per_unit).toLocaleString('en-AU',{minimumFractionDigits:2})}/unit</span>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function openEqItemModal(itemId){
+  _openEqItemId=itemId;
+  const item=eqItems.find(i=>i.id===itemId);
+  if(!item)return;
+  document.getElementById('eq-item-modal-title').textContent=item.name;
+  renderEqItemFields(item);
+  renderEqItemHistory(itemId);
+  document.getElementById('eq-item-modal').classList.add('open');
+}
+
+function renderEqItemFields(item){
+  const stockRows=eqStock.filter(s=>s.item_id===item.id&&s.qty>0);
+  const total=getItemTotalQty(item.id);
+  const totalVal=item.replacement_value_per_unit?(total*item.replacement_value_per_unit).toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2}):null;
+
+  // Location rows
+  const locRows=stockRows.map(s=>{
+    const loc=eqLocations.find(l=>l.id===s.location_id);
+    return`<tr>
+      <td>${esc(loc?.name||'Unknown')}</td>
+      <td style="font-weight:700;">${s.qty}</td>
+      <td style="font-size:.75rem;color:var(--grey-400);">${s.updated_by?esc(s.updated_by.split('@')[0]):''} ${s.updated_at?fmtDate(s.updated_at):''}</td>
+      <td><button class="eq-qty-btn" onclick="openQtyAdjust('${item.id}','${s.location_id}','${esc(loc?.name||'')}',${s.qty})">Adjust</button></td>
+    </tr>`;
+  }).join('');
+
+  // Available locations not yet used (or all if none)
+  const usedLocIds=stockRows.map(s=>s.location_id);
+  const availLocs=eqLocations.filter(l=>!usedLocIds.includes(l.id));
+  const addLocOptions=availLocs.map(l=>`<option value="${l.id}">${esc(l.name)}</option>`).join('');
+
+  document.getElementById('eq-item-fields').innerHTML=`
+    <div class="field-row">
+      <div class="field-label">Item ID</div>
+      <div class="field-val" style="font-family:monospace;font-size:.85rem;">${esc(item.display_id)}</div>
+    </div>
+    <div class="field-row">
+      <div class="field-label">Repl. Value/Unit</div>
+      <div class="field-val">
+        <input class="field-input" id="eq-edit-value" type="number" value="${item.replacement_value_per_unit||''}" placeholder="0.00" min="0" step="0.01" onblur="saveEqField('${item.id}','replacement_value_per_unit',this.value)"/>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field-label">Notes</div>
+      <div class="field-val">
+        <input class="field-input" id="eq-edit-notes" type="text" value="${esc(item.notes||'')}" placeholder="General notes..." onblur="saveEqField('${item.id}','notes',this.value)"/>
+      </div>
+    </div>
+    <div style="margin-top:.75rem;">
+      <div class="eq-section-title">Stock by Location</div>
+      <table class="eq-loc-table">
+        <thead><tr><th>Location</th><th>Qty</th><th>Last Updated</th><th></th></tr></thead>
+        <tbody>
+          ${locRows||'<tr><td colspan="4" style="color:var(--grey-400);font-size:.82rem;padding:.75rem;">No stock yet — add a location below.</td></tr>'}
+          <tr class="eq-total-row"><td>Total</td><td>${total}</td><td colspan="2">${totalVal?`<span style="color:var(--grey-600);">$${totalVal} total value</span>`:''}</td></tr>
+        </tbody>
+      </table>
+      <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-top:.5rem;">
+        ${availLocs.length?`
+          <select id="eq-add-loc-select" style="padding:.4rem .6rem;border:1.5px solid var(--grey-200);border-radius:6px;font-family:'Inter',sans-serif;font-size:.82rem;outline:none;">
+            <option value="">Add stock at location…</option>
+            ${addLocOptions}
+          </select>
+          <button class="btn btn-ghost btn-sm" onclick="openQtyAdjustNewLoc('${item.id}')">+ Add</button>
+        `:''}
+        <button class="btn btn-ghost btn-sm" onclick="openAddLocationModal()">+ New Location</button>
+      </div>
+    </div>
+    ${!item.retired?`<div style="margin-top:1.25rem;padding-top:1rem;border-top:1px solid var(--grey-100);">
+      <button class="btn btn-danger btn-sm" onclick="retireEqItem('${item.id}')">Retire this item</button>
+    </div>`:`<div style="margin-top:1.25rem;padding-top:1rem;border-top:1px solid var(--grey-100);">
+      <button class="btn btn-ghost btn-sm" onclick="unretireEqItem('${item.id}')">Unretire</button>
+    </div>`}
+  `;
+}
+
+function renderEqItemHistory(itemId){
+  const logs=eqLog.filter(l=>l.item_id===itemId);
+  document.getElementById('eq-item-history').innerHTML=logs.length?logs.slice(0,30).map(l=>`
+    <div class="eq-hist-item">
+      <div class="eq-hist-action">${esc(l.action||'')}</div>
+      <div class="eq-hist-note">${esc(l.note||'')}</div>
+      <div class="eq-hist-meta">${esc(l.user_email||'')} · ${fmtDate(l.timestamp)}</div>
+    </div>
+  `).join(''):'<div style="color:var(--grey-400);font-size:.82rem;">No history yet.</div>';
+}
+
+async function saveEqField(itemId,field,value){
+  const parsed=field==='replacement_value_per_unit'?(value?parseFloat(value):null):value;
+  await db.from('eq_items').update({[field]:parsed}).eq('id',itemId);
+  await db.from('eq_log').insert({item_id:itemId,user_email:currentUser.email,action:`Updated ${field.replace(/_/g,' ')}`,note:`Set to: ${value||'(cleared)'}`,data:{field,value}});
+  const{data}=await db.from('eq_items').select('*').eq('id',itemId).single();
+  eqItems=eqItems.map(i=>i.id===itemId?data:i);
+  const{data:log}=await db.from('eq_log').select('*').order('timestamp',{ascending:false});
+  eqLog=log||[];
+  renderEqItemHistory(itemId);
+  renderEquipmentGrid();
+  showToast('Saved ✓');
+}
+
+function openQtyAdjust(itemId,locId,locName,currentQty){
+  _adjItemId=itemId;_adjLocId=locId;_adjLocName=locName;_adjCurrentQty=currentQty;
+  document.getElementById('eq-adj-title').textContent=`Adjust — ${locName}`;
+  document.getElementById('eq-adj-qty').value='';
+  document.getElementById('eq-adj-note').value='';
+  document.getElementById('eq-adj-current').textContent=`Current qty: ${currentQty}`;
+  document.getElementById('eq-adj-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('eq-adj-qty').focus(),100);
+}
+
+function openQtyAdjustNewLoc(itemId){
+  const sel=document.getElementById('eq-add-loc-select');
+  const locId=sel?.value;
+  const loc=eqLocations.find(l=>l.id===locId);
+  if(!locId||!loc){showToast('Select a location first');return;}
+  openQtyAdjust(itemId,locId,loc.name,0);
+}
+
+async function submitQtyAdjust(){
+  const newQty=parseInt(document.getElementById('eq-adj-qty').value,10);
+  const note=document.getElementById('eq-adj-note').value.trim();
+  if(isNaN(newQty)||newQty<0){showToast('Enter a valid quantity');return;}
+  if(!note){showToast('Reason is required');return;}
+  const diff=newQty-_adjCurrentQty;
+  const action=diff>0?`+${diff} at ${_adjLocName}`:`${diff} at ${_adjLocName}`;
+
+  // Upsert stock row
+  const existing=eqStock.find(s=>s.item_id===_adjItemId&&s.location_id===_adjLocId);
+  if(existing){
+    if(newQty===0){
+      await db.from('eq_stock').delete().eq('id',existing.id);
+    }else{
+      await db.from('eq_stock').update({qty:newQty,updated_at:new Date().toISOString(),updated_by:currentUser.email}).eq('id',existing.id);
+    }
+  }else if(newQty>0){
+    await db.from('eq_stock').insert({item_id:_adjItemId,location_id:_adjLocId,qty:newQty,updated_at:new Date().toISOString(),updated_by:currentUser.email});
+  }
+
+  await db.from('eq_log').insert({item_id:_adjItemId,user_email:currentUser.email,action,note,data:{location_id:_adjLocId,old_qty:_adjCurrentQty,new_qty:newQty}});
+
+  // Reload
+  const[{data:stock},{data:log}]=await Promise.all([
+    db.from('eq_stock').select('*'),
+    db.from('eq_log').select('*').order('timestamp',{ascending:false})
+  ]);
+  eqStock=stock||[];eqLog=log||[];
+  closeModal('eq-adj-modal');
+  const item=eqItems.find(i=>i.id===_adjItemId);
+  if(item)renderEqItemFields(item);
+  renderEqItemHistory(_adjItemId);
+  renderEquipmentGrid();
+  showToast('Quantity updated ✓');
+}
+
+function openAddLocationModal(){
+  document.getElementById('eq-loc-name').value='';
+  document.getElementById('eq-loc-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('eq-loc-name').focus(),100);
+}
+
+async function submitAddLocation(){
+  const name=document.getElementById('eq-loc-name').value.trim();
+  if(!name){showToast('Location name required');return;}
+  const{error}=await db.from('eq_locations').insert({name,sort_order:eqLocations.length});
+  if(error){showToast('Error: '+error.message);return;}
+  const{data:locs}=await db.from('eq_locations').select('*').order('sort_order');
+  eqLocations=locs||[];
+  closeModal('eq-loc-modal');
+  showToast('Location added ✓');
+  if(_openEqItemId){const item=eqItems.find(i=>i.id===_openEqItemId);if(item)renderEqItemFields(item);}
+}
+
+function openAddEquipmentModal(){
+  document.getElementById('eq-add-name').value='';
+  document.getElementById('eq-add-id').value='';
+  document.getElementById('eq-add-id-hint').textContent='';
+  document.getElementById('eq-add-value').value='';
+  document.getElementById('eq-add-notes').value='';
+  document.getElementById('eq-add-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('eq-add-name').focus(),100);
+}
+
+function generateEqId(){
+  const name=document.getElementById('eq-add-name').value.trim();
+  if(!name){document.getElementById('eq-add-id').value='';return;}
+  const slug=name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+  const base=`EQP-${slug}-`;
+  const existing=eqItems.filter(i=>i.display_id.startsWith(base));
+  let next=1;
+  existing.forEach(i=>{const n=parseInt(i.display_id.replace(base,''),10);if(!isNaN(n)&&n>=next)next=n+1;});
+  document.getElementById('eq-add-id').value=`${base}${String(next).padStart(3,'0')}`;
+  document.getElementById('eq-add-id-hint').textContent='Auto-generated — edit if needed';
+}
+
+async function submitAddEquipment(){
+  const name=document.getElementById('eq-add-name').value.trim();
+  const displayId=document.getElementById('eq-add-id').value.trim();
+  const value=document.getElementById('eq-add-value').value;
+  const notes=document.getElementById('eq-add-notes').value.trim();
+  if(!name){showToast('Item name required');return;}
+  if(!displayId){showToast('Item ID required');return;}
+  if(eqItems.find(i=>i.display_id===displayId)){showToast('ID already exists');return;}
+  const{error}=await db.from('eq_items').insert({display_id:displayId,name,replacement_value_per_unit:value?parseFloat(value):null,notes:notes||null});
+  if(error){showToast('Error: '+error.message);return;}
+  await db.from('eq_log').insert({item_id:(await db.from('eq_items').select('id').eq('display_id',displayId).single()).data.id,user_email:currentUser.email,action:'Item created',note:name,data:{display_id:displayId}});
+  const{data:items}=await db.from('eq_items').select('*').order('name');
+  const{data:log}=await db.from('eq_log').select('*').order('timestamp',{ascending:false});
+  eqItems=items||[];eqLog=log||[];
+  closeModal('eq-add-modal');
+  renderEquipmentGrid();
+  showToast('Item added ✓');
+}
+
+async function retireEqItem(itemId){
+  if(!confirm('Retire this item? It will be hidden from the active list.'))return;
+  await db.from('eq_items').update({retired:true,retired_at:new Date().toISOString()}).eq('id',itemId);
+  await db.from('eq_log').insert({item_id:itemId,user_email:currentUser.email,action:'Item retired',note:'',data:{}});
+  const{data:items}=await db.from('eq_items').select('*').order('name');
+  eqItems=items||[];
+  closeModal('eq-item-modal');
+  renderEquipmentGrid();
+  showToast('Item retired ✓');
+}
+
+async function unretireEqItem(itemId){
+  await db.from('eq_items').update({retired:false,retired_at:null}).eq('id',itemId);
+  await db.from('eq_log').insert({item_id:itemId,user_email:currentUser.email,action:'Item unretired',note:'',data:{}});
+  const{data:items}=await db.from('eq_items').select('*').order('name');
+  eqItems=items||[];
+  closeModal('eq-item-modal');
+  renderEquipmentGrid();
+  showToast('Item unretired ✓');
+}
+
+['eq-item-modal','eq-add-modal','eq-adj-modal','eq-loc-modal'].forEach(id=>{
   document.getElementById(id).addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal(id);});
 });
 
