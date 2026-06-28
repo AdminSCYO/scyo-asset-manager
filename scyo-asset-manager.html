@@ -27,7 +27,7 @@
     .auth-note{margin-top:1rem;font-size:.78rem;color:var(--grey-400);}
 
     /* APP */
-    #app{display:none;min-height:100vh;flex-direction:column;}
+    #app{display:none;height:100vh;flex-direction:column;overflow:hidden;}
     #app.visible{display:flex;}
 
     /* HEADER */
@@ -283,7 +283,7 @@
     </div>
     <button class="btn btn-primary" onclick="openAddPercModal()">+ Add Asset</button>
   </div>
-  <div id="perc-view" style="display:none;flex:1;overflow:auto;">
+  <div id="perc-view" style="display:none;flex:1;overflow:auto;min-height:0;">
     <table id="perc-table" style="width:100%;border-collapse:collapse;">
       <thead id="perc-thead"></thead>
       <tbody id="perc-tbody"></tbody>
