@@ -448,6 +448,9 @@
 </div>
 
 <div id="toast"></div>
+
+<!-- EQUIPMENT ITEM MODAL -->
+<div class="modal-backdrop eq-modal" id="eq-item-modal">
   <div class="modal" style="max-width:780px;">
     <div class="modal-header">
       <span class="modal-title" id="eq-item-modal-title">Item</span>
@@ -1254,7 +1257,7 @@ function initDrag(catId){
 }
 
 // ── UTILS ─────────────────────────────────────────────────────
-function closeModal(id){document.getElementById(id).classList.remove('open');}
+function closeModal(id){document.getElementById(id)?.classList.remove('open');}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function fmtDate(iso){if(!iso)return'';return new Date(iso).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});}
 let _tt;function showToast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),2800);}
