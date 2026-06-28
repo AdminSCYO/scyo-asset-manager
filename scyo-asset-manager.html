@@ -1271,6 +1271,7 @@ function showPercView(){
   document.getElementById('eq-view').classList.remove('visible');
   document.getElementById('perc-toolbar').style.display='flex';
   document.getElementById('perc-view').style.display='block';
+  ['perc-add-modal','perc-item-modal','perc-types-modal'].forEach(id=>closeModal(id));
 }
 
 async function loadPercData(){
@@ -1602,13 +1603,17 @@ function showStandardView(){
   document.getElementById('perc-view').style.display='none';
   document.querySelector('.toolbar').style.display='';
   document.querySelector('main').style.display='';
+  ['eq-item-modal','eq-add-modal','eq-loc-modal','perc-add-modal','perc-item-modal','perc-types-modal'].forEach(id=>closeModal(id));
 }
 
 function showEquipmentView(){
   document.querySelector('.toolbar').style.display='none';
   document.querySelector('main').style.display='none';
+  document.getElementById('perc-toolbar').style.display='none';
+  document.getElementById('perc-view').style.display='none';
   document.getElementById('eq-toolbar').style.display='flex';
   document.getElementById('eq-view').classList.add('visible');
+  ['perc-add-modal','perc-item-modal','perc-types-modal','edit-modal','add-modal'].forEach(id=>closeModal(id));
 }
 
 async function loadEquipmentData(){
