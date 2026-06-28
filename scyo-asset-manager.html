@@ -1969,7 +1969,7 @@ function renderLibPieceForm(p=null){
           </div>`
       }
     </div>
-    <div class="fg"><label>External Link</label><textarea id="lib-link" style="height:50px;resize:vertical;word-break:break-all;" ${isEdit?'onblur="autoSaveLibPiece()"':''}>${esc(p?.external_link||'')}</textarea>
+    <div class="fg"><label style="display:flex;align-items:center;justify-content:space-between;">External Link<span id="lib-link-open" style="display:${p?.external_link?'inline':'none'};"><a id="lib-link-open-a" href="${esc(p?.external_link||'')}" target="_blank" style="font-size:.75rem;font-weight:600;color:var(--navy);text-decoration:none;padding:.1rem .4rem;border:1px solid var(--grey-200);border-radius:4px;">Open ↗</a></span></label><textarea id="lib-link" style="height:50px;resize:vertical;word-break:break-all;" oninput="updateLibLinkBtn()" ${isEdit?'onblur="autoSaveLibPiece()"':''}>${esc(p?.external_link||'')}</textarea>
     </div>
     <div class="fg"><label>Notes</label><textarea id="lib-notes" style="height:70px;resize:vertical;" ${isEdit?'onblur="autoSaveLibPiece()"':''}>${esc(p?.notes||'')}</textarea></div>
     ${isEdit?`
@@ -1978,6 +1978,14 @@ function renderLibPieceForm(p=null){
       <button class="btn btn-ghost" style="flex:1;justify-content:center;" onclick="closeModal('lib-piece-modal');openLibPerfModal(libEditPieceId)">+ Log Performance</button>
     </div>`:'<button class="btn btn-primary" style="width:100%;justify-content:center;padding:.75rem;" onclick="submitLibPiece()">Add Piece</button>'}
   `;
+}
+
+function updateLibLinkBtn(){
+  const val=document.getElementById('lib-link')?.value.trim();
+  const span=document.getElementById('lib-link-open');
+  const a=document.getElementById('lib-link-open-a');
+  if(span)span.style.display=val?'inline':'none';
+  if(a&&val)a.href=val;
 }
 
 async function autoSaveLibPiece(){
