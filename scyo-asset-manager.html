@@ -1948,21 +1948,20 @@ function renderLibPieceForm(p=null){
         <option value="99" ${p?.level===99?'selected':''}>Prof</option>
       </select></div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
-      <div class="fg"><label>Date Purchased</label><input type="date" id="lib-date-purchased" value="${p?.date_purchased||''}" onchange="updateLibOwnershipFields()"/></div>
-      <div class="fg" id="lib-ownership-wrap" style="padding-top:1.4rem;">
-        ${p?.date_purchased
-          ? `<span style="font-size:.85rem;color:var(--grey-500);">✓ Owned (purchased)</span>`
-          : `<label style="display:flex;align-items:center;gap:.5rem;text-transform:none;letter-spacing:0;font-size:.875rem;margin:0;cursor:pointer;">
+    <div class="fg"><label>Date Purchased</label><input type="date" id="lib-date-purchased" value="${p?.date_purchased||''}" onchange="updateLibOwnershipFields()"/></div>
+    <div class="fg" id="lib-ownership-wrap">
+      ${p?.date_purchased
+        ? `<div style="display:flex;align-items:center;gap:.5rem;padding:.5rem .75rem;background:#e8f5e9;border-radius:var(--radius);font-size:.85rem;color:#2e7d32;font-weight:600;">✓ Owned — purchased</div>`
+        : `<div style="display:flex;flex-direction:column;gap:.5rem;">
+            <label style="display:flex;align-items:center;gap:.5rem;text-transform:none;letter-spacing:0;font-size:.875rem;margin:0;cursor:pointer;">
               <input type="checkbox" id="lib-not-owned" ${!p?.owned?'checked':''} style="width:auto;padding:0;border:none;" onchange="updateLibOwnershipFields()"/>
               We don't own this piece
-            </label>`
-        }
-      </div>
-    </div>
-    <div class="fg" id="lib-borrowed-from-wrap" style="display:${!p?.date_purchased&&!p?.owned?'block':'none'};">
-      <label>Borrowed from</label>
-      <input type="text" id="lib-borrowed-from" value="${esc(p?.notes?.match(/Borrowed from: ([^\|]+)/)?.[1]?.trim()||'')}" placeholder="e.g. Queensland Symphony Orchestra"/>
+            </label>
+            <div id="lib-borrowed-from-wrap" style="display:${!p?.owned?'block':'none'};">
+              <input type="text" id="lib-borrowed-from" value="${esc(p?.notes?.match(/Borrowed from: ([^|]+)/)?.[1]?.trim()||'')}" placeholder="Borrowed from (e.g. Queensland SO)"/>
+            </div>
+          </div>`
+      }
     </div>
     <div class="fg"><label>External Link</label><input type="url" id="lib-link" value="${esc(p?.external_link||'')}" placeholder="https://..."/></div>
     <div class="fg"><label>Notes</label><textarea id="lib-notes" style="height:70px;resize:vertical;">${esc(p?.notes||'')}</textarea></div>
@@ -1976,19 +1975,21 @@ function renderLibPieceForm(p=null){
 
 function updateLibOwnershipFields(){
   const dateVal=document.getElementById('lib-date-purchased')?.value;
-  const ownershipWrap=document.getElementById('lib-ownership-wrap');
-  const borrowedWrap=document.getElementById('lib-borrowed-from-wrap');
-  if(!ownershipWrap)return;
+  const wrap=document.getElementById('lib-ownership-wrap');
+  if(!wrap)return;
   if(dateVal){
-    ownershipWrap.innerHTML=`<span style="font-size:.85rem;color:var(--grey-500);">✓ Owned (purchased)</span>`;
-    if(borrowedWrap)borrowedWrap.style.display='none';
+    wrap.innerHTML=`<div style="display:flex;align-items:center;gap:.5rem;padding:.5rem .75rem;background:#e8f5e9;border-radius:var(--radius);font-size:.85rem;color:#2e7d32;font-weight:600;">✓ Owned — purchased</div>`;
   }else{
-    ownershipWrap.innerHTML=`<label style="display:flex;align-items:center;gap:.5rem;text-transform:none;letter-spacing:0;font-size:.875rem;margin:0;cursor:pointer;">
-      <input type="checkbox" id="lib-not-owned" style="width:auto;padding:0;border:none;" onchange="updateLibOwnershipFields()"/>
-      We don't own this piece
-    </label>`;
-    const notOwned=document.getElementById('lib-not-owned');
-    if(borrowedWrap)borrowedWrap.style.display=notOwned?.checked?'block':'none';
+    const notOwned=document.getElementById('lib-not-owned')?.checked||false;
+    wrap.innerHTML=`<div style="display:flex;flex-direction:column;gap:.5rem;">
+      <label style="display:flex;align-items:center;gap:.5rem;text-transform:none;letter-spacing:0;font-size:.875rem;margin:0;cursor:pointer;">
+        <input type="checkbox" id="lib-not-owned" ${notOwned?'checked':''} style="width:auto;padding:0;border:none;" onchange="updateLibOwnershipFields()"/>
+        We don't own this piece
+      </label>
+      <div id="lib-borrowed-from-wrap" style="display:${notOwned?'block':'none'};">
+        <input type="text" id="lib-borrowed-from" placeholder="Borrowed from (e.g. Queensland SO)" style="width:100%;"/>
+      </div>
+    </div>`;
   }
 }
 
