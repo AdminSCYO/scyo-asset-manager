@@ -180,19 +180,19 @@
     .lib-view-btn.active{background:var(--navy);color:white;border-color:var(--navy);}
     .lib-cat-tab{padding:.6rem 1.1rem;border:none;border-bottom:2.5px solid transparent;background:none;font-family:'Inter',sans-serif;font-size:.82rem;font-weight:600;color:var(--grey-500);cursor:pointer;transition:color .15s;}
     .lib-cat-tab.active{color:var(--navy);border-bottom-color:var(--gold);}
-    .lib-piece-row{display:grid;grid-template-columns:minmax(200px,2fr) minmax(140px,1fr) 70px 90px 180px;align-items:center;padding:.65rem 1.25rem;border-bottom:1px solid var(--grey-100);cursor:pointer;transition:background .1s;}
-    .lib-piece-row:hover{background:var(--grey-50);}
-    .lib-piece-title{font-weight:600;color:var(--navy);font-size:.88rem;display:flex;align-items:center;gap:.5rem;}
-    .lib-piece-title a{color:var(--navy);text-decoration:none;}
-    .lib-piece-title a:hover{text-decoration:underline;}
+    .lib-piece-row{display:table-row;}
+    .lib-piece-row:hover td{background:var(--grey-50);}
+    .lib-piece-row td{padding:.6rem 1rem;border-bottom:1px solid var(--grey-100);font-size:.85rem;vertical-align:middle;white-space:nowrap;cursor:pointer;}
+    .lib-piece-row td.lib-title-cell{white-space:normal;min-width:200px;}
+    .lib-piece-title{font-weight:600;color:var(--navy);font-size:.88rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;}
     .lib-play-btn{display:inline-flex;align-items:center;gap:.2rem;font-size:.7rem;font-weight:700;padding:.15rem .45rem;border-radius:20px;background:var(--gold);color:var(--navy);text-decoration:none;white-space:nowrap;flex-shrink:0;}
     .lib-play-btn:hover{opacity:.85;}
     .lib-piece-meta{font-size:.8rem;color:var(--grey-500);}
-    .lib-piece-stat{font-size:.78rem;color:var(--grey-500);text-align:center;}
+    .lib-piece-stat{font-size:.78rem;color:var(--grey-500);}
     .lib-not-owned{display:inline-block;font-size:.68rem;font-weight:700;padding:.1rem .35rem;border-radius:3px;background:#fff3cd;color:#856404;text-transform:uppercase;margin-left:.4rem;}
-    .lib-table-header{display:grid;grid-template-columns:minmax(200px,2fr) minmax(140px,1fr) 70px 90px 180px;padding:.4rem 1.25rem;background:var(--grey-50);border-bottom:2px solid var(--grey-200);}
-    .lib-table-header span{font-size:.72rem;font-weight:700;color:var(--grey-500);text-transform:uppercase;letter-spacing:.04em;cursor:pointer;user-select:none;}
-    .lib-table-header span:hover{color:var(--navy);}
+    .lib-catalogue-table{width:auto;border-collapse:collapse;min-width:100%;}
+    .lib-catalogue-table thead th{position:sticky;top:0;background:var(--grey-50);border-bottom:2px solid var(--grey-200);padding:.4rem 1rem;text-align:left;font-size:.72rem;font-weight:700;color:var(--grey-500);text-transform:uppercase;letter-spacing:.04em;cursor:pointer;user-select:none;white-space:nowrap;z-index:5;}
+    .lib-catalogue-table thead th:hover{color:var(--navy);}
     .lib-sort-arrow{margin-left:.25rem;font-size:.65rem;}
     .lib-year-block{margin-bottom:2rem;}
     .lib-year-title{font-size:1.1rem;font-weight:800;color:var(--navy);padding:.75rem 1.25rem;border-bottom:2px solid var(--grey-200);background:var(--grey-50);}
@@ -1714,6 +1714,8 @@ async function loadLibData(){
     db.from('library_ensembles').select('*').order('sort_order')
   ]);
   libPieces=pieces||[];libBorrows=borrows||[];libPerformances=perfs||[];libEnsembles=ensembles||[];
+  const savedCat=sessionStorage.getItem('scyo-lib-cat');
+  if(savedCat&&['Band','Strings','Orchestra','Jazz Band'].includes(savedCat))libActiveCat=savedCat;
   showLibView();
   renderLibCatTabs();
   renderLibCatalogue();
@@ -1759,12 +1761,11 @@ function renderLibCatalogue(){
     return true;
   });
 
-  // Sort
   filtered=[...filtered].sort((a,b)=>{
     let av,bv;
     if(libSortCol==='title'){av=a.title.toLowerCase();bv=b.title.toLowerCase();}
     else if(libSortCol==='composer'){av=(a.composer||'').toLowerCase();bv=(b.composer||'').toLowerCase();}
-    else if(libSortCol==='level'){av=a.level||0;bv=b.level||0;}
+    else if(libSortCol==='level'){av=a.level??-1;bv=b.level??-1;}
     else if(libSortCol==='purchased'){av=a.date_purchased||'';bv=b.date_purchased||'';}
     else if(libSortCol==='usage'){
       av=libBorrows.filter(b=>b.piece_id===a.id).length;
@@ -1777,28 +1778,38 @@ function renderLibCatalogue(){
 
   const arr=col=>libSortCol===col?(libSortAsc?'▲':'▼'):'';
   const container=document.getElementById('lib-catalogue');
-  const header=`<div class="lib-table-header">
-    <span onclick="libSortBy('title')">Title<span class="lib-sort-arrow">${arr('title')}</span></span>
-    <span onclick="libSortBy('composer')">Composer<span class="lib-sort-arrow">${arr('composer')}</span></span>
-    <span onclick="libSortBy('level')" style="text-align:center;">Level<span class="lib-sort-arrow">${arr('level')}</span></span>
-    <span onclick="libSortBy('purchased')" style="text-align:center;">Purchased<span class="lib-sort-arrow">${arr('purchased')}</span></span>
-    <span onclick="libSortBy('usage')">Usage<span class="lib-sort-arrow">${arr('usage')}</span></span>
-  </div>`;
 
-  if(!filtered.length){container.innerHTML=header+`<div style="text-align:center;padding:3rem;color:var(--grey-400);">No pieces in ${libActiveCat} yet.</div>`;return;}
+  if(!filtered.length){
+    container.innerHTML=`<table class="lib-catalogue-table"><thead><tr>
+      <th onclick="libSortBy('title')">Title<span class="lib-sort-arrow">${arr('title')}</span></th>
+      <th onclick="libSortBy('composer')">Composer<span class="lib-sort-arrow">${arr('composer')}</span></th>
+      <th onclick="libSortBy('level')">Level<span class="lib-sort-arrow">${arr('level')}</span></th>
+      <th onclick="libSortBy('purchased')">Purchased<span class="lib-sort-arrow">${arr('purchased')}</span></th>
+      <th onclick="libSortBy('usage')">Usage in last 10 years<span class="lib-sort-arrow">${arr('usage')}</span></th>
+    </tr></thead></table><div style="text-align:center;padding:3rem;color:var(--grey-400);">No pieces in ${libActiveCat} yet.</div>`;
+    return;
+  }
 
-  container.innerHTML=header+filtered.map(p=>{
+  const rows=filtered.map(p=>{
     const borrows=libBorrows.filter(b=>b.piece_id===p.id).length;
     const perfs=libPerformances.filter(pf=>pf.piece_id===p.id).length;
     const playBtn=p.external_link?`<a class="lib-play-btn" href="${esc(p.external_link)}" target="_blank" onclick="event.stopPropagation()" title="Preview score">▶ Play</a>`:'';
-    return`<div class="lib-piece-row" onclick="openEditLibPiece('${p.id}')">
-      <div class="lib-piece-title">${esc(p.title)}${!p.owned?'<span class="lib-not-owned">Not owned</span>':''}${playBtn}</div>
-      <div class="lib-piece-meta">${esc(p.composer||'—')}</div>
-      <div class="lib-piece-stat">${p.level||'—'}</div>
-      <div class="lib-piece-stat">${p.date_purchased?p.date_purchased.slice(0,7):'—'}</div>
-      <div class="lib-piece-stat">${borrows>0?`Borrowed ${borrows}x, incl. ${perfs} perf.`:'Not used'}</div>
-    </div>`;
+    return`<tr class="lib-piece-row" onclick="openEditLibPiece('${p.id}')">
+      <td class="lib-title-cell"><div class="lib-piece-title">${esc(p.title)}${!p.owned?'<span class="lib-not-owned">Not owned</span>':''}${playBtn}</div></td>
+      <td class="lib-piece-meta">${esc(p.composer||'—')}</td>
+      <td class="lib-piece-stat">${p.level??'—'}</td>
+      <td class="lib-piece-stat">${p.date_purchased?p.date_purchased.slice(0,7):'—'}</td>
+      <td class="lib-piece-stat">${borrows>0?`Borrowed ${borrows}x, incl. ${perfs} perf.`:'Not used'}</td>
+    </tr>`;
   }).join('');
+
+  container.innerHTML=`<table class="lib-catalogue-table"><thead><tr>
+    <th onclick="libSortBy('title')">Title<span class="lib-sort-arrow">${arr('title')}</span></th>
+    <th onclick="libSortBy('composer')">Composer<span class="lib-sort-arrow">${arr('composer')}</span></th>
+    <th onclick="libSortBy('level')">Level<span class="lib-sort-arrow">${arr('level')}</span></th>
+    <th onclick="libSortBy('purchased')">Purchased<span class="lib-sort-arrow">${arr('purchased')}</span></th>
+    <th onclick="libSortBy('usage')">Usage in last 10 years<span class="lib-sort-arrow">${arr('usage')}</span></th>
+  </tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 function renderLibHistory(){
