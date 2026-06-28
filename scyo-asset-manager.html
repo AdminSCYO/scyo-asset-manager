@@ -206,12 +206,7 @@
     </div>
   </header>
 
-  <nav class="cat-nav">
-    <button class="active" onclick="selectCategory('ins')">Instruments for Loan</button>
-    <button class="disabled" onclick="showToast('Coming soon')">Percussion &amp; Auxiliary</button>
-    <button class="disabled" onclick="showToast('Coming soon')">Equipment</button>
-    <button class="disabled" onclick="showToast('Coming soon')">Stock</button>
-    <button class="disabled" onclick="showToast('Coming soon')">Music Library</button>
+  <nav class="cat-nav" id="cat-nav">
   </nav>
 
   <div class="toolbar">
@@ -290,7 +285,7 @@
 <div class="modal-backdrop settings-modal" id="settings-modal">
   <div class="modal" style="max-width:620px;">
     <div class="modal-header">
-      <span class="modal-title">Settings — Instruments for Loan</span>
+      <span class="modal-title" id="settings-modal-title">Settings</span>
       <button class="btn-close" onclick="closeModal('settings-modal')">✕</button>
     </div>
     <div style="padding:1.25rem;overflow-y:auto;max-height:75vh;">
@@ -351,6 +346,13 @@ async function loadCategories(){
   allCategories=(data||[]).map(c=>({...c,category_fields:(c.category_fields||[]).sort((a,b)=>a.sort_order-b.sort_order).map(f=>({...f,field_options:(f.field_options||[]).sort((a,b)=>a.sort_order-b.sort_order)}))}));
   // Default to first category
   if(!currentCatId&&allCategories.length)currentCatId=allCategories[0].id;
+  renderCatNav();
+}
+
+function renderCatNav(){
+  document.getElementById('cat-nav').innerHTML=allCategories.map(c=>`
+    <button class="${c.id===currentCatId?'active':''}" onclick="selectCategoryById('${c.id}')">${esc(c.name)}</button>
+  `).join('');
 }
 
 async function loadCategoryData(){
@@ -383,9 +385,17 @@ function getAssetHistory(assetId){
 }
 
 // ── CATEGORY SELECT ───────────────────────────────────────────
+async function selectCategoryById(id){
+  currentCatId=id;
+  renderCatNav();
+  await loadCategoryData();
+  const cat=allCategories.find(c=>c.id===id);
+  document.querySelector('.modal-title').textContent=`Settings — ${cat?.name||''}`;
+}
+
 async function selectCategory(prefix){
   const cat=allCategories.find(c=>c.prefix===prefix.toUpperCase());
-  if(cat){currentCatId=cat.id;await loadCategoryData();}
+  if(cat){currentCatId=cat.id;renderCatNav();await loadCategoryData();}
 }
 
 // ── TABLE RENDER ──────────────────────────────────────────────
@@ -726,6 +736,8 @@ async function submitAddAsset(){
 
 // ── SETTINGS ACCORDION ────────────────────────────────────────
 function openSettingsModal(){
+  const cat=allCategories.find(c=>c.id===currentCatId);
+  document.getElementById('settings-modal-title').textContent=`Settings — ${cat?.name||''}`;
   renderSettingsAccordion();
   document.getElementById('settings-modal').classList.add('open');
 }
