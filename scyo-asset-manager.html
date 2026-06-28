@@ -334,7 +334,7 @@
   <div id="lib-view" style="display:none;flex:1;overflow:auto;min-height:0;">
     <!-- Catalogue sub-tabs -->
     <div id="lib-cat-tabs" style="background:white;border-bottom:1px solid var(--grey-200);padding:0 1.25rem;display:flex;gap:0;">
-      <button class="lib-cat-tab active" data-cat="Band" onclick="switchLibCat('Band')">Band</button>
+      <button class="lib-cat-tab" data-cat="Band" onclick="switchLibCat('Band')">Band</button>
       <button class="lib-cat-tab" data-cat="Strings" onclick="switchLibCat('Strings')">Strings</button>
       <button class="lib-cat-tab" data-cat="Orchestra" onclick="switchLibCat('Orchestra')">Orchestra</button>
       <button class="lib-cat-tab" data-cat="Jazz Band" onclick="switchLibCat('Jazz Band')">Jazz Band</button>
@@ -610,6 +610,48 @@
       <button class="btn-close" onclick="closeModal('lib-perf-modal')">✕</button>
     </div>
     <div style="padding:1.25rem;" id="lib-perf-form"></div>
+  </div>
+</div>
+
+<!-- MANAGE ENSEMBLES MODAL -->
+<div class="modal-backdrop" id="lib-ensembles-modal">
+  <div class="modal" style="max-width:460px;">
+    <div class="modal-header">
+      <span class="modal-title">Manage Ensembles</span>
+      <button class="btn-close" onclick="closeModal('lib-ensembles-modal')">✕</button>
+    </div>
+    <div style="padding:1.25rem;overflow-y:auto;max-height:75vh;">
+      <div id="lib-ensembles-list"></div>
+      <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--grey-100);">
+        <div style="font-size:.82rem;font-weight:700;color:var(--grey-600);margin-bottom:.5rem;">Add Ensemble</div>
+        <div style="display:flex;gap:.5rem;">
+          <input type="text" id="lib-new-ensemble-name" placeholder="e.g. External - PLC" style="flex:1;"/>
+          <button class="btn btn-primary btn-sm" onclick="submitAddEnsemble()">Add</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT BORROW MODAL -->
+<div class="modal-backdrop" id="lib-edit-borrow-modal">
+  <div class="modal" style="max-width:380px;">
+    <div class="modal-header">
+      <span class="modal-title">Edit Borrow</span>
+      <button class="btn-close" onclick="closeModal('lib-edit-borrow-modal')">✕</button>
+    </div>
+    <div style="padding:1.25rem;" id="lib-edit-borrow-form"></div>
+  </div>
+</div>
+
+<!-- EDIT PERFORMANCE MODAL -->
+<div class="modal-backdrop" id="lib-edit-perf-modal">
+  <div class="modal" style="max-width:380px;">
+    <div class="modal-header">
+      <span class="modal-title">Edit Performance</span>
+      <button class="btn-close" onclick="closeModal('lib-edit-perf-modal')">✕</button>
+    </div>
+    <div style="padding:1.25rem;" id="lib-edit-perf-form"></div>
   </div>
 </div>
 
@@ -1693,7 +1735,7 @@ async function deletePercType(typeId){
 
 // ── MUSIC LIBRARY ─────────────────────────────────────────────
 let libPieces=[],libBorrows=[],libPerformances=[],libEnsembles=[];
-let libActiveCat='Band',libActiveView='catalogue',libEditPieceId=null,libDetailPieceId=null;
+let libActiveCat=(()=>{const s=sessionStorage.getItem('scyo-lib-cat');return['Band','Strings','Orchestra','Jazz Band'].includes(s)?s:'Band';})(),libActiveView='catalogue',libEditPieceId=null,libDetailPieceId=null;
 
 function showLibView(){
   document.querySelector('.toolbar').style.display='none';
@@ -1928,7 +1970,17 @@ function openLibDetail(pieceId){
   document.getElementById('lib-detail-history').innerHTML=allEvents.length?allEvents.map(ev=>{
     const ens=libEnsembles.find(e=>e.id===ev.ensemble_id);
     const label=ev.type==='borrow'?'Borrowed':`Performed — ${ev.event_type==='Workshop'?`Workshop: ${ev.workshop_name||''}`:ev.event_type}`;
-    return`<div class="hist-entry"><div class="hist-field">${label}</div><div class="hist-val">${esc(ens?.name||'Unknown')}</div><div class="hist-meta">${ev.date}</div></div>`;
+    const editBtn=ev.type==='borrow'
+      ?`<button class="btn btn-ghost btn-sm" style="padding:.1rem .4rem;font-size:.7rem;" onclick="openEditBorrow('${ev.id}')">Edit</button>`
+      :`<button class="btn btn-ghost btn-sm" style="padding:.1rem .4rem;font-size:.7rem;" onclick="openEditPerf('${ev.id}')">Edit</button>`;
+    const delBtn=ev.type==='borrow'
+      ?`<button class="btn btn-ghost btn-sm" style="padding:.1rem .4rem;font-size:.7rem;color:var(--danger);" onclick="deleteLibBorrow('${ev.id}')">✕</button>`
+      :`<button class="btn btn-ghost btn-sm" style="padding:.1rem .4rem;font-size:.7rem;color:var(--danger);" onclick="deleteLibPerf('${ev.id}')">✕</button>`;
+    return`<div class="hist-entry">
+      <div class="hist-field">${label}</div>
+      <div class="hist-val">${esc(ens?.name||'Unknown')}</div>
+      <div class="hist-meta" style="display:flex;justify-content:space-between;align-items:center;">${ev.date}<span style="display:flex;gap:.2rem;">${editBtn}${delBtn}</span></div>
+    </div>`;
   }).join(''):'<div style="color:var(--grey-400);font-size:.82rem;">No usage history.</div>';
   document.getElementById('lib-detail-modal').classList.add('open');
 }
@@ -1938,7 +1990,12 @@ function openLibBorrowModal(pieceId){
   const p=libPieces.find(pc=>pc.id===pieceId);
   document.getElementById('lib-borrow-form').innerHTML=`
     <div style="font-size:.85rem;font-weight:600;color:var(--navy);margin-bottom:.75rem;">${esc(p?.title||'')}</div>
-    <div class="fg"><label>Ensemble *</label><select id="lib-borrow-ensemble"><option value="">Select ensemble…</option>${libEnsembles.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('')}</select></div>
+    <div class="fg"><label>Ensemble *</label>
+      <div style="display:flex;gap:.5rem;">
+        <select id="lib-borrow-ensemble" style="flex:1;"><option value="">Select ensemble…</option>${libEnsembles.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('')}</select>
+        <button class="btn btn-ghost btn-sm" onclick="openManageEnsembles()">⚙ Manage</button>
+      </div>
+    </div>
     <div class="fg"><label>Date *</label><input type="date" id="lib-borrow-date" value="${new Date().toISOString().slice(0,10)}"/></div>
     <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="submitLibBorrow()">Log Borrow</button>
   `;
@@ -1961,7 +2018,12 @@ function openLibPerfModal(pieceId){
   const p=libPieces.find(pc=>pc.id===pieceId);
   document.getElementById('lib-perf-form').innerHTML=`
     <div style="font-size:.85rem;font-weight:600;color:var(--navy);margin-bottom:.75rem;">${esc(p?.title||'')}</div>
-    <div class="fg"><label>Ensemble *</label><select id="lib-perf-ensemble"><option value="">Select ensemble…</option>${libEnsembles.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('')}</select></div>
+    <div class="fg"><label>Ensemble *</label>
+      <div style="display:flex;gap:.5rem;">
+        <select id="lib-perf-ensemble" style="flex:1;"><option value="">Select ensemble…</option>${libEnsembles.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('')}</select>
+        <button class="btn btn-ghost btn-sm" onclick="openManageEnsembles()">⚙ Manage</button>
+      </div>
+    </div>
     <div class="fg"><label>Date *</label><input type="date" id="lib-perf-date" value="${new Date().toISOString().slice(0,10)}"/></div>
     <div class="fg"><label>Event Type *</label><select id="lib-perf-event-type" onchange="toggleWorkshopName()"><option value="">Select…</option><option>Camp</option><option>Concert</option><option>Gala</option><option>Workshop</option></select></div>
     <div class="fg" id="lib-workshop-name-wrap" style="display:none;"><label>Workshop Name *</label><input type="text" id="lib-workshop-name" placeholder="e.g. String Workshop"/></div>
@@ -1992,6 +2054,121 @@ async function submitLibPerformance(){
 }
 
 ['lib-piece-modal','lib-detail-modal','lib-borrow-modal','lib-perf-modal'].forEach(id=>{
+  document.getElementById(id)?.addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal(id);});
+});
+
+// ── ENSEMBLE MANAGEMENT ───────────────────────────────────────
+async function openManageEnsembles(){
+  renderEnsemblesList();
+  document.getElementById('lib-ensembles-modal').classList.add('open');
+}
+
+function renderEnsemblesList(){
+  document.getElementById('lib-ensembles-list').innerHTML=libEnsembles.map(e=>`
+    <div style="display:flex;align-items:center;gap:.75rem;padding:.5rem 0;border-bottom:1px solid var(--grey-100);">
+      <div style="flex:1;font-size:.875rem;font-weight:500;">${esc(e.name)}</div>
+      <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteEnsemble('${e.id}','${esc(e.name)}')">✕</button>
+    </div>
+  `).join('');
+}
+
+async function submitAddEnsemble(){
+  const name=document.getElementById('lib-new-ensemble-name').value.trim();
+  if(!name){showToast('Name required');return;}
+  await db.from('library_ensembles').insert({name,sort_order:libEnsembles.length});
+  document.getElementById('lib-new-ensemble-name').value='';
+  const{data}=await db.from('library_ensembles').select('*').order('sort_order');
+  libEnsembles=data||[];
+  renderEnsemblesList();
+  showToast('Ensemble added ✓');
+}
+
+async function deleteEnsemble(id,name){
+  if(!confirm(`Delete "${name}"? This won't affect existing records.`))return;
+  await db.from('library_ensembles').delete().eq('id',id);
+  const{data}=await db.from('library_ensembles').select('*').order('sort_order');
+  libEnsembles=data||[];
+  renderEnsemblesList();
+  showToast('Ensemble removed ✓');
+}
+
+// ── EDIT/DELETE BORROW & PERFORMANCE ─────────────────────────
+function openEditBorrow(borrowId){
+  const b=libBorrows.find(x=>x.id===borrowId);
+  if(!b)return;
+  const opts=libEnsembles.map(e=>`<option value="${e.id}" ${e.id===b.ensemble_id?'selected':''}>${esc(e.name)}</option>`).join('');
+  document.getElementById('lib-edit-borrow-form').innerHTML=`
+    <div class="fg"><label>Ensemble *</label><select id="edit-borrow-ensemble"><option value="">Select…</option>${opts}</select></div>
+    <div class="fg"><label>Date *</label><input type="date" id="edit-borrow-date" value="${b.date}"/></div>
+    <div style="display:flex;gap:.5rem;">
+      <button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="submitEditBorrow('${borrowId}')">Save</button>
+      <button class="btn btn-ghost" style="flex:1;justify-content:center;" onclick="closeModal('lib-edit-borrow-modal')">Cancel</button>
+    </div>
+  `;
+  document.getElementById('lib-edit-borrow-modal').classList.add('open');
+}
+
+async function submitEditBorrow(id){
+  const ensembleId=document.getElementById('edit-borrow-ensemble').value;
+  const date=document.getElementById('edit-borrow-date').value;
+  if(!ensembleId||!date){showToast('All fields required');return;}
+  await db.from('library_borrows').update({ensemble_id:ensembleId,date}).eq('id',id);
+  closeModal('lib-edit-borrow-modal');
+  await loadLibData();openLibDetail(libDetailPieceId);
+  showToast('Borrow updated ✓');
+}
+
+async function deleteLibBorrow(id){
+  if(!confirm('Delete this borrow record?'))return;
+  await db.from('library_borrows').delete().eq('id',id);
+  await loadLibData();openLibDetail(libDetailPieceId);
+  showToast('Borrow deleted ✓');
+}
+
+function openEditPerf(perfId){
+  const pf=libPerformances.find(x=>x.id===perfId);
+  if(!pf)return;
+  const opts=libEnsembles.map(e=>`<option value="${e.id}" ${e.id===pf.ensemble_id?'selected':''}>${esc(e.name)}</option>`).join('');
+  const etOpts=['Camp','Concert','Gala','Workshop'].map(t=>`<option ${pf.event_type===t?'selected':''}>${t}</option>`).join('');
+  document.getElementById('lib-edit-perf-form').innerHTML=`
+    <div class="fg"><label>Ensemble *</label><select id="edit-perf-ensemble"><option value="">Select…</option>${opts}</select></div>
+    <div class="fg"><label>Date *</label><input type="date" id="edit-perf-date" value="${pf.date}"/></div>
+    <div class="fg"><label>Event Type *</label><select id="edit-perf-event-type" onchange="toggleEditWorkshopName()"><option value="">Select…</option>${etOpts}</select></div>
+    <div class="fg" id="edit-workshop-wrap" style="display:${pf.event_type==='Workshop'?'block':'none'};"><label>Workshop Name</label><input type="text" id="edit-perf-workshop" value="${esc(pf.workshop_name||'')}"/></div>
+    <div style="display:flex;gap:.5rem;">
+      <button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="submitEditPerf('${perfId}')">Save</button>
+      <button class="btn btn-ghost" style="flex:1;justify-content:center;" onclick="closeModal('lib-edit-perf-modal')">Cancel</button>
+    </div>
+  `;
+  document.getElementById('lib-edit-perf-modal').classList.add('open');
+}
+
+function toggleEditWorkshopName(){
+  const t=document.getElementById('edit-perf-event-type')?.value;
+  const w=document.getElementById('edit-workshop-wrap');
+  if(w)w.style.display=t==='Workshop'?'block':'none';
+}
+
+async function submitEditPerf(id){
+  const ensembleId=document.getElementById('edit-perf-ensemble').value;
+  const date=document.getElementById('edit-perf-date').value;
+  const eventType=document.getElementById('edit-perf-event-type').value;
+  const workshopName=document.getElementById('edit-perf-workshop')?.value.trim()||null;
+  if(!ensembleId||!date||!eventType){showToast('All fields required');return;}
+  await db.from('library_performances').update({ensemble_id:ensembleId,date,event_type:eventType,workshop_name:workshopName}).eq('id',id);
+  closeModal('lib-edit-perf-modal');
+  await loadLibData();openLibDetail(libDetailPieceId);
+  showToast('Performance updated ✓');
+}
+
+async function deleteLibPerf(id){
+  if(!confirm('Delete this performance record?'))return;
+  await db.from('library_performances').delete().eq('id',id);
+  await loadLibData();openLibDetail(libDetailPieceId);
+  showToast('Performance deleted ✓');
+}
+
+['lib-ensembles-modal','lib-edit-borrow-modal','lib-edit-perf-modal'].forEach(id=>{
   document.getElementById(id)?.addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal(id);});
 });
 
