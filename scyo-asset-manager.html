@@ -327,7 +327,7 @@
     </div>
     <div class="search-wrap" style="flex:1;min-width:180px;" id="lib-search-wrap">
       <span class="si">🔍</span>
-      <input type="text" id="lib-search" placeholder="Search pieces..." oninput="renderLibCatalogue()"/>
+      <input type="text" id="lib-search" placeholder="Search pieces..." oninput="renderLibCatalogue()" style="padding-left:2.2rem;"/>
     </div>
     <button class="btn btn-primary" id="lib-add-btn" onclick="openAddLibModal()">+ Add Piece</button>
     <div class="col-picker-wrap no-print" id="lib-col-picker-wrap">
@@ -1881,8 +1881,8 @@ function renderLibCatalogue(){
       ${show('level')?`<td class="lib-piece-stat">${fmtLevel(p.level)}</td>`:''}
       ${show('purchased')?`<td class="lib-piece-stat">${p.date_purchased?p.date_purchased.slice(0,7):'—'}</td>`:''}
       ${show('usage')?`<td class="lib-piece-stat">${borrows>0?'Borrowed '+borrows+'x, incl. '+perfs+' perf.':'Not used'}</td>`:''}
+      <td style="text-align:center;width:30px;">${p.notes?`<span title="${esc(p.notes)}" style="font-size:.9rem;cursor:default;">📋</span>`:''}</td>
       <td style="white-space:nowrap;">
-        ${p.notes?`<span title="${esc(p.notes)}" style="font-size:.9rem;cursor:default;margin-right:.3rem;" >📋</span>`:''}
         <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openLibBorrowModal('${p.id}')">Borrow</button>
         <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openLibPerfModal('${p.id}')">Perform</button>
       </td>
@@ -1895,6 +1895,7 @@ function renderLibCatalogue(){
     ${show('level')?`<th onclick="libSortBy('level')">Level<span class="lib-sort-arrow">${arr('level')}</span></th>`:''}
     ${show('purchased')?`<th onclick="libSortBy('purchased')">Purchased<span class="lib-sort-arrow">${arr('purchased')}</span></th>`:''}
     ${show('usage')?`<th onclick="libSortBy('usage')">Usage in last 10 years<span class="lib-sort-arrow">${arr('usage')}</span></th>`:''}
+    <th></th>
     <th></th>
   </tr></thead><tbody>${rows}</tbody></table>`;
 }
@@ -2002,6 +2003,8 @@ async function autoSaveLibPiece(){
   const link=document.getElementById('lib-link')?.value.trim();
   let notes=document.getElementById('lib-notes')?.value.trim()||'';
   const payload={title,composer:composer||null,category,level:level?parseFloat(level):null,date_purchased:datePurchased||null,owned,borrowed_from:(!owned&&borrowedFrom)?borrowedFrom:null,external_link:link||null,notes:notes||null};
+  const{error}=await db.from('library_pieces').update(payload).eq('id',libEditPieceId);
+  if(error){showToast('Error saving: '+error.message);return;}
   libPieces=libPieces.map(p=>p.id===libEditPieceId?{...p,...payload}:p);
   renderLibCatalogue();
   showToast('Saved ✓');
