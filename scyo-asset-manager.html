@@ -1787,6 +1787,7 @@ function switchLibView(view){
 
 function switchLibCat(cat){
   libActiveCat=cat;
+  sessionStorage.setItem('scyo-lib-cat',cat);
   renderLibCatTabs();
   renderLibCatalogue();
 }
