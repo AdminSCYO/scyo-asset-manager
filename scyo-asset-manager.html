@@ -275,8 +275,21 @@
     </div>
   </main>
 
-  <!-- EQUIPMENT VIEW -->
-  <div class="eq-toolbar" id="eq-toolbar" style="display:none;">
+  <!-- PERCUSSION & EQUIPMENT VIEW -->
+  <div class="eq-toolbar" id="perc-toolbar" style="display:none;">
+    <div class="search-wrap" style="flex:1;min-width:180px;">
+      <span class="si">🔍</span>
+      <input type="text" id="perc-search" placeholder="Search..." oninput="renderPercView()"/>
+    </div>
+    <button class="btn btn-primary" onclick="openAddPercModal()">+ Add Asset</button>
+  </div>
+  <div id="perc-view" style="display:none;flex:1;overflow:auto;">
+    <table id="perc-table" style="width:100%;border-collapse:collapse;">
+      <thead id="perc-thead"></thead>
+      <tbody id="perc-tbody"></tbody>
+    </table>
+  </div>
+</div>
     <div class="search-wrap" style="flex:1;min-width:180px;">
       <span class="si">🔍</span>
       <input type="text" id="eq-search" placeholder="Search equipment..." oninput="renderEquipmentGrid()"/>
@@ -347,8 +360,90 @@
   </div>
 </div>
 
-<!-- EQUIPMENT ITEM MODAL -->
-<div class="modal-backdrop eq-modal" id="eq-item-modal">
+<!-- ADD PERC ASSET MODAL -->
+<div class="modal-backdrop" id="perc-add-modal">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-header">
+      <span class="modal-title">Add Asset</span>
+      <button class="btn-close" onclick="closeModal('perc-add-modal')">✕</button>
+    </div>
+    <div style="padding:1.25rem;overflow-y:auto;max-height:75vh;">
+      <div class="fg">
+        <label>Asset ID</label>
+        <input type="text" id="perc-add-id" readonly style="background:var(--grey-50);color:var(--grey-400);cursor:default;font-family:monospace;"/>
+      </div>
+      <div class="fg">
+        <label>Type *</label>
+        <div style="display:flex;gap:.5rem;">
+          <select id="perc-add-type" style="flex:1;padding:.5rem .6rem;border:1.5px solid var(--grey-200);border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:.875rem;outline:none;">
+            <option value="">Select type…</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" onclick="openPercTypesModal()">⚙ Manage</button>
+        </div>
+      </div>
+      <div class="fg"><label>Item *</label><input type="text" id="perc-add-item" placeholder="e.g. Timpani 26inch"/></div>
+      <div class="fg"><label>Serial Number</label><input type="text" id="perc-add-serial" placeholder="Serial Number"/></div>
+      <div class="fg">
+        <label>Status</label>
+        <select id="perc-add-status" onchange="renderPercAddStatusDetail()">
+          <option value="In Storage">In Storage</option>
+          <option value="Missing">Missing</option>
+          <option value="Retired">Retired</option>
+        </select>
+      </div>
+      <div id="perc-add-status-detail"></div>
+      <div class="fg"><label>Last Sighted</label><input type="date" id="perc-add-lastsighted"/></div>
+      <div class="fg"><label>Last Serviced</label><input type="date" id="perc-add-lastserviced"/></div>
+      <div class="fg"><label>Replacement Value (Insurance)</label><input type="number" id="perc-add-value" placeholder="0.00" min="0" step="0.01"/></div>
+      <div class="fg"><label>Notes</label><input type="text" id="perc-add-notes" placeholder="Notes"/></div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;padding:.75rem;" onclick="submitAddPercAsset()">Add Asset</button>
+    </div>
+  </div>
+</div>
+
+<!-- PERC ITEM MODAL -->
+<div class="modal-backdrop eq-modal" id="perc-item-modal">
+  <div class="modal" style="max-width:780px;">
+    <div class="modal-header">
+      <span class="modal-title" id="perc-item-modal-title">Asset</span>
+      <button class="btn-close" onclick="closeModal('perc-item-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-fields" id="perc-item-fields" style="overflow-y:auto;"></div>
+      <div class="modal-history" style="width:280px;padding:1.25rem;overflow-y:auto;background:var(--grey-50);border-left:1px solid var(--grey-100);">
+        <div class="hist-title">History</div>
+        <div id="perc-item-history"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PERC TYPES MODAL -->
+<div class="modal-backdrop" id="perc-types-modal">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <span class="modal-title">Manage Types</span>
+      <button class="btn-close" onclick="closeModal('perc-types-modal')">✕</button>
+    </div>
+    <div style="padding:1.25rem;overflow-y:auto;max-height:75vh;">
+      <div id="perc-types-list"></div>
+      <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--grey-100);">
+        <div style="font-size:.82rem;font-weight:700;color:var(--grey-600);margin-bottom:.5rem;">Add New Type</div>
+        <div class="fg"><label>Type Name *</label><input type="text" id="perc-new-type-name" placeholder="e.g. Music Stand"/></div>
+        <div class="fg" style="display:flex;align-items:center;gap:.75rem;">
+          <label style="text-transform:none;letter-spacing:0;font-size:.875rem;display:flex;align-items:center;gap:.5rem;cursor:pointer;">
+            <input type="checkbox" id="perc-new-type-bulk" style="width:auto;padding:0;border:none;"/>
+            Bulk item (group in table view)
+          </label>
+        </div>
+        <div class="fg"><label>Replacement Value/Unit</label><input type="number" id="perc-new-type-value" placeholder="0.00" min="0" step="0.01"/></div>
+        <button class="btn btn-primary" onclick="submitAddPercType()">Add Type</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
   <div class="modal" style="max-width:780px;">
     <div class="modal-header">
       <span class="modal-title" id="eq-item-modal-title">Item</span>
@@ -480,6 +575,10 @@ async function loadCategoryData(){
   const prefix=(cat?.prefix||'INS').toUpperCase();
   if(prefix==='EQP'){
     await loadEquipmentData();
+    return;
+  }
+  if(prefix==='PRC'){
+    await loadPercData();
     return;
   }
   const{assets:aTable,log:lTable}=getCatTables();
@@ -1159,7 +1258,336 @@ let _tt;function showToast(m){const t=document.getElementById('toast');t.textCon
   document.getElementById(id).addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal(id);});
 });
 
-// ── EQUIPMENT ─────────────────────────────────────────────────
+// ── PERCUSSION & EQUIPMENT ────────────────────────────────────
+let percTypes=[],percAssets=[],percLog=[];
+
+function showPercView(){
+  document.querySelector('.toolbar').style.display='none';
+  document.querySelector('main').style.display='none';
+  document.getElementById('eq-toolbar').style.display='none';
+  document.getElementById('eq-view').classList.remove('visible');
+  document.getElementById('perc-toolbar').style.display='flex';
+  document.getElementById('perc-view').style.display='block';
+}
+
+async function loadPercData(){
+  const[{data:types},{data:assets},{data:log}]=await Promise.all([
+    db.from('perc_types').select('*').order('sort_order'),
+    db.from('perc_assets').select('*').order('created_at'),
+    db.from('perc_log').select('*').order('timestamp',{ascending:false})
+  ]);
+  percTypes=types||[];
+  percAssets=assets||[];
+  percLog=log||[];
+  showPercView();
+  renderPercView();
+}
+
+function getPercAssetState(assetId){
+  const state={};
+  const entries=percLog.filter(l=>l.asset_id===assetId);
+  const fields=['Item','Serial Number','Status','Location','Last Sighted','Last Serviced','Replacement Value (Insurance)','Notes'];
+  fields.forEach(f=>{
+    const entry=entries.find(l=>l.field===f);
+    if(entry)state[f]=entry.data;
+  });
+  return state;
+}
+
+function renderPercView(){
+  const q=(document.getElementById('perc-search')?.value||'').toLowerCase();
+  const thead=document.getElementById('perc-thead');
+  const tbody=document.getElementById('perc-tbody');
+
+  thead.innerHTML=`<tr>
+    <th style="padding:.6rem 1rem;text-align:left;font-size:.75rem;font-weight:700;color:var(--grey-600);text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid var(--grey-200);background:var(--grey-50);">ID</th>
+    <th style="padding:.6rem 1rem;text-align:left;font-size:.75rem;font-weight:700;color:var(--grey-600);text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid var(--grey-200);background:var(--grey-50);">Item</th>
+    <th style="padding:.6rem 1rem;text-align:left;font-size:.75rem;font-weight:700;color:var(--grey-600);text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid var(--grey-200);background:var(--grey-50);">Type</th>
+    <th style="padding:.6rem 1rem;text-align:left;font-size:.75rem;font-weight:700;color:var(--grey-600);text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid var(--grey-200);background:var(--grey-50);">Status</th>
+    <th style="padding:.6rem 1rem;text-align:left;font-size:.75rem;font-weight:700;color:var(--grey-600);text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid var(--grey-200);background:var(--grey-50);">Location</th>
+    <th style="padding:.6rem 1rem;text-align:left;font-size:.75rem;font-weight:700;color:var(--grey-600);text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid var(--grey-200);background:var(--grey-50);">Last Sighted</th>
+    <th style="padding:.6rem 1rem;text-align:left;font-size:.75rem;font-weight:700;color:var(--grey-600);text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid var(--grey-200);background:var(--grey-50);">Action</th>
+  </tr>`;
+
+  // Separate bulk and non-bulk types
+  const bulkTypes=percTypes.filter(t=>t.is_bulk);
+  const nonBulkTypeIds=new Set(percTypes.filter(t=>!t.is_bulk).map(t=>t.id));
+
+  // Filter assets
+  const filtered=percAssets.filter(a=>{
+    if(!q)return true;
+    const state=getPercAssetState(a.display_id);
+    return a.display_id.toLowerCase().includes(q)||
+      (state['Item']||'').toLowerCase().includes(q)||
+      (state['Location']||'').toLowerCase().includes(q);
+  });
+
+  let rows='';
+
+  // Non-bulk: individual rows
+  filtered.filter(a=>!a.type_id||nonBulkTypeIds.has(a.type_id)).forEach(a=>{
+    const state=getPercAssetState(a.display_id);
+    const type=percTypes.find(t=>t.id===a.type_id);
+    const statusCls=state['Status']==='Missing'?'sc-missing':state['Status']==='Retired'?'sc-retired':'sc-storage';
+    rows+=`<tr style="border-bottom:1px solid var(--grey-100);cursor:pointer;" onclick="openPercItemModal('${a.display_id}')" onmouseover="this.style.background='var(--grey-50)'" onmouseout="this.style.background=''">
+      <td style="padding:.65rem 1rem;font-family:monospace;font-size:.82rem;color:var(--grey-600);">${esc(a.display_id)}</td>
+      <td style="padding:.65rem 1rem;font-weight:600;">${esc(state['Item']||'—')}</td>
+      <td style="padding:.65rem 1rem;font-size:.82rem;color:var(--grey-600);">${esc(type?.name||'—')}</td>
+      <td style="padding:.65rem 1rem;"><span class="status-chip ${statusCls}">${esc(state['Status']||'In Storage')}</span></td>
+      <td style="padding:.65rem 1rem;font-size:.85rem;">${esc(state['Location']||'—')}</td>
+      <td style="padding:.65rem 1rem;font-size:.85rem;">${state['Last Sighted']?fmtDate(state['Last Sighted']):'—'}</td>
+      <td style="padding:.65rem 1rem;"><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openPercItemModal('${a.display_id}')">Edit</button></td>
+    </tr>`;
+  });
+
+  // Bulk: grouped rows
+  bulkTypes.forEach(type=>{
+    const typeAssets=filtered.filter(a=>a.type_id===type.id);
+    if(!typeAssets.length&&q)return;
+    const count=typeAssets.length;
+
+    // Location summary
+    const locMap={};
+    typeAssets.forEach(a=>{
+      const loc=getPercAssetState(a.display_id)['Location']||'Unknown';
+      locMap[loc]=(locMap[loc]||0)+1;
+    });
+    const locSummary=Object.entries(locMap).map(([l,c])=>`${esc(l)}: ${c}`).join(' | ')||'—';
+
+    const expandId=`perc-bulk-${type.id}`;
+    rows+=`<tr style="border-bottom:1px solid var(--grey-200);background:var(--grey-50);cursor:pointer;" onclick="togglePercBulk('${type.id}')">
+      <td style="padding:.65rem 1rem;" colspan="2">
+        <span style="font-weight:700;color:var(--navy);">${esc(type.name)}</span>
+        <span style="font-size:.82rem;color:var(--grey-500);margin-left:.5rem;">× ${count}</span>
+        <span id="perc-bulk-arrow-${type.id}" style="font-size:.75rem;color:var(--grey-400);margin-left:.5rem;">▶</span>
+      </td>
+      <td style="padding:.65rem 1rem;font-size:.82rem;color:var(--grey-500);">Bulk</td>
+      <td style="padding:.65rem 1rem;" colspan="3"><span style="font-size:.82rem;color:var(--grey-600);">${locSummary}</span></td>
+      <td style="padding:.65rem 1rem;"><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openAddPercModal('${type.id}')">+ Add</button></td>
+    </tr>`;
+
+    // Individual units (hidden by default)
+    typeAssets.forEach(a=>{
+      const state=getPercAssetState(a.display_id);
+      const statusCls=state['Status']==='Missing'?'sc-missing':state['Status']==='Retired'?'sc-retired':'sc-storage';
+      rows+=`<tr class="${expandId}" style="display:none;border-bottom:1px solid var(--grey-100);background:#fafbfc;cursor:pointer;" onclick="openPercItemModal('${a.display_id}')" onmouseover="this.style.background='var(--grey-50)'" onmouseout="this.style.background='#fafbfc'">
+        <td style="padding:.5rem 1rem .5rem 2rem;font-family:monospace;font-size:.78rem;color:var(--grey-500);">${esc(a.display_id)}</td>
+        <td style="padding:.5rem 1rem;font-size:.85rem;">${esc(state['Item']||'—')}</td>
+        <td style="padding:.5rem 1rem;"></td>
+        <td style="padding:.5rem 1rem;"><span class="status-chip ${statusCls}" style="font-size:.7rem;padding:.2rem .5rem;">${esc(state['Status']||'In Storage')}</span></td>
+        <td style="padding:.5rem 1rem;font-size:.82rem;">${esc(state['Location']||'—')}</td>
+        <td style="padding:.5rem 1rem;font-size:.82rem;">${state['Last Sighted']?fmtDate(state['Last Sighted']):'—'}</td>
+        <td style="padding:.5rem 1rem;"><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openPercItemModal('${a.display_id}')">Edit</button></td>
+      </tr>`;
+    });
+  });
+
+  tbody.innerHTML=rows||`<tr><td colspan="7" style="text-align:center;padding:3rem;color:var(--grey-400);">No assets found.</td></tr>`;
+}
+
+function togglePercBulk(typeId){
+  const rows=document.querySelectorAll(`.perc-bulk-${typeId}`);
+  const arrow=document.getElementById(`perc-bulk-arrow-${typeId}`);
+  const isHidden=rows[0]?.style.display==='none';
+  rows.forEach(r=>r.style.display=isHidden?'':'none');
+  if(arrow)arrow.textContent=isHidden?'▼':'▶';
+}
+
+function openAddPercModal(presetTypeId=''){
+  // Generate next ID
+  const base='PRC-';
+  const existing=percAssets;
+  let next=1;
+  existing.forEach(a=>{const n=parseInt(a.display_id.replace(base,''),10);if(!isNaN(n)&&n>=next)next=n+1;});
+  document.getElementById('perc-add-id').value=`${base}${String(next).padStart(4,'0')}`;
+
+  // Populate type dropdown
+  const sel=document.getElementById('perc-add-type');
+  sel.innerHTML=`<option value="">Select type…</option>`+percTypes.map(t=>`<option value="${t.id}">${esc(t.name)}${t.is_bulk?' (bulk)':''}</option>`).join('');
+  if(presetTypeId)sel.value=presetTypeId;
+
+  // Clear fields
+  ['perc-add-item','perc-add-serial','perc-add-notes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('perc-add-value').value='';
+  document.getElementById('perc-add-lastsighted').value='';
+  document.getElementById('perc-add-lastserviced').value='';
+  document.getElementById('perc-add-status').value='In Storage';
+  document.getElementById('perc-add-status-detail').innerHTML='<input type="text" id="perc-add-location" placeholder="Location (e.g. Storage Shed)"/>';
+
+  document.getElementById('perc-add-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('perc-add-type').focus(),100);
+}
+
+function renderPercAddStatusDetail(){
+  const status=document.getElementById('perc-add-status').value;
+  const detail=document.getElementById('perc-add-status-detail');
+  if(status==='In Storage'){
+    detail.innerHTML='<input type="text" id="perc-add-location" placeholder="Location (e.g. Storage Shed)"/>';
+  }else{
+    detail.innerHTML='';
+  }
+}
+
+async function submitAddPercAsset(){
+  const displayId=document.getElementById('perc-add-id').value.trim();
+  const typeId=document.getElementById('perc-add-type').value;
+  const item=document.getElementById('perc-add-item').value.trim();
+  const serial=document.getElementById('perc-add-serial').value.trim();
+  const status=document.getElementById('perc-add-status').value;
+  const location=document.getElementById('perc-add-location')?.value.trim()||'';
+  const lastSighted=document.getElementById('perc-add-lastsighted').value;
+  const lastServiced=document.getElementById('perc-add-lastserviced').value;
+  const value=document.getElementById('perc-add-value').value;
+  const notes=document.getElementById('perc-add-notes').value.trim();
+
+  if(!item){showToast('Item name required');return;}
+  if(!typeId){showToast('Type required');return;}
+
+  const{error}=await db.from('perc_assets').insert({display_id:displayId,type_id:typeId});
+  if(error){showToast('Error: '+error.message);return;}
+
+  const logEntries=[
+    {asset_id:displayId,user_email:currentUser.email,field:'Item',data:item},
+    {asset_id:displayId,user_email:currentUser.email,field:'Status',data:status+(location?` at ${location}`:'')},
+  ];
+  if(serial)logEntries.push({asset_id:displayId,user_email:currentUser.email,field:'Serial Number',data:serial});
+  if(location)logEntries.push({asset_id:displayId,user_email:currentUser.email,field:'Location',data:location});
+  if(lastSighted)logEntries.push({asset_id:displayId,user_email:currentUser.email,field:'Last Sighted',data:lastSighted});
+  if(lastServiced)logEntries.push({asset_id:displayId,user_email:currentUser.email,field:'Last Serviced',data:lastServiced});
+  if(value)logEntries.push({asset_id:displayId,user_email:currentUser.email,field:'Replacement Value (Insurance)',data:value});
+  if(notes)logEntries.push({asset_id:displayId,user_email:currentUser.email,field:'Notes',data:notes});
+
+  await db.from('perc_log').insert(logEntries);
+  closeModal('perc-add-modal');
+  await loadPercData();
+  showToast('Asset added ✓');
+}
+
+function openPercItemModal(assetId){
+  const asset=percAssets.find(a=>a.display_id===assetId);
+  if(!asset)return;
+  const state=getPercAssetState(assetId);
+  const type=percTypes.find(t=>t.id===asset.type_id);
+  document.getElementById('perc-item-modal-title').textContent=state['Item']||assetId;
+
+  const percFields=[
+    {name:'Item',type:'text'},
+    {name:'Serial Number',type:'text'},
+    {name:'Status',type:'status'},
+    {name:'Location',type:'text'},
+    {name:'Last Sighted',type:'date'},
+    {name:'Last Serviced',type:'date'},
+    {name:'Replacement Value (Insurance)',type:'number'},
+    {name:'Notes',type:'text'},
+  ];
+
+  document.getElementById('perc-item-fields').innerHTML=`
+    <div class="field-row"><div class="field-label">Asset ID</div><div class="field-val" style="font-family:monospace;font-size:.85rem;">${esc(assetId)}</div></div>
+    <div class="field-row"><div class="field-label">Type</div><div class="field-val">${esc(type?.name||'—')}</div></div>
+    ${percFields.map(f=>{
+      const val=state[f.name]||'';
+      if(f.type==='status'){
+        return`<div class="field-row">
+          <div class="field-label">Status</div>
+          <div class="field-val">
+            <select onchange="savePercField('${assetId}','Status',this.value);renderPercStatusLoc('${assetId}',this.value)" style="padding:.35rem .5rem;border:1.5px solid var(--grey-200);border-radius:4px;font-family:'Inter',sans-serif;font-size:.85rem;outline:none;">
+              <option ${val==='In Storage'||val.startsWith('In Storage')?'selected':''}>In Storage</option>
+              <option ${val==='Missing'?'selected':''}>Missing</option>
+              <option ${val==='Retired'?'selected':''}>Retired</option>
+            </select>
+          </div>
+        </div>`;
+      }
+      return`<div class="field-row">
+        <div class="field-label">${esc(f.name)}</div>
+        <div class="field-val">
+          <input class="field-input" type="${f.type==='number'?'number':f.type==='date'?'date':'text'}" value="${esc(val)}" placeholder="${esc(f.name)}" onblur="savePercField('${assetId}','${f.name}',this.value)" data-orig="${esc(val)}"/>
+        </div>
+      </div>`;
+    }).join('')}
+  `;
+
+  // History
+  const logs=percLog.filter(l=>l.asset_id===assetId);
+  document.getElementById('perc-item-history').innerHTML=logs.length?logs.slice(0,30).map(l=>`
+    <div class="hist-entry">
+      <div class="hist-field">${esc(l.field||'')}</div>
+      <div class="hist-val">${esc(l.data||'')}</div>
+      <div class="hist-meta">${esc(l.user_email||'')} · ${fmtDate(l.timestamp)}</div>
+    </div>
+  `).join(''):'<div style="color:var(--grey-400);font-size:.82rem;">No history yet.</div>';
+
+  document.getElementById('perc-item-modal').classList.add('open');
+}
+
+async function savePercField(assetId,field,value){
+  const trimmed=value.trim();
+  await db.from('perc_log').insert({asset_id:assetId,user_email:currentUser.email,field,data:trimmed});
+  const{data:log}=await db.from('perc_log').select('*').order('timestamp',{ascending:false});
+  percLog=log||[];
+  renderPercView();
+  showToast(`${field} updated ✓`);
+}
+
+// ── PERC TYPES ────────────────────────────────────────────────
+async function openPercTypesModal(){
+  await renderPercTypesList();
+  document.getElementById('perc-types-modal').classList.add('open');
+}
+
+async function renderPercTypesList(){
+  const{data:types}=await db.from('perc_types').select('*').order('sort_order');
+  percTypes=types||[];
+  document.getElementById('perc-types-list').innerHTML=percTypes.length?percTypes.map(t=>`
+    <div style="display:flex;align-items:center;gap:.75rem;padding:.6rem 0;border-bottom:1px solid var(--grey-100);">
+      <div style="flex:1;">
+        <div style="font-weight:600;font-size:.875rem;">${esc(t.name)}</div>
+        <div style="font-size:.75rem;color:var(--grey-400);">${t.is_bulk?'Bulk':'Individual'}${t.replacement_value_per_unit?` · $${parseFloat(t.replacement_value_per_unit).toLocaleString('en-AU',{minimumFractionDigits:2})}/unit`:''}</div>
+      </div>
+      <label style="display:flex;align-items:center;gap:.35rem;font-size:.78rem;cursor:pointer;">
+        <input type="checkbox" ${t.is_bulk?'checked':''} onchange="updatePercType('${t.id}','is_bulk',this.checked)" style="width:auto;padding:0;border:none;"/> Bulk
+      </label>
+      <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deletePercType('${t.id}')">✕</button>
+    </div>
+  `).join(''):'<div style="color:var(--grey-400);font-size:.82rem;padding:.5rem 0;">No types yet.</div>';
+  // Also refresh dropdown in add modal if open
+  const sel=document.getElementById('perc-add-type');
+  if(sel)sel.innerHTML=`<option value="">Select type…</option>`+percTypes.map(t=>`<option value="${t.id}">${esc(t.name)}${t.is_bulk?' (bulk)':''}</option>`).join('');
+}
+
+async function submitAddPercType(){
+  const name=document.getElementById('perc-new-type-name').value.trim();
+  const isBulk=document.getElementById('perc-new-type-bulk').checked;
+  const value=document.getElementById('perc-new-type-value').value;
+  if(!name){showToast('Type name required');return;}
+  await db.from('perc_types').insert({name,is_bulk:isBulk,replacement_value_per_unit:value?parseFloat(value):null,sort_order:percTypes.length});
+  document.getElementById('perc-new-type-name').value='';
+  document.getElementById('perc-new-type-bulk').checked=false;
+  document.getElementById('perc-new-type-value').value='';
+  await renderPercTypesList();
+  showToast('Type added ✓');
+}
+
+async function updatePercType(typeId,field,value){
+  await db.from('perc_types').update({[field]:value}).eq('id',typeId);
+  await renderPercTypesList();
+  await loadPercData();
+}
+
+async function deletePercType(typeId){
+  const count=percAssets.filter(a=>a.type_id===typeId).length;
+  if(count>0){showToast(`Cannot delete — ${count} asset(s) use this type`);return;}
+  if(!confirm('Delete this type?'))return;
+  await db.from('perc_types').delete().eq('id',typeId);
+  await renderPercTypesList();
+  showToast('Type deleted ✓');
+}
+
+['perc-add-modal','perc-item-modal','perc-types-modal'].forEach(id=>{
+  document.getElementById(id).addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal(id);});
+});
+
+initAuth();
 let eqItems=[],eqLocations=[],eqStock=[],eqLog=[];
 let _adjItemId=null,_adjLocId=null,_adjLocName='',_adjCurrentQty=0;
 let _openEqItemId=null;
@@ -1167,6 +1595,8 @@ let _openEqItemId=null;
 function showStandardView(){
   document.getElementById('eq-toolbar').style.display='none';
   document.getElementById('eq-view').classList.remove('visible');
+  document.getElementById('perc-toolbar').style.display='none';
+  document.getElementById('perc-view').style.display='none';
   document.querySelector('.toolbar').style.display='';
   document.querySelector('main').style.display='';
 }
