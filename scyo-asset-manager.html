@@ -285,7 +285,7 @@
     </div>
     <button class="btn btn-primary" onclick="openAddPercModal()">+ Add Asset</button>
   </div>
-  <div id="perc-view">
+  <div id="perc-view" style="display:none;">
     <table id="perc-table" style="width:100%;border-collapse:collapse;">
       <thead id="perc-thead"></thead>
       <tbody id="perc-tbody"></tbody>
@@ -303,7 +303,7 @@
     </label>
     <button class="btn btn-primary" onclick="openAddEquipmentModal()">+ Add Item</button>
   </div>
-  <div id="eq-view">
+  <div id="eq-view" style="display:none;">
     <div class="eq-grid" id="eq-grid"></div>
   </div>
 </div>
@@ -1270,9 +1270,9 @@ function showPercView(){
   document.querySelector('.toolbar').style.display='none';
   document.querySelector('main').style.display='none';
   document.getElementById('eq-toolbar').style.display='none';
-  document.getElementById('eq-view').classList.remove('visible');
+  document.getElementById('eq-view').style.display='none';
   document.getElementById('perc-toolbar').style.display='flex';
-  document.getElementById('perc-view').classList.add('visible');
+  document.getElementById('perc-view').style.display='block';
   ['perc-add-modal','perc-item-modal','perc-types-modal'].forEach(id=>closeModal(id));
 }
 
@@ -1600,7 +1600,7 @@ let _openEqItemId=null;
 
 function showStandardView(){
   document.getElementById('eq-toolbar').style.display='none';
-  document.getElementById('eq-view').classList.remove('visible');
+  document.getElementById('eq-view').style.display='none';
   document.getElementById('perc-toolbar').style.display='none';
   document.getElementById('perc-view').style.display='none';
   document.querySelector('.toolbar').style.display='';
@@ -1612,9 +1612,9 @@ function showEquipmentView(){
   document.querySelector('.toolbar').style.display='none';
   document.querySelector('main').style.display='none';
   document.getElementById('perc-toolbar').style.display='none';
-  document.getElementById('perc-view').classList.remove('visible');
+  document.getElementById('perc-view').style.display='none';
   document.getElementById('eq-toolbar').style.display='flex';
-  document.getElementById('eq-view').classList.add('visible');
+  document.getElementById('eq-view').style.display='block';
   ['perc-add-modal','perc-item-modal','perc-types-modal','edit-modal','add-modal'].forEach(id=>closeModal(id));
 }
 
