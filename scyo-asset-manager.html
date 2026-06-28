@@ -396,31 +396,6 @@
   </div>
 </div>
 
-<!-- QTY ADJUST MODAL -->
-<div class="modal-backdrop adj-modal" id="eq-adj-modal">
-  <div class="modal" style="max-width:420px;">
-    <div class="modal-header">
-      <span class="modal-title" id="eq-adj-title">Adjust Quantity</span>
-      <button class="btn-close" onclick="closeModal('eq-adj-modal')">✕</button>
-    </div>
-    <div style="padding:1.25rem;">
-      <div class="fg">
-        <label>New Quantity *</label>
-        <input type="number" id="eq-adj-qty" min="0" placeholder="0"/>
-        <div style="font-size:.72rem;color:var(--grey-400);margin-top:.3rem;" id="eq-adj-current"></div>
-      </div>
-      <div class="fg">
-        <label>Reason * <span style="font-weight:400;text-transform:none;letter-spacing:0;">(required — e.g. "Purchased 5 new stands")</span></label>
-        <textarea id="eq-adj-note" placeholder="Explain why the quantity is changing..." style="height:80px;resize:vertical;"></textarea>
-      </div>
-      <div style="display:flex;gap:.5rem;">
-        <button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="submitQtyAdjust()">Save</button>
-        <button class="btn btn-ghost" style="flex:1;justify-content:center;" onclick="closeModal('eq-adj-modal')">Cancel</button>
-      </div>
-    </div>
-  </div>
-</div>
-
 <!-- ADD LOCATION MODAL -->
 <div class="modal-backdrop" id="eq-loc-modal">
   <div class="modal" style="max-width:380px;">
@@ -1275,22 +1250,63 @@ function renderEqItemFields(item){
   const stockRows=eqStock.filter(s=>s.item_id===item.id&&s.qty>0);
   const total=getItemTotalQty(item.id);
   const totalVal=item.replacement_value_per_unit?(total*item.replacement_value_per_unit).toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2}):null;
+  const usedLocIds=stockRows.map(s=>s.location_id);
+  const availLocs=eqLocations.filter(l=>!usedLocIds.includes(l.id));
 
-  // Location rows
   const locRows=stockRows.map(s=>{
     const loc=eqLocations.find(l=>l.id===s.location_id);
-    return`<tr>
-      <td>${esc(loc?.name||'Unknown')}</td>
-      <td style="font-weight:700;">${s.qty}</td>
-      <td style="font-size:.75rem;color:var(--grey-400);">${s.updated_by?esc(s.updated_by.split('@')[0]):''} ${s.updated_at?fmtDate(s.updated_at):''}</td>
-      <td><button class="eq-qty-btn" onclick="openQtyAdjust('${item.id}','${s.location_id}','${esc(loc?.name||'')}',${s.qty})">Adjust</button></td>
+    const locName=esc(loc?.name||'Unknown');
+    const updater=s.updated_by?s.updated_by.split('@')[0]:'';
+    return`<tr id="eq-row-${s.location_id}">
+      <td>${locName}</td>
+      <td>
+        <span class="eq-qty-display" id="eq-qty-display-${s.location_id}" onclick="startInlineEdit('${item.id}','${s.location_id}','${locName}',${s.qty})" title="Click to adjust" style="cursor:pointer;font-weight:700;border-bottom:1.5px dashed var(--grey-400);padding-bottom:1px;">${s.qty}</span>
+        <span id="eq-qty-editing-${s.location_id}" style="display:none;">
+          <input type="number" id="eq-qty-input-${s.location_id}" min="0" value="${s.qty}" style="width:60px;padding:.25rem .4rem;border:1.5px solid var(--navy);border-radius:4px;font-family:'Inter',sans-serif;font-size:.85rem;font-weight:700;"/>
+        </span>
+      </td>
+      <td style="font-size:.75rem;color:var(--grey-400);">${updater} ${s.updated_at?fmtDate(s.updated_at):''}</td>
+      <td>
+        <div id="eq-inline-actions-${s.location_id}" style="display:none;"></div>
+      </td>
+    </tr>
+    <tr id="eq-reason-row-${s.location_id}" style="display:none;">
+      <td colspan="4" style="padding:.35rem .75rem .6rem;">
+        <input type="text" id="eq-reason-${s.location_id}" placeholder="Reason for change (required)" style="width:100%;padding:.4rem .6rem;border:1.5px solid var(--grey-200);border-radius:4px;font-family:'Inter',sans-serif;font-size:.82rem;outline:none;" onkeydown="if(event.key==='Enter')saveInlineQty('${item.id}','${s.location_id}',${s.qty});if(event.key==='Escape')cancelInlineEdit('${s.location_id}',${s.qty})"/>
+        <div style="display:flex;gap:.4rem;margin-top:.35rem;">
+          <button class="btn btn-primary btn-sm" onclick="saveInlineQty('${item.id}','${s.location_id}',${s.qty})">Save</button>
+          <button class="btn btn-ghost btn-sm" onclick="cancelInlineEdit('${s.location_id}',${s.qty})">Cancel</button>
+        </div>
+      </td>
     </tr>`;
   }).join('');
 
-  // Available locations not yet used (or all if none)
-  const usedLocIds=stockRows.map(s=>s.location_id);
-  const availLocs=eqLocations.filter(l=>!usedLocIds.includes(l.id));
-  const addLocOptions=availLocs.map(l=>`<option value="${l.id}">${esc(l.name)}</option>`).join('');
+  // Add new location row
+  const addRow=availLocs.length?`<tr id="eq-add-loc-row">
+    <td colspan="4">
+      <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;border:1.5px dashed var(--grey-200);" onclick="showAddLocRow('${item.id}')">+ Add stock at a location</button>
+    </td>
+  </tr>
+  <tr id="eq-new-loc-form" style="display:none;">
+    <td>
+      <select id="eq-new-loc-select" style="width:100%;padding:.35rem .5rem;border:1.5px solid var(--grey-200);border-radius:4px;font-family:'Inter',sans-serif;font-size:.82rem;outline:none;">
+        <option value="">Select location…</option>
+        ${availLocs.map(l=>`<option value="${l.id}">${esc(l.name)}</option>`).join('')}
+      </select>
+    </td>
+    <td><input type="number" id="eq-new-loc-qty" min="1" placeholder="Qty" style="width:60px;padding:.35rem .4rem;border:1.5px solid var(--grey-200);border-radius:4px;font-family:'Inter',sans-serif;font-size:.85rem;"/></td>
+    <td colspan="2">
+      <input type="text" id="eq-new-loc-reason" placeholder="Reason (required)" style="width:100%;padding:.35rem .5rem;border:1.5px solid var(--grey-200);border-radius:4px;font-family:'Inter',sans-serif;font-size:.82rem;outline:none;"/>
+    </td>
+  </tr>
+  <tr id="eq-new-loc-btns" style="display:none;">
+    <td colspan="4" style="padding:.35rem .75rem .6rem;">
+      <div style="display:flex;gap:.4rem;">
+        <button class="btn btn-primary btn-sm" onclick="saveNewLocStock('${item.id}')">Save</button>
+        <button class="btn btn-ghost btn-sm" onclick="hideAddLocRow()">Cancel</button>
+      </div>
+    </td>
+  </tr>`:'';
 
   document.getElementById('eq-item-fields').innerHTML=`
     <div class="field-row">
@@ -1300,13 +1316,13 @@ function renderEqItemFields(item){
     <div class="field-row">
       <div class="field-label">Repl. Value/Unit</div>
       <div class="field-val">
-        <input class="field-input" id="eq-edit-value" type="number" value="${item.replacement_value_per_unit||''}" placeholder="0.00" min="0" step="0.01" onblur="saveEqField('${item.id}','replacement_value_per_unit',this.value)"/>
+        <input class="field-input" type="number" value="${item.replacement_value_per_unit||''}" placeholder="0.00" min="0" step="0.01" onblur="saveEqField('${item.id}','replacement_value_per_unit',this.value)"/>
       </div>
     </div>
     <div class="field-row">
       <div class="field-label">Notes</div>
       <div class="field-val">
-        <input class="field-input" id="eq-edit-notes" type="text" value="${esc(item.notes||'')}" placeholder="General notes..." onblur="saveEqField('${item.id}','notes',this.value)"/>
+        <input class="field-input" type="text" value="${esc(item.notes||'')}" placeholder="General notes..." onblur="saveEqField('${item.id}','notes',this.value)"/>
       </div>
     </div>
     <div style="margin-top:.75rem;">
@@ -1314,18 +1330,12 @@ function renderEqItemFields(item){
       <table class="eq-loc-table">
         <thead><tr><th>Location</th><th>Qty</th><th>Last Updated</th><th></th></tr></thead>
         <tbody>
-          ${locRows||'<tr><td colspan="4" style="color:var(--grey-400);font-size:.82rem;padding:.75rem;">No stock yet — add a location below.</td></tr>'}
+          ${locRows}
+          ${addRow}
           <tr class="eq-total-row"><td>Total</td><td>${total}</td><td colspan="2">${totalVal?`<span style="color:var(--grey-600);">$${totalVal} total value</span>`:''}</td></tr>
         </tbody>
       </table>
-      <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-top:.5rem;">
-        ${availLocs.length?`
-          <select id="eq-add-loc-select" style="padding:.4rem .6rem;border:1.5px solid var(--grey-200);border-radius:6px;font-family:'Inter',sans-serif;font-size:.82rem;outline:none;">
-            <option value="">Add stock at location…</option>
-            ${addLocOptions}
-          </select>
-          <button class="btn btn-ghost btn-sm" onclick="openQtyAdjustNewLoc('${item.id}')">+ Add</button>
-        `:''}
+      <div style="margin-top:.5rem;">
         <button class="btn btn-ghost btn-sm" onclick="openAddLocationModal()">+ New Location</button>
       </div>
     </div>
@@ -1335,6 +1345,84 @@ function renderEqItemFields(item){
       <button class="btn btn-ghost btn-sm" onclick="unretireEqItem('${item.id}')">Unretire</button>
     </div>`}
   `;
+}
+
+function startInlineEdit(itemId,locId,locName,currentQty){
+  document.getElementById(`eq-qty-display-${locId}`).style.display='none';
+  document.getElementById(`eq-qty-editing-${locId}`).style.display='inline';
+  document.getElementById(`eq-inline-actions-${locId}`).style.display='block';
+  document.getElementById(`eq-reason-row-${locId}`).style.display='';
+  document.getElementById(`eq-qty-input-${locId}`).focus();
+  document.getElementById(`eq-qty-input-${locId}`).select();
+}
+
+function cancelInlineEdit(locId,currentQty){
+  document.getElementById(`eq-qty-display-${locId}`).style.display='';
+  document.getElementById(`eq-qty-editing-${locId}`).style.display='none';
+  document.getElementById(`eq-inline-actions-${locId}`).style.display='none';
+  document.getElementById(`eq-reason-row-${locId}`).style.display='none';
+  document.getElementById(`eq-qty-input-${locId}`).value=currentQty;
+}
+
+async function saveInlineQty(itemId,locId,oldQty){
+  const newQty=parseInt(document.getElementById(`eq-qty-input-${locId}`)?.value,10);
+  const note=document.getElementById(`eq-reason-${locId}`)?.value.trim();
+  if(isNaN(newQty)||newQty<0){showToast('Enter a valid quantity');return;}
+  if(!note){showToast('Reason is required');return;}
+  const diff=newQty-oldQty;
+  const loc=eqLocations.find(l=>l.id===locId);
+  const action=diff>0?`+${diff} at ${loc?.name}`:`${diff} at ${loc?.name}`;
+  const existing=eqStock.find(s=>s.item_id===itemId&&s.location_id===locId);
+  if(existing){
+    if(newQty===0)await db.from('eq_stock').delete().eq('id',existing.id);
+    else await db.from('eq_stock').update({qty:newQty,updated_at:new Date().toISOString(),updated_by:currentUser.email}).eq('id',existing.id);
+  }
+  await db.from('eq_log').insert({item_id:itemId,user_email:currentUser.email,action,note,data:{location_id:locId,old_qty:oldQty,new_qty:newQty}});
+  const[{data:stock},{data:log}]=await Promise.all([
+    db.from('eq_stock').select('*'),
+    db.from('eq_log').select('*').order('timestamp',{ascending:false})
+  ]);
+  eqStock=stock||[];eqLog=log||[];
+  const item=eqItems.find(i=>i.id===itemId);
+  if(item)renderEqItemFields(item);
+  renderEqItemHistory(itemId);
+  renderEquipmentGrid();
+  showToast('Quantity updated ✓');
+}
+
+function showAddLocRow(itemId){
+  document.getElementById('eq-add-loc-row').style.display='none';
+  document.getElementById('eq-new-loc-form').style.display='';
+  document.getElementById('eq-new-loc-btns').style.display='';
+  document.getElementById('eq-new-loc-select').focus();
+}
+
+function hideAddLocRow(){
+  document.getElementById('eq-add-loc-row').style.display='';
+  document.getElementById('eq-new-loc-form').style.display='none';
+  document.getElementById('eq-new-loc-btns').style.display='none';
+}
+
+async function saveNewLocStock(itemId){
+  const locId=document.getElementById('eq-new-loc-select')?.value;
+  const qty=parseInt(document.getElementById('eq-new-loc-qty')?.value,10);
+  const note=document.getElementById('eq-new-loc-reason')?.value.trim();
+  const loc=eqLocations.find(l=>l.id===locId);
+  if(!locId){showToast('Select a location');return;}
+  if(isNaN(qty)||qty<=0){showToast('Enter a valid quantity');return;}
+  if(!note){showToast('Reason is required');return;}
+  await db.from('eq_stock').insert({item_id:itemId,location_id:locId,qty,updated_at:new Date().toISOString(),updated_by:currentUser.email});
+  await db.from('eq_log').insert({item_id:itemId,user_email:currentUser.email,action:`+${qty} at ${loc?.name}`,note,data:{location_id:locId,old_qty:0,new_qty:qty}});
+  const[{data:stock},{data:log}]=await Promise.all([
+    db.from('eq_stock').select('*'),
+    db.from('eq_log').select('*').order('timestamp',{ascending:false})
+  ]);
+  eqStock=stock||[];eqLog=log||[];
+  const item=eqItems.find(i=>i.id===itemId);
+  if(item)renderEqItemFields(item);
+  renderEqItemHistory(itemId);
+  renderEquipmentGrid();
+  showToast('Stock added ✓');
 }
 
 function renderEqItemHistory(itemId){
@@ -1359,60 +1447,6 @@ async function saveEqField(itemId,field,value){
   renderEqItemHistory(itemId);
   renderEquipmentGrid();
   showToast('Saved ✓');
-}
-
-function openQtyAdjust(itemId,locId,locName,currentQty){
-  _adjItemId=itemId;_adjLocId=locId;_adjLocName=locName;_adjCurrentQty=currentQty;
-  document.getElementById('eq-adj-title').textContent=`Adjust — ${locName}`;
-  document.getElementById('eq-adj-qty').value='';
-  document.getElementById('eq-adj-note').value='';
-  document.getElementById('eq-adj-current').textContent=`Current qty: ${currentQty}`;
-  document.getElementById('eq-adj-modal').classList.add('open');
-  setTimeout(()=>document.getElementById('eq-adj-qty').focus(),100);
-}
-
-function openQtyAdjustNewLoc(itemId){
-  const sel=document.getElementById('eq-add-loc-select');
-  const locId=sel?.value;
-  const loc=eqLocations.find(l=>l.id===locId);
-  if(!locId||!loc){showToast('Select a location first');return;}
-  openQtyAdjust(itemId,locId,loc.name,0);
-}
-
-async function submitQtyAdjust(){
-  const newQty=parseInt(document.getElementById('eq-adj-qty').value,10);
-  const note=document.getElementById('eq-adj-note').value.trim();
-  if(isNaN(newQty)||newQty<0){showToast('Enter a valid quantity');return;}
-  if(!note){showToast('Reason is required');return;}
-  const diff=newQty-_adjCurrentQty;
-  const action=diff>0?`+${diff} at ${_adjLocName}`:`${diff} at ${_adjLocName}`;
-
-  // Upsert stock row
-  const existing=eqStock.find(s=>s.item_id===_adjItemId&&s.location_id===_adjLocId);
-  if(existing){
-    if(newQty===0){
-      await db.from('eq_stock').delete().eq('id',existing.id);
-    }else{
-      await db.from('eq_stock').update({qty:newQty,updated_at:new Date().toISOString(),updated_by:currentUser.email}).eq('id',existing.id);
-    }
-  }else if(newQty>0){
-    await db.from('eq_stock').insert({item_id:_adjItemId,location_id:_adjLocId,qty:newQty,updated_at:new Date().toISOString(),updated_by:currentUser.email});
-  }
-
-  await db.from('eq_log').insert({item_id:_adjItemId,user_email:currentUser.email,action,note,data:{location_id:_adjLocId,old_qty:_adjCurrentQty,new_qty:newQty}});
-
-  // Reload
-  const[{data:stock},{data:log}]=await Promise.all([
-    db.from('eq_stock').select('*'),
-    db.from('eq_log').select('*').order('timestamp',{ascending:false})
-  ]);
-  eqStock=stock||[];eqLog=log||[];
-  closeModal('eq-adj-modal');
-  const item=eqItems.find(i=>i.id===_adjItemId);
-  if(item)renderEqItemFields(item);
-  renderEqItemHistory(_adjItemId);
-  renderEquipmentGrid();
-  showToast('Quantity updated ✓');
 }
 
 function openAddLocationModal(){
@@ -1495,7 +1529,7 @@ async function unretireEqItem(itemId){
   showToast('Item unretired ✓');
 }
 
-['eq-item-modal','eq-add-modal','eq-adj-modal','eq-loc-modal'].forEach(id=>{
+['eq-item-modal','eq-add-modal','eq-loc-modal'].forEach(id=>{
   document.getElementById(id).addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal(id);});
 });
 
