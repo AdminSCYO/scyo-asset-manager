@@ -1949,11 +1949,20 @@ function renderLibPieceForm(p=null){
       </select></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
-      <div class="fg"><label>Date Purchased</label><input type="date" id="lib-date-purchased" value="${p?.date_purchased||''}"/></div>
-      <div class="fg" style="display:flex;align-items:center;gap:.5rem;padding-top:1.4rem;">
-        <input type="checkbox" id="lib-owned" ${p===null||p?.owned?'checked':''} style="width:auto;padding:0;border:none;"/>
-        <label style="text-transform:none;letter-spacing:0;font-size:.875rem;margin:0;cursor:pointer;" for="lib-owned">We own this piece</label>
+      <div class="fg"><label>Date Purchased</label><input type="date" id="lib-date-purchased" value="${p?.date_purchased||''}" onchange="updateLibOwnershipFields()"/></div>
+      <div class="fg" id="lib-ownership-wrap" style="padding-top:1.4rem;">
+        ${p?.date_purchased
+          ? `<span style="font-size:.85rem;color:var(--grey-500);">✓ Owned (purchased)</span>`
+          : `<label style="display:flex;align-items:center;gap:.5rem;text-transform:none;letter-spacing:0;font-size:.875rem;margin:0;cursor:pointer;">
+              <input type="checkbox" id="lib-not-owned" ${!p?.owned?'checked':''} style="width:auto;padding:0;border:none;" onchange="updateLibOwnershipFields()"/>
+              We don't own this piece
+            </label>`
+        }
       </div>
+    </div>
+    <div class="fg" id="lib-borrowed-from-wrap" style="display:${!p?.date_purchased&&!p?.owned?'block':'none'};">
+      <label>Borrowed from</label>
+      <input type="text" id="lib-borrowed-from" value="${esc(p?.notes?.match(/Borrowed from: ([^\|]+)/)?.[1]?.trim()||'')}" placeholder="e.g. Queensland Symphony Orchestra"/>
     </div>
     <div class="fg"><label>External Link</label><input type="url" id="lib-link" value="${esc(p?.external_link||'')}" placeholder="https://..."/></div>
     <div class="fg"><label>Notes</label><textarea id="lib-notes" style="height:70px;resize:vertical;">${esc(p?.notes||'')}</textarea></div>
@@ -1965,15 +1974,47 @@ function renderLibPieceForm(p=null){
   `;
 }
 
+function updateLibOwnershipFields(){
+  const dateVal=document.getElementById('lib-date-purchased')?.value;
+  const ownershipWrap=document.getElementById('lib-ownership-wrap');
+  const borrowedWrap=document.getElementById('lib-borrowed-from-wrap');
+  if(!ownershipWrap)return;
+  if(dateVal){
+    ownershipWrap.innerHTML=`<span style="font-size:.85rem;color:var(--grey-500);">✓ Owned (purchased)</span>`;
+    if(borrowedWrap)borrowedWrap.style.display='none';
+  }else{
+    ownershipWrap.innerHTML=`<label style="display:flex;align-items:center;gap:.5rem;text-transform:none;letter-spacing:0;font-size:.875rem;margin:0;cursor:pointer;">
+      <input type="checkbox" id="lib-not-owned" style="width:auto;padding:0;border:none;" onchange="updateLibOwnershipFields()"/>
+      We don't own this piece
+    </label>`;
+    const notOwned=document.getElementById('lib-not-owned');
+    if(borrowedWrap)borrowedWrap.style.display=notOwned?.checked?'block':'none';
+  }
+}
+
+function toggleBorrowedFrom(){
+  const notOwned=document.getElementById('lib-not-owned')?.checked;
+  const wrap=document.getElementById('lib-borrowed-from-wrap');
+  if(wrap)wrap.style.display=notOwned?'block':'none';
+}
+
 async function submitLibPiece(){
   const title=document.getElementById('lib-title').value.trim();
   const composer=document.getElementById('lib-composer').value.trim();
   const category=document.getElementById('lib-category').value;
   const level=document.getElementById('lib-level').value;
   const datePurchased=document.getElementById('lib-date-purchased').value;
-  const owned=document.getElementById('lib-owned').checked;
+  const notOwned=document.getElementById('lib-not-owned')?.checked||false;
+  const owned=datePurchased?true:!notOwned;
+  const borrowedFrom=document.getElementById('lib-borrowed-from')?.value.trim()||'';
   const link=document.getElementById('lib-link').value.trim();
-  const notes=document.getElementById('lib-notes').value.trim();
+  let notes=document.getElementById('lib-notes').value.trim();
+  if(!owned&&borrowedFrom){
+    notes=notes.replace(/Borrowed from:[^\|]*/,'').replace(/^\s*\|\s*/,'').trim();
+    notes=notes?`Borrowed from: ${borrowedFrom} | ${notes}`:`Borrowed from: ${borrowedFrom}`;
+  }else{
+    notes=notes.replace(/Borrowed from:[^\|]*/,'').replace(/^\s*\|\s*/,'').trim();
+  }
   if(!title){showToast('Title required');return;}
   if(!category){showToast('Category required');return;}
   const payload={title,composer:composer||null,category,level:level?parseFloat(level):null,date_purchased:datePurchased||null,owned,external_link:link||null,notes:notes||null};
