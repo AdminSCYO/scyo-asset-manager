@@ -330,6 +330,13 @@
       <input type="text" id="lib-search" placeholder="Search pieces..." oninput="renderLibCatalogue()"/>
     </div>
     <button class="btn btn-primary" id="lib-add-btn" onclick="openAddLibModal()">+ Add Piece</button>
+    <div class="col-picker-wrap no-print" id="lib-col-picker-wrap">
+      <button class="btn btn-ghost" onclick="toggleLibColPicker()" id="lib-col-picker-btn">⚙ Columns</button>
+      <div class="col-picker" id="lib-col-picker" style="display:none;">
+        <div class="col-picker-title">Visible Columns</div>
+        <div id="lib-col-picker-list"></div>
+      </div>
+    </div>
   </div>
   <div id="lib-view" style="display:none;flex:1;overflow:auto;min-height:0;">
     <!-- Catalogue sub-tabs -->
@@ -1769,6 +1776,8 @@ function switchLibView(view){
   document.getElementById('lib-history').style.display=view==='history'?'block':'none';
   document.getElementById('lib-search-wrap').style.display=view==='catalogue'?'flex':'none';
   document.getElementById('lib-add-btn').style.display=view==='catalogue'?'':'none';
+  document.getElementById('lib-col-picker-wrap').style.display=view==='catalogue'?'':'none';
+  if(view!=='catalogue')document.getElementById('lib-col-picker').style.display='none';
   document.querySelectorAll('.lib-view-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById(`lib-btn-${view}`).classList.add('active');
   document.getElementById('lib-cat-tabs').style.display=view==='catalogue'?'flex':'none';
@@ -1787,7 +1796,37 @@ function renderLibCatTabs(){
   });
 }
 
-let libSortCol='title',libSortAsc=true;
+function fmtLevel(l){if(l===null||l===undefined)return'—';if(l===99)return'Prof';return l;}
+
+const LIB_COLS=[
+  {id:'composer',label:'Composer'},
+  {id:'level',label:'Level'},
+  {id:'purchased',label:'Purchased'},
+  {id:'usage',label:'Usage in last 10 years'},
+];
+let libHiddenCols=new Set();
+
+function toggleLibColPicker(){
+  const picker=document.getElementById('lib-col-picker');
+  const isOpen=picker.style.display!=='none';
+  picker.style.display=isOpen?'none':'block';
+  if(!isOpen)renderLibColPickerList();
+}
+
+function renderLibColPickerList(){
+  document.getElementById('lib-col-picker-list').innerHTML=LIB_COLS.map(c=>`
+    <label style="display:flex;align-items:center;gap:.5rem;padding:.3rem 0;font-size:.82rem;font-weight:500;cursor:pointer;text-transform:none;letter-spacing:0;color:var(--grey-800);">
+      <input type="checkbox" ${libHiddenCols.has(c.id)?'':'checked'} onchange="toggleLibCol('${c.id}',this.checked)" style="width:auto;padding:0;border:none;"/>
+      ${c.label}
+    </label>
+  `).join('');
+}
+
+function toggleLibCol(colId,visible){
+  if(visible)libHiddenCols.delete(colId);
+  else libHiddenCols.add(colId);
+  renderLibCatalogue();
+}
 
 function libSortBy(col){
   if(libSortCol===col)libSortAsc=!libSortAsc;
@@ -1819,16 +1858,18 @@ function renderLibCatalogue(){
   });
 
   const arr=col=>libSortCol===col?(libSortAsc?'▲':'▼'):'';
+  const show=id=>!libHiddenCols.has(id);
   const container=document.getElementById('lib-catalogue');
+  const header=`<table class="lib-catalogue-table"><thead><tr>
+    <th onclick="libSortBy('title')">Title<span class="lib-sort-arrow">${arr('title')}</span></th>
+    ${show('composer')?`<th onclick="libSortBy('composer')">Composer<span class="lib-sort-arrow">${arr('composer')}</span></th>`:''}
+    ${show('level')?`<th onclick="libSortBy('level')">Level<span class="lib-sort-arrow">${arr('level')}</span></th>`:''}
+    ${show('purchased')?`<th onclick="libSortBy('purchased')">Purchased<span class="lib-sort-arrow">${arr('purchased')}</span></th>`:''}
+    ${show('usage')?`<th onclick="libSortBy('usage')">Usage in last 10 years<span class="lib-sort-arrow">${arr('usage')}</span></th>`:''}
+  </tr></thead>`;
 
   if(!filtered.length){
-    container.innerHTML=`<table class="lib-catalogue-table"><thead><tr>
-      <th onclick="libSortBy('title')">Title<span class="lib-sort-arrow">${arr('title')}</span></th>
-      <th onclick="libSortBy('composer')">Composer<span class="lib-sort-arrow">${arr('composer')}</span></th>
-      <th onclick="libSortBy('level')">Level<span class="lib-sort-arrow">${arr('level')}</span></th>
-      <th onclick="libSortBy('purchased')">Purchased<span class="lib-sort-arrow">${arr('purchased')}</span></th>
-      <th onclick="libSortBy('usage')">Usage in last 10 years<span class="lib-sort-arrow">${arr('usage')}</span></th>
-    </tr></thead></table><div style="text-align:center;padding:3rem;color:var(--grey-400);">No pieces in ${libActiveCat} yet.</div>`;
+    container.innerHTML=header+`</table><div style="text-align:center;padding:3rem;color:var(--grey-400);">No pieces in ${libActiveCat} yet.</div>`;
     return;
   }
 
@@ -1838,20 +1879,14 @@ function renderLibCatalogue(){
     const playBtn=p.external_link?`<a class="lib-play-btn" href="${esc(p.external_link)}" target="_blank" onclick="event.stopPropagation()" title="Preview score">▶ Play</a>`:'';
     return`<tr class="lib-piece-row" onclick="openEditLibPiece('${p.id}')">
       <td class="lib-title-cell"><div class="lib-piece-title">${esc(p.title)}${!p.owned?'<span class="lib-not-owned">Not owned</span>':''}${playBtn}</div></td>
-      <td class="lib-piece-meta">${esc(p.composer||'—')}</td>
-      <td class="lib-piece-stat">${p.level??'—'}</td>
-      <td class="lib-piece-stat">${p.date_purchased?p.date_purchased.slice(0,7):'—'}</td>
-      <td class="lib-piece-stat">${borrows>0?`Borrowed ${borrows}x, incl. ${perfs} perf.`:'Not used'}</td>
+      ${show('composer')?`<td class="lib-piece-meta">${esc(p.composer||'—')}</td>`:''}
+      ${show('level')?`<td class="lib-piece-stat">${fmtLevel(p.level)}</td>`:''}
+      ${show('purchased')?`<td class="lib-piece-stat">${p.date_purchased?p.date_purchased.slice(0,7):'—'}</td>`:''}
+      ${show('usage')?`<td class="lib-piece-stat">${borrows>0?`Borrowed ${borrows}x, incl. ${perfs} perf.`:'Not used'}</td>`:''}
     </tr>`;
   }).join('');
 
-  container.innerHTML=`<table class="lib-catalogue-table"><thead><tr>
-    <th onclick="libSortBy('title')">Title<span class="lib-sort-arrow">${arr('title')}</span></th>
-    <th onclick="libSortBy('composer')">Composer<span class="lib-sort-arrow">${arr('composer')}</span></th>
-    <th onclick="libSortBy('level')">Level<span class="lib-sort-arrow">${arr('level')}</span></th>
-    <th onclick="libSortBy('purchased')">Purchased<span class="lib-sort-arrow">${arr('purchased')}</span></th>
-    <th onclick="libSortBy('usage')">Usage in last 10 years<span class="lib-sort-arrow">${arr('usage')}</span></th>
-  </tr></thead><tbody>${rows}</tbody></table>`;
+  container.innerHTML=header+`<tbody>${rows}</tbody></table>`;
 }
 
 function renderLibHistory(){
@@ -1903,7 +1938,11 @@ function renderLibPieceForm(p=null){
     <div class="fg"><label>Composer</label><input type="text" id="lib-composer" value="${esc(p?.composer||'')}" placeholder="Composer / Arranger"/></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
       <div class="fg"><label>Category *</label><select id="lib-category">${['Band','Strings','Orchestra','Jazz Band'].map(c=>`<option ${p?.category===c?'selected':''}>${c}</option>`).join('')}</select></div>
-      <div class="fg"><label>Level</label><input type="number" id="lib-level" value="${p?.level||''}" placeholder="e.g. 2.5" min="0" max="6" step="0.5"/></div>
+      <div class="fg"><label>Level</label><select id="lib-level">
+        <option value="">—</option>
+        ${[0.5,1,1.5,2,2.5,3,3.5,4,4.5,5,5.5,6].map(l=>`<option value="${l}" ${p?.level===l?'selected':''}>${l}</option>`).join('')}
+        <option value="99" ${p?.level===99?'selected':''}>Prof</option>
+      </select></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
       <div class="fg"><label>Date Purchased</label><input type="date" id="lib-date-purchased" value="${p?.date_purchased||''}"/></div>
@@ -1952,7 +1991,7 @@ function openLibDetail(pieceId){
     <div class="field-row"><div class="field-label">Title</div><div class="field-val">${p.external_link?`<a href="${esc(p.external_link)}" target="_blank" style="color:var(--navy);">${esc(p.title)}</a>`:esc(p.title)}</div></div>
     <div class="field-row"><div class="field-label">Composer</div><div class="field-val">${esc(p.composer||'—')}</div></div>
     <div class="field-row"><div class="field-label">Category</div><div class="field-val">${esc(p.category)}</div></div>
-    <div class="field-row"><div class="field-label">Level</div><div class="field-val">${p.level||'—'}</div></div>
+    <div class="field-row"><div class="field-label">Level</div><div class="field-val">${fmtLevel(p.level)}</div></div>
     <div class="field-row"><div class="field-label">Owned</div><div class="field-val">${p.owned?'Yes':'No — not in library'}</div></div>
     <div class="field-row"><div class="field-label">Date Purchased</div><div class="field-val">${p.date_purchased||'—'}</div></div>
     <div class="field-row"><div class="field-label">Notes</div><div class="field-val">${esc(p.notes||'—')}</div></div>
