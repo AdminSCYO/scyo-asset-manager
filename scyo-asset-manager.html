@@ -673,8 +673,6 @@ async function _writeStatus(assetId,data){
 
 // ── ADD ASSET ─────────────────────────────────────────────────
 function openAddModal(){
-  document.getElementById('add-id').value='';
-  document.getElementById('add-id-hint').textContent='';
   const cat=allCategories.find(c=>c.id===currentCatId);
   const prefix=(cat?.prefix||'INS').toUpperCase();
 
