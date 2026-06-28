@@ -330,7 +330,10 @@
   <div id="lib-view" style="display:none;flex:1;overflow:auto;min-height:0;">
     <!-- Catalogue sub-tabs -->
     <div id="lib-cat-tabs" style="background:white;border-bottom:1px solid var(--grey-200);padding:0 1.25rem;display:flex;gap:0;">
-      ${['Band','Strings','Orchestra','Jazz Band'].map(c=>`<button class="lib-cat-tab" data-cat="${c}" onclick="switchLibCat('${c}')">${c}</button>`).join('')}
+      <button class="lib-cat-tab active" data-cat="Band" onclick="switchLibCat('Band')">Band</button>
+      <button class="lib-cat-tab" data-cat="Strings" onclick="switchLibCat('Strings')">Strings</button>
+      <button class="lib-cat-tab" data-cat="Orchestra" onclick="switchLibCat('Orchestra')">Orchestra</button>
+      <button class="lib-cat-tab" data-cat="Jazz Band" onclick="switchLibCat('Jazz Band')">Jazz Band</button>
     </div>
     <div id="lib-catalogue" style="display:block;"></div>
     <div id="lib-history" style="display:none;padding:1.25rem;"></div>
