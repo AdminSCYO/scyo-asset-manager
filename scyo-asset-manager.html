@@ -619,7 +619,8 @@ async function selectCategoryById(id){
   if(cat)sessionStorage.setItem('scyo-active-tab',cat.prefix.toUpperCase());
   renderCatNav();
   await loadCategoryData();
-  document.querySelector('.modal-title').textContent=`Settings — ${cat?.name||''}`;
+  const titleEl=document.getElementById('settings-modal-title');
+  if(titleEl)titleEl.textContent=`Settings — ${cat?.name||''}`;
 }
 
 async function selectCategory(prefix){
