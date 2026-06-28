@@ -1881,6 +1881,10 @@ function renderLibCatalogue(){
       ${show('level')?`<td class="lib-piece-stat">${fmtLevel(p.level)}</td>`:''}
       ${show('purchased')?`<td class="lib-piece-stat">${p.date_purchased?p.date_purchased.slice(0,7):'—'}</td>`:''}
       ${show('usage')?`<td class="lib-piece-stat">${borrows>0?'Borrowed '+borrows+'x, incl. '+perfs+' perf.':'Not used'}</td>`:''}
+      <td style="white-space:nowrap;">
+        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openLibBorrowModal('${p.id}')">Borrow</button>
+        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openLibPerfModal('${p.id}')">Perform</button>
+      </td>
     </tr>`;
   }).join('');
 
@@ -1890,6 +1894,7 @@ function renderLibCatalogue(){
     ${show('level')?`<th onclick="libSortBy('level')">Level<span class="lib-sort-arrow">${arr('level')}</span></th>`:''}
     ${show('purchased')?`<th onclick="libSortBy('purchased')">Purchased<span class="lib-sort-arrow">${arr('purchased')}</span></th>`:''}
     ${show('usage')?`<th onclick="libSortBy('usage')">Usage in last 10 years<span class="lib-sort-arrow">${arr('usage')}</span></th>`:''}
+    <th></th>
   </tr></thead><tbody>${rows}</tbody></table>`;
 }
 
@@ -1937,40 +1942,67 @@ function openEditLibPiece(pieceId){
 }
 
 function renderLibPieceForm(p=null){
+  const isEdit=!!p;
   document.getElementById('lib-piece-form').innerHTML=`
-    <div class="fg"><label>Title *</label><input type="text" id="lib-title" value="${esc(p?.title||'')}" placeholder="Title"/></div>
-    <div class="fg"><label>Composer</label><input type="text" id="lib-composer" value="${esc(p?.composer||'')}" placeholder="Composer / Arranger"/></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
-      <div class="fg"><label>Category *</label><select id="lib-category">${['Band','Strings','Orchestra','Jazz Band'].map(c=>`<option ${p?.category===c?'selected':''}>${c}</option>`).join('')}</select></div>
-      <div class="fg"><label>Level</label><select id="lib-level">
-        <option value="">—</option>
-        ${[0.5,1,1.5,2,2.5,3,3.5,4,4.5,5,5.5,6].map(l=>`<option value="${l}" ${p?.level===l?'selected':''}>${l}</option>`).join('')}
-        <option value="99" ${p?.level===99?'selected':''}>Prof</option>
-      </select></div>
+    <div class="fg"><label>Title *</label><input type="text" id="lib-title" value="${esc(p?.title||'')}" placeholder="Title" ${isEdit?'onblur="autoSaveLibPiece()"':''}/>
     </div>
-    <div class="fg"><label>Date Purchased</label><input type="date" id="lib-date-purchased" value="${p?.date_purchased||''}" onchange="updateLibOwnershipFields()"/></div>
+    <div class="fg"><label>Composer</label><input type="text" id="lib-composer" value="${esc(p?.composer||'')}" placeholder="Composer / Arranger" ${isEdit?'onblur="autoSaveLibPiece()"':''}/>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
+      <div class="fg"><label>Category *</label><select id="lib-category" ${isEdit?'onchange="autoSaveLibPiece()"':''}>${['Band','Strings','Orchestra','Jazz Band'].map(c=>`<option ${p?.category===c?'selected':''}>${c}</option>`).join('')}</select></div>
+      <div class="fg"><label>Level</label><select id="lib-level" ${isEdit?'onchange="autoSaveLibPiece()"':''}><option value="">—</option>${[0.5,1,1.5,2,2.5,3,3.5,4,4.5,5,5.5,6].map(l=>`<option value="${l}" ${p?.level===l?'selected':''}>${l}</option>`).join('')}<option value="99" ${p?.level===99?'selected':''}>Prof</option></select></div>
+    </div>
+    <div class="fg"><label>Date Purchased</label><input type="date" id="lib-date-purchased" value="${p?.date_purchased||''}" onchange="updateLibOwnershipFields();${isEdit?'autoSaveLibPiece();':''}"/>
+    </div>
     <div class="fg" id="lib-ownership-wrap">
       ${p?.date_purchased
-        ? `<div style="display:flex;align-items:center;gap:.5rem;padding:.5rem .75rem;background:#e8f5e9;border-radius:var(--radius);font-size:.85rem;color:#2e7d32;font-weight:600;">✓ Owned — purchased</div>`
+        ? '<div style="display:flex;align-items:center;gap:.5rem;padding:.5rem .75rem;background:#e8f5e9;border-radius:var(--radius);font-size:.85rem;color:#2e7d32;font-weight:600;">✓ Owned — purchased</div>'
         : `<div style="display:flex;flex-direction:column;gap:.5rem;">
             <label style="display:flex;align-items:center;gap:.5rem;text-transform:none;letter-spacing:0;font-size:.875rem;margin:0;cursor:pointer;">
-              <input type="checkbox" id="lib-not-owned" ${!p?.owned?'checked':''} style="width:auto;padding:0;border:none;" onchange="updateLibOwnershipFields(this.checked)"/>
+              <input type="checkbox" id="lib-not-owned" ${!p?.owned?'checked':''} style="width:auto;padding:0;border:none;" onchange="updateLibOwnershipFields(this.checked);${isEdit?'autoSaveLibPiece();':''}"/>
               We don't own this piece
             </label>
             <div id="lib-borrowed-from-wrap" style="display:${!p?.owned?'block':'none'};">
-              <input type="text" id="lib-borrowed-from" value="${esc(p?.notes?.match(/Borrowed from: ([^|]+)/)?.[1]?.trim()||'')}" placeholder="Borrowed from (e.g. Queensland SO)"/>
+              <input type="text" id="lib-borrowed-from" value="${esc(p?.notes?.match(/Borrowed from: ([^|]+)/)?.[1]?.trim()||'')}" placeholder="Borrowed from (e.g. Queensland SO)" ${isEdit?'onblur="autoSaveLibPiece()"':''}/>
             </div>
           </div>`
       }
     </div>
-    <div class="fg"><label>External Link</label><input type="url" id="lib-link" value="${esc(p?.external_link||'')}" placeholder="https://..."/></div>
-    <div class="fg"><label>Notes</label><textarea id="lib-notes" style="height:70px;resize:vertical;">${esc(p?.notes||'')}</textarea></div>
-    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:.75rem;" onclick="submitLibPiece()">Save</button>
-    ${libEditPieceId?`<div style="display:flex;gap:.5rem;margin-top:.5rem;">
+    <div class="fg"><label>External Link</label><textarea id="lib-link" style="height:50px;resize:vertical;word-break:break-all;" ${isEdit?'onblur="autoSaveLibPiece()"':''}>${esc(p?.external_link||'')}</textarea>
+    </div>
+    <div class="fg"><label>Notes</label><textarea id="lib-notes" style="height:70px;resize:vertical;" ${isEdit?'onblur="autoSaveLibPiece()"':''}>${esc(p?.notes||'')}</textarea></div>
+    ${isEdit?`
+    <div style="display:flex;gap:.5rem;margin-top:.25rem;">
       <button class="btn btn-ghost" style="flex:1;justify-content:center;" onclick="closeModal('lib-piece-modal');openLibBorrowModal(libEditPieceId)">+ Log Borrow</button>
       <button class="btn btn-ghost" style="flex:1;justify-content:center;" onclick="closeModal('lib-piece-modal');openLibPerfModal(libEditPieceId)">+ Log Performance</button>
-    </div>`:''}
+    </div>`:'<button class="btn btn-primary" style="width:100%;justify-content:center;padding:.75rem;" onclick="submitLibPiece()">Add Piece</button>'}
   `;
+}
+
+async function autoSaveLibPiece(){
+  if(!libEditPieceId)return;
+  const title=document.getElementById('lib-title')?.value.trim();
+  if(!title)return;
+  const composer=document.getElementById('lib-composer')?.value.trim();
+  const category=document.getElementById('lib-category')?.value;
+  const level=document.getElementById('lib-level')?.value;
+  const datePurchased=document.getElementById('lib-date-purchased')?.value;
+  const notOwned=document.getElementById('lib-not-owned')?.checked||false;
+  const owned=datePurchased?true:!notOwned;
+  const borrowedFrom=document.getElementById('lib-borrowed-from')?.value.trim()||'';
+  const link=document.getElementById('lib-link')?.value.trim();
+  let notes=document.getElementById('lib-notes')?.value.trim()||'';
+  if(!owned&&borrowedFrom){
+    notes=notes.replace(/Borrowed from:[^|]*/,'').replace(/^\s*\|\s*/,'').trim();
+    notes=notes?`Borrowed from: ${borrowedFrom} | ${notes}`:`Borrowed from: ${borrowedFrom}`;
+  }else{
+    notes=notes.replace(/Borrowed from:[^|]*/,'').replace(/^\s*\|\s*/,'').trim();
+  }
+  const payload={title,composer:composer||null,category,level:level?parseFloat(level):null,date_purchased:datePurchased||null,owned,external_link:link||null,notes:notes||null};
+  await db.from('library_pieces').update(payload).eq('id',libEditPieceId);
+  libPieces=libPieces.map(p=>p.id===libEditPieceId?{...p,...payload}:p);
+  renderLibCatalogue();
+  showToast('Saved ✓');
 }
 
 function updateLibOwnershipFields(checkedVal){
