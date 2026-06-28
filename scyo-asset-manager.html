@@ -206,7 +206,9 @@
     </div>
   </header>
 
-  <nav class="cat-nav" id="cat-nav">
+  <nav class="cat-nav" id="cat-nav" style="justify-content:space-between;">
+    <div id="cat-nav-tabs" style="display:flex;overflow-x:auto;scrollbar-width:none;"></div>
+    <button onclick="openSettingsModal()" style="flex-shrink:0;padding:.7rem 1.25rem;border:none;background:none;font-family:'Inter',sans-serif;font-size:.82rem;font-weight:600;color:rgba(255,255,255,.5);cursor:pointer;white-space:nowrap;transition:color .15s;" onmouseover="this.style.color='rgba(255,255,255,.8)'" onmouseout="this.style.color='rgba(255,255,255,.5)'">⚙ Settings</button>
   </nav>
 
   <div class="toolbar">
@@ -232,7 +234,6 @@
         <div id="col-picker-list"></div>
       </div>
     </div>
-    <button class="btn btn-ghost no-print" onclick="openSettingsModal()">⚙ Settings</button>
   </div>
 
   <main>
@@ -338,6 +339,13 @@ async function handleSession(session){
 // ── DATA ──────────────────────────────────────────────────────
 async function loadAll(){
   await loadCategories();
+  // Restore category from URL hash
+  const hash=window.location.hash.replace('#','').toUpperCase();
+  if(hash){
+    const cat=allCategories.find(c=>c.prefix.toUpperCase()===hash);
+    if(cat)currentCatId=cat.id;
+  }
+  renderCatNav();
   if(currentCatId)await loadCategoryData();
 }
 
@@ -396,6 +404,8 @@ function getAssetHistory(assetId){
 // ── CATEGORY SELECT ───────────────────────────────────────────
 async function selectCategoryById(id){
   currentCatId=id;
+  const cat=allCategories.find(c=>c.id===id);
+  if(cat)window.location.hash=cat.prefix.toLowerCase();
   renderCatNav();
   await loadCategoryData();
   const cat=allCategories.find(c=>c.id===id);
