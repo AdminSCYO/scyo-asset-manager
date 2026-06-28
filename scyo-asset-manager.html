@@ -804,7 +804,7 @@ function openAddModal(){
     </div>
     <div class="fg">
       <label>Asset ID *</label>
-      <input type="text" id="add-id" placeholder="Auto-generated from Item name"/>
+      <input type="text" id="add-id" placeholder="Auto-generated from Item field"/>
       <div style="font-size:.72rem;color:var(--grey-400);margin-top:.3rem;" id="add-id-hint"></div>
     </div>`:''}
     ${otherFields.map(f=>{
@@ -839,18 +839,16 @@ async function generateAssetId(prefix){
   const itemVal=document.getElementById('add-f-item')?.value.trim()||'';
   const hint=document.getElementById('add-id-hint');
   if(!itemVal){document.getElementById('add-id').value='';hint.textContent='';return;}
-  const slug=itemVal.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
-  const base=`${prefix}-${slug}-`;
-  // Find highest existing number for this base
+  const base=`${prefix}-`;
   const existing=allAssets.filter(a=>a.display_id.startsWith(base));
   let next=1;
   existing.forEach(a=>{
     const n=parseInt(a.display_id.replace(base,''),10);
     if(!isNaN(n)&&n>=next)next=n+1;
   });
-  const generated=`${base}${String(next).padStart(3,'0')}`;
+  const generated=`${base}${String(next).padStart(4,'0')}`;
   document.getElementById('add-id').value=generated;
-  hint.textContent=`Auto-generated — edit if needed`;
+  hint.textContent='Auto-generated — edit if needed';
 }
 
 function renderAddStatusDetail(){
@@ -1480,12 +1478,11 @@ function openAddEquipmentModal(){
 function generateEqId(){
   const name=document.getElementById('eq-add-name').value.trim();
   if(!name){document.getElementById('eq-add-id').value='';return;}
-  const slug=name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
-  const base=`EQP-${slug}-`;
+  const base='EQP-';
   const existing=eqItems.filter(i=>i.display_id.startsWith(base));
   let next=1;
   existing.forEach(i=>{const n=parseInt(i.display_id.replace(base,''),10);if(!isNaN(n)&&n>=next)next=n+1;});
-  document.getElementById('eq-add-id').value=`${base}${String(next).padStart(3,'0')}`;
+  document.getElementById('eq-add-id').value=`${base}${String(next).padStart(4,'0')}`;
   document.getElementById('eq-add-id-hint').textContent='Auto-generated — edit if needed';
 }
 
