@@ -1849,8 +1849,8 @@ function renderLibCatalogue(){
     else if(libSortCol==='level'){av=a.level??-1;bv=b.level??-1;}
     else if(libSortCol==='purchased'){av=a.date_purchased||'';bv=b.date_purchased||'';}
     else if(libSortCol==='usage'){
-      av=libBorrows.filter(b=>b.piece_id===a.id).length;
-      bv=libBorrows.filter(b=>b.piece_id===b.id).length;
+      av=libBorrows.filter(br=>br.piece_id===a.id).length;
+      bv=libBorrows.filter(br=>br.piece_id===b.id).length;
     }
     if(av<bv)return libSortAsc?-1:1;
     if(av>bv)return libSortAsc?1:-1;
@@ -1874,7 +1874,7 @@ function renderLibCatalogue(){
   }
 
   const rows=filtered.map(p=>{
-    const borrows=libBorrows.filter(b=>b.piece_id===p.id).length;
+    const borrows=libBorrows.filter(br=>br.piece_id===p.id).length;
     const perfs=libPerformances.filter(pf=>pf.piece_id===p.id).length;
     const playBtn=p.external_link?`<a class="lib-play-btn" href="${esc(p.external_link)}" target="_blank" onclick="event.stopPropagation()" title="Preview score">▶ Play</a>`:'';
     return`<tr class="lib-piece-row" onclick="openEditLibPiece('${p.id}')">
