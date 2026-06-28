@@ -320,7 +320,7 @@
   </div>
 
   <!-- MUSIC LIBRARY VIEW -->
-  <div id="lib-toolbar" style="display:none;background:white;border-bottom:1px solid var(--grey-200);padding:.6rem 1.25rem;display:none;align-items:center;gap:.75rem;flex-wrap:wrap;">
+  <div id="lib-toolbar" style="display:none;background:white;border-bottom:1px solid var(--grey-200);padding:.6rem 1.25rem;align-items:center;gap:.75rem;flex-wrap:wrap;">
     <div style="display:flex;gap:.5rem;">
       <button class="lib-view-btn active" id="lib-btn-catalogue" onclick="switchLibView('catalogue')">Catalogue</button>
       <button class="lib-view-btn" id="lib-btn-history" onclick="switchLibView('history')">Performance History</button>
@@ -1763,6 +1763,8 @@ async function loadLibData(){
     db.from('library_ensembles').select('*').order('sort_order')
   ]);
   libPieces=pieces||[];libBorrows=borrows||[];libPerformances=perfs||[];libEnsembles=ensembles||[];
+  const _savedCat=sessionStorage.getItem('scyo-lib-cat');
+  if(_savedCat&&['Band','Strings','Orchestra','Jazz Band'].includes(_savedCat))libActiveCat=_savedCat;
   showLibView();
   renderLibCatTabs();
   renderLibCatalogue();
