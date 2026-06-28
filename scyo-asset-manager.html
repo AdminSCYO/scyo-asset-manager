@@ -86,7 +86,7 @@
     tbody tr{border-bottom:1px solid var(--grey-100);transition:background .1s;}
     tbody tr:hover{background:var(--grey-50);}
     tbody td{padding:.6rem .85rem;color:var(--grey-800);white-space:nowrap;}
-    tbody td.id-col{font-family:monospace;font-size:.78rem;color:var(--grey-600);font-weight:600;}
+    tbody td.id-col{font-family:monospace;font-size:.78rem;color:var(--grey-600);font-weight:600;width:105px;min-width:105px;max-width:105px;}
     .status-pill{display:inline-block;padding:.15rem .55rem;border-radius:12px;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;}
     .sp-storage{background:#d4f4e3;color:var(--success);}
     .sp-loan{background:#fff3cd;color:var(--warning);}
@@ -639,12 +639,12 @@ function renderTable(){
   // Header
   const idArrow=sortCol==='__id'?(sortAsc?'▲':'▼'):'';
   document.getElementById('table-head').innerHTML=`<tr>
-    <th class="${sortCol==='__id'?'sorted':''}" onclick="sortBy('__id')" style="white-space:nowrap;position:sticky;left:0;z-index:11;background:var(--grey-50);">ID<span class="sort-arrow">${idArrow}</span></th>
+    <th class="${sortCol==='__id'?'sorted':''}" onclick="sortBy('__id')" style="white-space:nowrap;position:sticky;left:0;z-index:11;background:var(--grey-50);width:105px;min-width:105px;">ID<span class="sort-arrow">${idArrow}</span></th>
     ${visFields.map((f,i)=>{
       const arrow=sortCol===f.id?(sortAsc?'▲':'▼'):'';
       const header=f.display_name||f.name;
       const isItem=f.sort_order===1||f.name==='Item';
-      return`<th class="${sortCol===f.id?'sorted':''}" onclick="sortBy('${f.id}')" style="white-space:normal;min-width:80px;max-width:140px;word-break:break-word;${isItem?'position:sticky;left:120px;z-index:11;background:var(--grey-50);':''}">${esc(header)}<span class="sort-arrow">${arrow}</span></th>`;
+      return`<th class="${sortCol===f.id?'sorted':''}" onclick="sortBy('${f.id}')" style="white-space:normal;min-width:80px;max-width:140px;word-break:break-word;${isItem?'position:sticky;left:105px;z-index:11;background:var(--grey-50);':''}">${esc(header)}<span class="sort-arrow">${arrow}</span></th>`;
     }).join('')}
     <th style="white-space:nowrap;">Action</th>
   </tr>`;
@@ -688,7 +688,7 @@ function renderTable(){
         }
         // Sticky second column (Item — first non-Status field at sort_order 1)
         const isItem=f.sort_order===1||f.name==='Item';
-        return`<td${isItem?' style="position:sticky;left:120px;background:white;z-index:1;box-shadow:2px 0 4px rgba(0,0,0,.06);"':''}>${display}</td>`;
+        return`<td${isItem?' style="position:sticky;left:105px;background:white;z-index:1;box-shadow:2px 0 4px rgba(0,0,0,.06);"':''}>${display}</td>`;
       }).join('')}
       <td><button class="action-btn" onclick="openEditModal('${asset.display_id}')">Edit</button></td>
     </tr>`;
