@@ -818,13 +818,52 @@ function renderAccBody(cat){
         <button class="btn btn-ghost btn-sm" onclick="hideAff('${cat.id}')">Cancel</button>
       </div>
     </div>
-    <div style="margin-top:.75rem;">
+    <div style="margin-top:.75rem;display:flex;gap:.5rem;flex-wrap:wrap;">
       <button class="btn btn-primary btn-sm" id="aff-btn-${cat.id}" onclick="showAff('${cat.id}')">+ Add Field</button>
+      ${allCategories.filter(c=>c.id!==cat.id&&c.category_fields.length>0).length?`
+      <select id="copy-from-${cat.id}" style="padding:.35rem .7rem;border:1.5px solid var(--grey-200);border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:.78rem;outline:none;">
+        <option value="">Copy fields from…</option>
+        ${allCategories.filter(c=>c.id!==cat.id&&c.category_fields.length>0).map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}
+      </select>
+      <button class="btn btn-ghost btn-sm" onclick="copyFieldsFrom('${cat.id}')">Copy</button>
+      `:''}
     </div>
   `;
 }
 
 function toggleAcc(id){openAccId=openAccId===id?null:id;renderSettingsAccordion();}
+
+async function copyFieldsFrom(targetCatId){
+  const srcId=document.getElementById(`copy-from-${targetCatId}`)?.value;
+  if(!srcId){showToast('Select a category to copy from');return;}
+  const src=allCategories.find(c=>c.id===srcId);
+  if(!src||!src.category_fields.length){showToast('No fields to copy');return;}
+  if(!confirm(`Copy ${src.category_fields.length} field(s) from "${src.name}"? Existing fields are kept.`))return;
+  const inserts=src.category_fields.map((f,i)=>({
+    category_id:targetCatId,
+    name:f.name,
+    display_name:f.display_name||null,
+    field_type:f.field_type,
+    format:f.format||null,
+    required:f.required||false,
+    sort_order:1000+i
+  }));
+  const{data:newFields,error}=await db.from('category_fields').insert(inserts).select();
+  if(error){showToast('Error: '+error.message);return;}
+  // Copy dropdown options
+  const optInserts=[];
+  for(const f of src.category_fields){
+    if(f.field_type==='dropdown'&&f.field_options?.length){
+      const newField=newFields.find(nf=>nf.name===f.name);
+      if(newField){
+        f.field_options.forEach(o=>optInserts.push({field_id:newField.id,value:o.value,sort_order:o.sort_order}));
+      }
+    }
+  }
+  if(optInserts.length)await db.from('field_options').insert(optInserts);
+  showToast(`Copied ${inserts.length} field(s) ✓`);
+  await loadCategories();renderSettingsAccordion();renderTable();renderColPicker();
+}
 function showAff(id){document.getElementById(`aff-${id}`).style.display='block';document.getElementById(`aff-btn-${id}`).style.display='none';document.getElementById(`aff-name-${id}`).focus();}
 function hideAff(id){document.getElementById(`aff-${id}`).style.display='none';document.getElementById(`aff-btn-${id}`).style.display='inline-flex';}
 
