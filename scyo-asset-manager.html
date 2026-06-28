@@ -357,7 +357,7 @@ function renderCatNav(){
 
 async function loadCategoryData(){
   const[{data:assets},{data:log}]=await Promise.all([
-    db.from('ins_assets').select('*').order('created_at'),
+    db.from('ins_assets').select('*').eq('category_id',currentCatId).order('created_at'),
     db.from('ins_log').select('*').order('timestamp',{ascending:false})
   ]);
   allAssets=assets||[];
