@@ -1798,6 +1798,8 @@ function renderLibCatTabs(){
 
 function fmtLevel(l){if(l===null||l===undefined)return'—';if(l===99)return'Prof';return l;}
 
+let libSortCol='title',libSortAsc=true;
+
 const LIB_COLS=[
   {id:'composer',label:'Composer'},
   {id:'level',label:'Level'},
