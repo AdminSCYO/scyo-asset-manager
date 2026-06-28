@@ -606,7 +606,7 @@ function renderInlineStatusDetail(assetId){
   const type=sel.value;
   const detail=document.getElementById('inline-status-detail');
   if(!detail)return;
-  if(type==='Retired'||type==='Missing'){detail.innerHTML='';return;}
+  if(type==='Retired'||type==='Missing'){detail.innerHTML='';saveInlineStatus(assetId);return;}
   const placeholder=type==='Stored at'?'Location (e.g. SCYO Storage Room)':'Student / borrower name';
   const orig=_inlineStatusDetail.statusType===type?_inlineStatusDetail.statusDetail:'';
   detail.innerHTML=`<input class="field-input" id="inline-status-val" placeholder="${placeholder}" value="${esc(orig)}" onblur="saveInlineStatus('${assetId}')"/>`;
