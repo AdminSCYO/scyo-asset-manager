@@ -1873,6 +1873,10 @@ function renderLibPieceForm(p=null){
     <div class="fg"><label>External Link</label><input type="url" id="lib-link" value="${esc(p?.external_link||'')}" placeholder="https://..."/></div>
     <div class="fg"><label>Notes</label><textarea id="lib-notes" style="height:70px;resize:vertical;">${esc(p?.notes||'')}</textarea></div>
     <button class="btn btn-primary" style="width:100%;justify-content:center;padding:.75rem;" onclick="submitLibPiece()">Save</button>
+    ${libEditPieceId?`<div style="display:flex;gap:.5rem;margin-top:.5rem;">
+      <button class="btn btn-ghost" style="flex:1;justify-content:center;" onclick="closeModal('lib-piece-modal');openLibBorrowModal(libEditPieceId)">+ Log Borrow</button>
+      <button class="btn btn-ghost" style="flex:1;justify-content:center;" onclick="closeModal('lib-piece-modal');openLibPerfModal(libEditPieceId)">+ Log Performance</button>
+    </div>`:''}
   `;
 }
 
