@@ -206,9 +206,9 @@
     </div>
   </header>
 
-  <nav class="cat-nav" id="cat-nav" style="justify-content:space-between;">
-    <div id="cat-nav-tabs" style="display:flex;overflow-x:auto;scrollbar-width:none;"></div>
-    <button onclick="openSettingsModal()" style="flex-shrink:0;padding:.7rem 1.25rem;border:none;background:none;font-family:'Inter',sans-serif;font-size:.82rem;font-weight:600;color:rgba(255,255,255,.5);cursor:pointer;white-space:nowrap;transition:color .15s;" onmouseover="this.style.color='rgba(255,255,255,.8)'" onmouseout="this.style.color='rgba(255,255,255,.5)'">⚙ Settings</button>
+  <nav class="cat-nav" id="cat-nav">
+    <div id="cat-nav-tabs" style="display:flex;flex:1;overflow-x:auto;scrollbar-width:none;"></div>
+    <button onclick="openSettingsModal()" style="flex-shrink:0;padding:.7rem 1.25rem;border:none;border-left:1px solid rgba(255,255,255,.08);background:none;font-family:'Inter',sans-serif;font-size:.82rem;font-weight:600;color:rgba(255,255,255,.5);cursor:pointer;white-space:nowrap;transition:color .15s;" onmouseover="this.style.color='rgba(255,255,255,.8)'" onmouseout="this.style.color='rgba(255,255,255,.5)'">⚙ Settings</button>
   </nav>
 
   <div class="toolbar">
@@ -353,7 +353,7 @@ async function loadCategories(){
 }
 
 function renderCatNav(){
-  document.getElementById('cat-nav').innerHTML=allCategories.map(c=>`
+  document.getElementById('cat-nav-tabs').innerHTML=allCategories.map(c=>`
     <button class="${c.id===currentCatId?'active':''}" onclick="selectCategoryById('${c.id}')">${esc(c.name)}</button>
   `).join('');
 }
