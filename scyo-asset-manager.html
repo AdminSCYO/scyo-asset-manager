@@ -274,7 +274,7 @@
   </main>
 
   <!-- PERCUSSION & EQUIPMENT VIEW -->
-  <div id="perc-toolbar" style="display:none;">
+  <div id="perc-toolbar" style="display:none;background:white;border-bottom:1px solid var(--grey-200);padding:.6rem 1.25rem;align-items:center;gap:.75rem;flex-wrap:wrap;">
     <div class="search-wrap" style="flex:1;min-width:180px;">
       <span class="si">🔍</span>
       <input type="text" id="perc-search" placeholder="Search..." oninput="renderPercView()"/>
@@ -1307,6 +1307,7 @@ function showPercView(){
   document.querySelector('main').style.display='none';
   document.getElementById('lib-toolbar').style.cssText='display:none;';
   document.getElementById('lib-view').style.cssText='display:none;';
+  document.getElementById('perc-toolbar').style.display='flex';
   document.getElementById('perc-view').style.display='block';
   ['perc-add-modal','perc-item-modal','perc-types-modal'].forEach(id=>closeModal(id));
 }
