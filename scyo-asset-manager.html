@@ -1343,6 +1343,16 @@ let _tt;function showToast(m){const t=document.getElementById('toast');t.textCon
   document.getElementById(id).addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal(id);});
 });
 
+function parsePercStatus(status){
+  if(!status||status==='In Storage')return{cls:'storage',label:'In Storage',location:''};
+  if(status.toLowerCase().startsWith('in storage at ')){return{cls:'storage',label:'In Storage',location:status.slice(14)};}
+  if(status.toLowerCase().startsWith('stored at ')){return{cls:'storage',label:'In Storage',location:status.slice(10)};}
+  if(status==='Missing')return{cls:'missing',label:'Missing',location:''};
+  if(status==='Retired')return{cls:'retired',label:'Retired',location:''};
+  if(status.toLowerCase().startsWith('loaned to ')){return{cls:'loan',label:'On Loan',location:status.slice(10)};}
+  return{cls:'storage',label:'In Storage',location:status};
+}
+
 // ── PERCUSSION & EQUIPMENT ────────────────────────────────────
 let percTypes=[],percAssets=[],percLog=[];
 
@@ -1380,19 +1390,23 @@ function getPercAssetState(assetId){
   return state;
 }
 
+let percSortCol='id',percSortAsc=true;
+function percSortBy(col){if(percSortCol===col)percSortAsc=!percSortAsc;else{percSortCol=col;percSortAsc=true;}renderPercView();}
+
 function renderPercView(){
   const q=(document.getElementById('perc-search')?.value||'').toLowerCase();
   const thead=document.getElementById('perc-thead');
   const tbody=document.getElementById('perc-tbody');
 
+  const arr=col=>percSortCol===col?(percSortAsc?'▲':'▼'):'';
+  const thStyle='padding:.6rem 1rem;text-align:left;font-size:.75rem;font-weight:700;color:var(--grey-600);text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid var(--grey-200);background:var(--grey-50);cursor:pointer;user-select:none;white-space:nowrap;';
   thead.innerHTML=`<tr>
-    <th style="padding:.6rem 1rem;text-align:left;font-size:.75rem;font-weight:700;color:var(--grey-600);text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid var(--grey-200);background:var(--grey-50);">ID</th>
-    <th style="padding:.6rem 1rem;text-align:left;font-size:.75rem;font-weight:700;color:var(--grey-600);text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid var(--grey-200);background:var(--grey-50);">Item</th>
-    <th style="padding:.6rem 1rem;text-align:left;font-size:.75rem;font-weight:700;color:var(--grey-600);text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid var(--grey-200);background:var(--grey-50);">Type</th>
-    <th style="padding:.6rem 1rem;text-align:left;font-size:.75rem;font-weight:700;color:var(--grey-600);text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid var(--grey-200);background:var(--grey-50);">Status</th>
-    <th style="padding:.6rem 1rem;text-align:left;font-size:.75rem;font-weight:700;color:var(--grey-600);text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid var(--grey-200);background:var(--grey-50);">Location</th>
-    <th style="padding:.6rem 1rem;text-align:left;font-size:.75rem;font-weight:700;color:var(--grey-600);text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid var(--grey-200);background:var(--grey-50);">Last Sighted</th>
-    <th style="padding:.6rem 1rem;text-align:left;font-size:.75rem;font-weight:700;color:var(--grey-600);text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid var(--grey-200);background:var(--grey-50);">Action</th>
+    <th style="${thStyle}" onclick="percSortBy('id')">ID <span style="font-size:.65rem;">${arr('id')}</span></th>
+    <th style="${thStyle}" onclick="percSortBy('item')">Item <span style="font-size:.65rem;">${arr('item')}</span></th>
+    <th style="${thStyle}" onclick="percSortBy('type')">Type <span style="font-size:.65rem;">${arr('type')}</span></th>
+    <th style="${thStyle}" onclick="percSortBy('status')">Status <span style="font-size:.65rem;">${arr('status')}</span></th>
+    <th style="${thStyle}" onclick="percSortBy('lastsighted')">Last Sighted <span style="font-size:.65rem;">${arr('lastsighted')}</span></th>
+    <th style="${thStyle}">Action</th>
   </tr>`;
 
   // Separate bulk and non-bulk types
@@ -1410,17 +1424,34 @@ function renderPercView(){
 
   let rows='';
 
+  // Sort non-bulk assets
+  const sortedFiltered=[...filtered].sort((a,b)=>{
+    const sa=getPercAssetState(a.display_id),sb=getPercAssetState(b.display_id);
+    let av,bv;
+    if(percSortCol==='id'){av=a.display_id;bv=b.display_id;}
+    else if(percSortCol==='item'){av=(sa['Item']||'').toLowerCase();bv=(sb['Item']||'').toLowerCase();}
+    else if(percSortCol==='type'){const ta=percTypes.find(t=>t.id===a.type_id);const tb=percTypes.find(t=>t.id===b.type_id);av=(ta?.name||'').toLowerCase();bv=(tb?.name||'').toLowerCase();}
+    else if(percSortCol==='status'){av=sa['Status']||'';bv=sb['Status']||'';}
+    else if(percSortCol==='lastsighted'){av=sa['Last Sighted']||'';bv=sb['Last Sighted']||'';}
+    if(av<bv)return percSortAsc?-1:1;
+    if(av>bv)return percSortAsc?1:-1;
+    return 0;
+  });
+
   // Non-bulk: individual rows
-  filtered.filter(a=>!a.type_id||nonBulkTypeIds.has(a.type_id)).forEach(a=>{
+  sortedFiltered.filter(a=>!a.type_id||nonBulkTypeIds.has(a.type_id)).forEach(a=>{
     const state=getPercAssetState(a.display_id);
     const type=percTypes.find(t=>t.id===a.type_id);
-    const statusCls=state['Status']==='Missing'?'sc-missing':state['Status']==='Retired'?'sc-retired':'sc-storage';
+    const rawStatus=state['Status']||'In Storage';
+    const {cls:statusCls,label:statusLabel,location:statusLoc}=parsePercStatus(rawStatus);
     rows+=`<tr style="border-bottom:1px solid var(--grey-100);cursor:pointer;" onclick="openPercItemModal('${a.display_id}')" onmouseover="this.style.background='var(--grey-50)'" onmouseout="this.style.background=''">
       <td style="padding:.65rem 1rem;font-family:monospace;font-size:.82rem;color:var(--grey-600);">${esc(a.display_id)}</td>
       <td style="padding:.65rem 1rem;font-weight:600;">${esc(state['Item']||'—')}</td>
       <td style="padding:.65rem 1rem;font-size:.82rem;color:var(--grey-600);">${esc(type?.name||'—')}</td>
-      <td style="padding:.65rem 1rem;"><span class="status-chip ${statusCls}">${esc(state['Status']||'In Storage')}</span></td>
-      <td style="padding:.65rem 1rem;font-size:.85rem;">${esc(state['Location']||'—')}</td>
+      <td style="padding:.65rem 1rem;">
+        <span class="status-chip sc-${statusCls}">${statusLabel}</span>
+        ${statusLoc?`<span style="font-size:.75rem;color:var(--grey-500);margin-left:.4rem;">${esc(statusLoc)}</span>`:''}
+      </td>
       <td style="padding:.65rem 1rem;font-size:.85rem;">${state['Last Sighted']?fmtDate(state['Last Sighted']):'—'}</td>
       <td style="padding:.65rem 1rem;"><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openPercItemModal('${a.display_id}')">Edit</button></td>
     </tr>`;
@@ -1438,7 +1469,7 @@ function renderPercView(){
       const loc=getPercAssetState(a.display_id)['Location']||'Unknown';
       locMap[loc]=(locMap[loc]||0)+1;
     });
-    const locSummary=Object.entries(locMap).map(([l,c])=>`${esc(l)}: ${c}`).join(' | ')||'—';
+    const locSummary=Object.entries(locMap).map(([l,c])=>`<div style="font-size:.82rem;color:var(--grey-600);">${esc(l)}: ${c}</div>`).join('')||'—';
 
     const expandId=`perc-bulk-${type.id}`;
     rows+=`<tr style="border-bottom:1px solid var(--grey-200);background:var(--grey-50);cursor:pointer;" onclick="togglePercBulk('${type.id}')">
@@ -1448,20 +1479,23 @@ function renderPercView(){
         <span id="perc-bulk-arrow-${type.id}" style="font-size:.75rem;color:var(--grey-400);margin-left:.5rem;">▶</span>
       </td>
       <td style="padding:.65rem 1rem;font-size:.82rem;color:var(--grey-600);"></td>
-      <td style="padding:.65rem 1rem;" colspan="3"><span style="font-size:.82rem;color:var(--grey-600);">${locSummary}</span></td>
+      <td style="padding:.65rem 1rem;" colspan="3">${locSummary}</td>
       <td style="padding:.65rem 1rem;"><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openAddPercModal('${type.id}')">+ Add</button></td>
     </tr>`;
 
     // Individual units (hidden by default)
     typeAssets.forEach(a=>{
       const state=getPercAssetState(a.display_id);
-      const statusCls=state['Status']==='Missing'?'sc-missing':state['Status']==='Retired'?'sc-retired':'sc-storage';
+      const rawStatus=state['Status']||'In Storage';
+      const {cls:statusCls,label:statusLabel,location:statusLoc}=parsePercStatus(rawStatus);
       rows+=`<tr class="${expandId}" style="display:none;border-bottom:1px solid var(--grey-100);background:#fafbfc;cursor:pointer;" onclick="openPercItemModal('${a.display_id}')" onmouseover="this.style.background='var(--grey-50)'" onmouseout="this.style.background='#fafbfc'">
         <td style="padding:.5rem 1rem .5rem 2rem;font-family:monospace;font-size:.78rem;color:var(--grey-500);">${esc(a.display_id)}</td>
         <td style="padding:.5rem 1rem;font-size:.85rem;">${esc(state['Item']||'—')}</td>
         <td style="padding:.5rem 1rem;"></td>
-        <td style="padding:.5rem 1rem;"><span class="status-chip ${statusCls}" style="font-size:.7rem;padding:.2rem .5rem;">${esc(state['Status']||'In Storage')}</span></td>
-        <td style="padding:.5rem 1rem;font-size:.82rem;">${esc(state['Location']||'—')}</td>
+        <td style="padding:.5rem 1rem;">
+          <span class="status-chip sc-${statusCls}" style="font-size:.7rem;padding:.2rem .5rem;">${statusLabel}</span>
+          ${statusLoc?`<span style="font-size:.72rem;color:var(--grey-500);margin-left:.3rem;">${esc(statusLoc)}</span>`:''}
+        </td>
         <td style="padding:.5rem 1rem;font-size:.82rem;">${state['Last Sighted']?fmtDate(state['Last Sighted']):'—'}</td>
         <td style="padding:.5rem 1rem;"><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openPercItemModal('${a.display_id}')">Edit</button></td>
       </tr>`;
