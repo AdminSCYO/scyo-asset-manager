@@ -173,7 +173,14 @@
 
     @media print{header,.cat-nav,.toolbar,.no-print{display:none!important;}body{background:white;}}
 
-    /* MUSIC LIBRARY */
+    .bulk-piece-row{display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem;position:relative;}
+    .bulk-piece-row input{flex:1;padding:.45rem .6rem;border:1.5px solid var(--grey-200);border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:.85rem;outline:none;}
+    .bulk-piece-row input:focus{border-color:var(--navy);}
+    .bulk-piece-dropdown{position:absolute;top:100%;left:0;right:2rem;background:white;border:1.5px solid var(--grey-200);border-radius:var(--radius);box-shadow:var(--shadow);z-index:50;max-height:200px;overflow-y:auto;display:none;}
+    .bulk-piece-option{padding:.45rem .75rem;cursor:pointer;font-size:.85rem;display:flex;align-items:baseline;gap:.5rem;}
+    .bulk-piece-option:hover{background:var(--grey-50);}
+    .bulk-piece-option .piece-cat{font-size:.72rem;color:var(--grey-400);font-style:italic;}
+    .bulk-piece-selected{background:var(--grey-50);border-color:var(--navy)!important;color:var(--navy);font-weight:600;}
     .lib-view-btn{padding:.45rem 1rem;border:1.5px solid var(--grey-200);border-radius:var(--radius);background:white;font-family:'Inter',sans-serif;font-size:.82rem;font-weight:600;color:var(--grey-600);cursor:pointer;}
     .lib-view-btn.active{background:var(--navy);color:white;border-color:var(--navy);}
     .lib-cat-tab{padding:.6rem 1.1rem;border:none;border-bottom:2.5px solid transparent;background:none;font-family:'Inter',sans-serif;font-size:.82rem;font-weight:600;color:var(--grey-500);cursor:pointer;transition:color .15s;}
@@ -299,6 +306,7 @@
       <input type="text" id="lib-search" placeholder="Search pieces..." oninput="renderLibCatalogue()" style="padding-left:2.2rem;"/>
     </div>
     <button class="btn btn-primary" id="lib-add-btn" onclick="openAddLibModal()">+ Add Piece</button>
+    <button class="btn btn-ghost" id="lib-bulk-borrow-btn" onclick="openBulkBorrowModal()">Bulk Borrow</button>
     <div class="col-picker-wrap no-print" id="lib-col-picker-wrap">
       <button class="btn btn-ghost" onclick="toggleLibColPicker()" id="lib-col-picker-btn">⚙ Columns</button>
       <div class="col-picker" id="lib-col-picker" style="display:none;">
@@ -549,6 +557,37 @@
       <button class="btn-close" onclick="closeModal('lib-edit-perf-modal')">✕</button>
     </div>
     <div style="padding:1.25rem;" id="lib-edit-perf-form"></div>
+  </div>
+</div>
+
+<!-- BULK BORROW MODAL -->
+<div class="modal-backdrop" id="lib-bulk-borrow-modal">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <span class="modal-title">Bulk Borrow</span>
+      <button class="btn-close" onclick="closeModal('lib-bulk-borrow-modal')">✕</button>
+    </div>
+    <div style="padding:1.25rem;overflow-y:auto;max-height:80vh;">
+      <div class="fg">
+        <label>Ensemble *</label>
+        <div style="display:flex;gap:.5rem;">
+          <select id="bulk-borrow-ensemble" style="flex:1;padding:.5rem .6rem;border:1.5px solid var(--grey-200);border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:.875rem;outline:none;">
+            <option value="">Select ensemble…</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" onclick="openManageEnsembles()">⚙ Manage</button>
+        </div>
+      </div>
+      <div class="fg">
+        <label>Date *</label>
+        <input type="date" id="bulk-borrow-date"/>
+      </div>
+      <div class="fg">
+        <label>Pieces</label>
+        <div id="bulk-borrow-pieces"></div>
+        <button class="btn btn-ghost btn-sm" style="margin-top:.5rem;width:100%;justify-content:center;border:1.5px dashed var(--grey-200);" onclick="addBulkBorrowRow()">+ Add piece</button>
+      </div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;padding:.75rem;margin-top:.5rem;" onclick="submitBulkBorrow()">Log Borrow</button>
+    </div>
   </div>
 </div>
 
@@ -1663,6 +1702,7 @@ function switchLibView(view){
   document.getElementById('lib-history').style.display=view==='history'?'block':'none';
   document.getElementById('lib-search-wrap').style.display=view==='catalogue'?'flex':'none';
   document.getElementById('lib-add-btn').style.display=view==='catalogue'?'':'none';
+  document.getElementById('lib-bulk-borrow-btn').style.display=view==='catalogue'?'':'none';
   document.getElementById('lib-col-picker-wrap').style.display=view==='catalogue'?'':'none';
   if(view!=='catalogue')document.getElementById('lib-col-picker').style.display='none';
   document.querySelectorAll('.lib-view-btn').forEach(b=>b.classList.remove('active'));
@@ -2174,6 +2214,102 @@ async function deleteLibPerf(id){
 ['lib-ensembles-modal','lib-edit-borrow-modal','lib-edit-perf-modal'].forEach(id=>{
   document.getElementById(id)?.addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal(id);});
 });
+
+// ── BULK BORROW ───────────────────────────────────────────────
+let bulkBorrowSelectedPieces={};
+let bulkBorrowRowCount=0;
+
+function openBulkBorrowModal(){
+  bulkBorrowSelectedPieces={};
+  bulkBorrowRowCount=0;
+  const sel=document.getElementById('bulk-borrow-ensemble');
+  sel.innerHTML=`<option value="">Select ensemble…</option>`+libEnsembles.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('');
+  document.getElementById('bulk-borrow-date').value=new Date().toISOString().slice(0,10);
+  document.getElementById('bulk-borrow-pieces').innerHTML='';
+  addBulkBorrowRow();
+  document.getElementById('lib-bulk-borrow-modal').classList.add('open');
+}
+
+function addBulkBorrowRow(){
+  const id=++bulkBorrowRowCount;
+  const row=document.createElement('div');
+  row.className='bulk-piece-row';
+  row.id=`bulk-row-${id}`;
+  row.innerHTML=`
+    <div style="flex:1;position:relative;">
+      <input type="text" id="bulk-input-${id}" placeholder="Search for a piece…" autocomplete="off"
+        oninput="filterBulkPieces(${id})"
+        onfocus="showBulkDropdown(${id})"
+        onkeydown="bulkKeyNav(event,${id})"/>
+      <div class="bulk-piece-dropdown" id="bulk-dropdown-${id}"></div>
+    </div>
+    <button onclick="removeBulkRow(${id})" style="background:none;border:none;color:var(--grey-400);cursor:pointer;font-size:1rem;padding:.2rem .4rem;flex-shrink:0;">✕</button>
+  `;
+  document.getElementById('bulk-borrow-pieces').appendChild(row);
+  document.getElementById(`bulk-input-${id}`).focus();
+  document.addEventListener('click',function handler(e){
+    if(!row.contains(e.target)){const dd=document.getElementById(`bulk-dropdown-${id}`);if(dd)dd.style.display='none';}
+  });
+}
+
+function removeBulkRow(id){
+  delete bulkBorrowSelectedPieces[id];
+  document.getElementById(`bulk-row-${id}`)?.remove();
+}
+
+function filterBulkPieces(id){
+  const q=document.getElementById(`bulk-input-${id}`)?.value.toLowerCase()||'';
+  delete bulkBorrowSelectedPieces[id];
+  const input=document.getElementById(`bulk-input-${id}`);
+  if(input)input.classList.remove('bulk-piece-selected');
+  showBulkDropdown(id,q);
+}
+
+function showBulkDropdown(id,q=''){
+  const input=document.getElementById(`bulk-input-${id}`);
+  const dd=document.getElementById(`bulk-dropdown-${id}`);
+  if(!dd)return;
+  const val=q||input?.value.toLowerCase()||'';
+  const matches=libPieces.filter(p=>!val||p.title.toLowerCase().includes(val)||(p.composer||'').toLowerCase().includes(val)).slice(0,20);
+  if(!matches.length){dd.style.display='none';return;}
+  dd.innerHTML=matches.map(p=>`<div class="bulk-piece-option" onclick="selectBulkPiece(${id},'${p.id}')"><span>${esc(p.title)}</span><span class="piece-cat">${esc(p.category)}</span></div>`).join('');
+  dd.style.display='block';
+}
+
+function selectBulkPiece(id,pieceId){
+  const piece=libPieces.find(p=>p.id===pieceId);
+  if(!piece)return;
+  bulkBorrowSelectedPieces[id]=piece;
+  const input=document.getElementById(`bulk-input-${id}`);
+  if(input){input.value=piece.title;input.classList.add('bulk-piece-selected');}
+  const dd=document.getElementById(`bulk-dropdown-${id}`);
+  if(dd)dd.style.display='none';
+}
+
+function bulkKeyNav(event,id){
+  const dd=document.getElementById(`bulk-dropdown-${id}`);
+  if(!dd||dd.style.display==='none')return;
+  const options=[...dd.querySelectorAll('.bulk-piece-option')];
+  if(event.key==='Escape'){dd.style.display='none';}
+  if(event.key==='Enter'&&options.length){event.preventDefault();options[0].click();}
+}
+
+async function submitBulkBorrow(){
+  const ensembleId=document.getElementById('bulk-borrow-ensemble').value;
+  const date=document.getElementById('bulk-borrow-date').value;
+  if(!ensembleId){showToast('Select an ensemble');return;}
+  if(!date){showToast('Date required');return;}
+  const pieces=Object.values(bulkBorrowSelectedPieces);
+  if(!pieces.length){showToast('Add at least one piece');return;}
+  const inserts=pieces.map(p=>({piece_id:p.id,ensemble_id:ensembleId,date}));
+  const{error}=await db.from('library_borrows').insert(inserts);
+  if(error){showToast('Error: '+error.message);return;}
+  closeModal('lib-bulk-borrow-modal');
+  await loadLibData();
+  showToast(`${pieces.length} borrow${pieces.length>1?'s':''} logged ✓`);
+}
+
+document.getElementById('lib-bulk-borrow-modal')?.addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal('lib-bulk-borrow-modal');});
 
 initAuth();
 
