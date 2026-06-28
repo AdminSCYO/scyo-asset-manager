@@ -334,8 +334,8 @@ async function handleSession(session){
 // ── DATA ──────────────────────────────────────────────────────
 async function loadAll(){
   await loadCategories();
-  // Restore category from URL hash
-  const hash=window.location.hash.replace('#','').toUpperCase();
+  // Restore category from sessionStorage
+  const hash=sessionStorage.getItem('scyo-active-tab')||'';
   if(hash){
     const cat=allCategories.find(c=>c.prefix.toUpperCase()===hash);
     if(cat)currentCatId=cat.id;
@@ -400,10 +400,9 @@ function getAssetHistory(assetId){
 async function selectCategoryById(id){
   currentCatId=id;
   const cat=allCategories.find(c=>c.id===id);
-  if(cat)window.location.hash=cat.prefix.toLowerCase();
+  if(cat)sessionStorage.setItem('scyo-active-tab',cat.prefix.toUpperCase());
   renderCatNav();
   await loadCategoryData();
-  const cat=allCategories.find(c=>c.id===id);
   document.querySelector('.modal-title').textContent=`Settings — ${cat?.name||''}`;
 }
 
