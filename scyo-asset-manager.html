@@ -89,6 +89,7 @@
     .sp-storage{background:#d4f4e3;color:var(--success);}
     .sp-loan{background:#fff3cd;color:var(--warning);}
     .sp-retired{background:var(--grey-100);color:var(--grey-400);}
+    .sp-missing{background:#fde8e8;color:var(--danger);}
     .action-btn{background:var(--grey-100);border:none;border-radius:5px;padding:.3rem .65rem;font-size:.78rem;font-weight:600;cursor:pointer;color:var(--navy);font-family:'Inter',sans-serif;}
     .action-btn:hover{background:var(--grey-200);}
     .empty-row td{text-align:center;padding:3rem;color:var(--grey-400);}
@@ -124,6 +125,7 @@
     .sc-storage{background:#d4f4e3;color:var(--success);}
     .sc-loan{background:#fff3cd;color:var(--warning);}
     .sc-retired{background:var(--grey-100);color:var(--grey-400);}
+    .sc-missing{background:#fde8e8;color:var(--danger);}
 
     /* ADD ASSET MODAL */
     .add-modal .modal{max-width:520px;}
@@ -224,6 +226,7 @@
         <label style="display:flex;align-items:center;gap:.5rem;font-size:.82rem;font-weight:500;color:var(--grey-800);text-transform:none;letter-spacing:0;padding:.25rem 0;cursor:pointer;"><input type="checkbox" checked id="sf-storage" onchange="filterTable()" style="width:auto;padding:0;border:none;"/> In Storage</label>
         <label style="display:flex;align-items:center;gap:.5rem;font-size:.82rem;font-weight:500;color:var(--grey-800);text-transform:none;letter-spacing:0;padding:.25rem 0;cursor:pointer;"><input type="checkbox" checked id="sf-loan" onchange="filterTable()" style="width:auto;padding:0;border:none;"/> On Loan</label>
         <label style="display:flex;align-items:center;gap:.5rem;font-size:.82rem;font-weight:500;color:var(--grey-800);text-transform:none;letter-spacing:0;padding:.25rem 0;cursor:pointer;"><input type="checkbox" checked id="sf-retired" onchange="filterTable()" style="width:auto;padding:0;border:none;"/> Retired</label>
+        <label style="display:flex;align-items:center;gap:.5rem;font-size:.82rem;font-weight:500;color:var(--grey-800);text-transform:none;letter-spacing:0;padding:.25rem 0;cursor:pointer;"><input type="checkbox" checked id="sf-missing" onchange="filterTable()" style="width:auto;padding:0;border:none;"/> Missing</label>
       </div>
     </div>
     <button class="btn btn-primary" onclick="openAddModal()">+ Add Asset</button>
@@ -423,6 +426,7 @@ function renderTable(){
     if(status.startsWith('stored at ')){statusCls='storage';statusLabel='In Storage';}
     else if(status.startsWith('loaned to ')){statusCls='loan';statusLabel='On Loan';}
     else if(status==='Retired'){statusCls='retired';statusLabel='Retired';}
+    else if(status==='Missing'){statusCls='missing';statusLabel='Missing';}
     else if(status==='In Storage'){statusCls='storage';statusLabel='In Storage';}
     return`<tr>
       <td class="id-col" style="position:sticky;left:0;background:white;z-index:1;box-shadow:2px 0 4px rgba(0,0,0,.06);">${esc(asset.display_id)}</td>
@@ -460,7 +464,9 @@ function getFilteredRows(){
     if(status.startsWith('stored at '))statusLabel='In Storage';
     else if(status.startsWith('loaned to '))statusLabel='On Loan';
     else if(status==='Retired')statusLabel='Retired';
-    const matchS=(statusLabel==='In Storage'&&showStorage)||(statusLabel==='On Loan'&&showLoan)||(statusLabel==='Retired'&&showRetired);
+    else if(status==='Missing')statusLabel='Missing';
+    const showMissing=document.getElementById('sf-missing')?.checked??true;
+    const matchS=(statusLabel==='In Storage'&&showStorage)||(statusLabel==='On Loan'&&showLoan)||(statusLabel==='Retired'&&showRetired)||(statusLabel==='Missing'&&showMissing);
     return matchQ&&matchS;
   });
 }
@@ -501,7 +507,7 @@ async function openEditModal(assetId){
   const state=getAssetState(assetId);
   const history=getAssetHistory(assetId);
   const status=state['Status']||'In Storage';
-  const statusCls={'In Storage':'storage','On Loan':'loan','Retired':'retired'}[status]||'storage';
+  const statusCls={'In Storage':'storage','On Loan':'loan','Retired':'retired','Missing':'missing'}[status]||'storage';
 
   document.getElementById('edit-modal-title').textContent=assetId;
 
@@ -510,6 +516,7 @@ async function openEditModal(assetId){
   if(status.startsWith('stored at ')){statusType='Stored at';statusDetail=status.replace('stored at ','');}
   else if(status.startsWith('loaned to ')){statusType='Loaned to';statusDetail=status.replace('loaned to ','');}
   else if(status==='Retired'){statusType='Retired';statusDetail='';}
+  else if(status==='Missing'){statusType='Missing';statusDetail='';}
   else if(status==='In Storage'){statusType='Stored at';statusDetail='';}
 
   // Fields — Status replaces its own field row (it's field named "Status")
@@ -522,6 +529,7 @@ async function openEditModal(assetId){
             <option ${statusType==='Stored at'?'selected':''}>Stored at</option>
             <option ${statusType==='Loaned to'?'selected':''}>Loaned to</option>
             <option ${statusType==='Retired'?'selected':''}>Retired</option>
+            <option ${statusType==='Missing'?'selected':''}>Missing</option>
           </select>
           <div id="inline-status-detail"></div>
         </div>
@@ -598,7 +606,7 @@ function renderInlineStatusDetail(assetId){
   const type=sel.value;
   const detail=document.getElementById('inline-status-detail');
   if(!detail)return;
-  if(type==='Retired'){detail.innerHTML='';return;}
+  if(type==='Retired'||type==='Missing'){detail.innerHTML='';return;}
   const placeholder=type==='Stored at'?'Location (e.g. SCYO Storage Room)':'Student / borrower name';
   const orig=_inlineStatusDetail.statusType===type?_inlineStatusDetail.statusDetail:'';
   detail.innerHTML=`<input class="field-input" id="inline-status-val" placeholder="${placeholder}" value="${esc(orig)}" onblur="saveInlineStatus('${assetId}')"/>`;
@@ -609,6 +617,8 @@ async function saveInlineStatus(assetId){
   const val=document.getElementById('inline-status-val')?.value.trim()||'';
   if(type==='Retired'){
     await _writeStatus(assetId,'Retired');
+  }else if(type==='Missing'){
+    await _writeStatus(assetId,'Missing');
   }else if(type==='Stored at'){
     if(!val)return;
     await _writeStatus(assetId,`stored at ${val}`);
@@ -649,6 +659,7 @@ function openAddModal(){
           <option>Stored at</option>
           <option>Loaned to</option>
           <option>Retired</option>
+          <option>Missing</option>
         </select>
         <div id="add-status-detail">
           <input type="text" id="add-status-val" placeholder="Location (e.g. SCYO Storage Room)"/>
@@ -671,7 +682,7 @@ function renderAddStatusDetail(){
   const type=document.getElementById('add-status-type')?.value;
   const detail=document.getElementById('add-status-detail');
   if(!detail)return;
-  if(type==='Retired'){detail.innerHTML='';return;}
+  if(type==='Retired'||type==='Missing'){detail.innerHTML='';return;}
   const placeholder=type==='Stored at'?'Location (e.g. SCYO Storage Room)':'Student / borrower name';
   detail.innerHTML=`<input type="text" id="add-status-val" placeholder="${placeholder}"/>`;
 }
@@ -697,6 +708,7 @@ async function submitAddAsset(){
   if(statusType==='Stored at'&&statusVal)statusData=`stored at ${statusVal}`;
   else if(statusType==='Loaned to'&&statusVal)statusData=`loaned to ${statusVal}`;
   else if(statusType==='Retired')statusData='Retired';
+  else if(statusType==='Missing')statusData='Missing';
 
   // Log all filled fields (skip Status — handled separately)
   const logEntries=fields.filter(f=>f.name!=='Status').map(f=>{
