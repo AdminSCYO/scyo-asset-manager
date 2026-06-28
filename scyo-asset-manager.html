@@ -1954,7 +1954,7 @@ function renderLibPieceForm(p=null){
         ? `<div style="display:flex;align-items:center;gap:.5rem;padding:.5rem .75rem;background:#e8f5e9;border-radius:var(--radius);font-size:.85rem;color:#2e7d32;font-weight:600;">✓ Owned — purchased</div>`
         : `<div style="display:flex;flex-direction:column;gap:.5rem;">
             <label style="display:flex;align-items:center;gap:.5rem;text-transform:none;letter-spacing:0;font-size:.875rem;margin:0;cursor:pointer;">
-              <input type="checkbox" id="lib-not-owned" ${!p?.owned?'checked':''} style="width:auto;padding:0;border:none;" onchange="updateLibOwnershipFields()"/>
+              <input type="checkbox" id="lib-not-owned" ${!p?.owned?'checked':''} style="width:auto;padding:0;border:none;" onchange="updateLibOwnershipFields(this.checked)"/>
               We don't own this piece
             </label>
             <div id="lib-borrowed-from-wrap" style="display:${!p?.owned?'block':'none'};">
@@ -1973,17 +1973,17 @@ function renderLibPieceForm(p=null){
   `;
 }
 
-function updateLibOwnershipFields(){
+function updateLibOwnershipFields(checkedVal){
   const dateVal=document.getElementById('lib-date-purchased')?.value;
   const wrap=document.getElementById('lib-ownership-wrap');
   if(!wrap)return;
   if(dateVal){
     wrap.innerHTML=`<div style="display:flex;align-items:center;gap:.5rem;padding:.5rem .75rem;background:#e8f5e9;border-radius:var(--radius);font-size:.85rem;color:#2e7d32;font-weight:600;">✓ Owned — purchased</div>`;
   }else{
-    const notOwned=document.getElementById('lib-not-owned')?.checked||false;
+    const notOwned=checkedVal!==undefined?checkedVal:(document.getElementById('lib-not-owned')?.checked||false);
     wrap.innerHTML=`<div style="display:flex;flex-direction:column;gap:.5rem;">
       <label style="display:flex;align-items:center;gap:.5rem;text-transform:none;letter-spacing:0;font-size:.875rem;margin:0;cursor:pointer;">
-        <input type="checkbox" id="lib-not-owned" ${notOwned?'checked':''} style="width:auto;padding:0;border:none;" onchange="updateLibOwnershipFields()"/>
+        <input type="checkbox" id="lib-not-owned" ${notOwned?'checked':''} style="width:auto;padding:0;border:none;" onchange="updateLibOwnershipFields(this.checked)"/>
         We don't own this piece
       </label>
       <div id="lib-borrowed-from-wrap" style="display:${notOwned?'block':'none'};">
