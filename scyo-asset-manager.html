@@ -338,16 +338,15 @@
       </div>
     </div>
   </div>
-  <div id="lib-view" style="display:none;flex:1;overflow:auto;min-height:0;">
-    <!-- Catalogue sub-tabs -->
-    <div id="lib-cat-tabs" style="background:white;border-bottom:1px solid var(--grey-200);padding:0 1.25rem;display:flex;gap:0;">
+  <div id="lib-view" style="display:none;flex:1;flex-direction:column;min-height:0;">
+    <div id="lib-cat-tabs" style="background:white;border-bottom:1px solid var(--grey-200);padding:0 1.25rem;display:flex;gap:0;flex-shrink:0;">
       <button class="lib-cat-tab" data-cat="Band" onclick="switchLibCat('Band')">Band</button>
       <button class="lib-cat-tab" data-cat="Strings" onclick="switchLibCat('Strings')">Strings</button>
       <button class="lib-cat-tab" data-cat="Orchestra" onclick="switchLibCat('Orchestra')">Orchestra</button>
       <button class="lib-cat-tab" data-cat="Jazz Band" onclick="switchLibCat('Jazz Band')">Jazz Band</button>
     </div>
-    <div id="lib-catalogue" style="display:block;"></div>
-    <div id="lib-history" style="display:none;padding:1.25rem;"></div>
+    <div id="lib-catalogue" style="display:block;overflow:auto;flex:1;min-height:0;"></div>
+    <div id="lib-history" style="display:none;padding:1.25rem;overflow:auto;flex:1;min-height:0;"></div>
   </div>
 
   <!-- EQUIPMENT VIEW -->
@@ -1753,7 +1752,7 @@ function showLibView(){
   document.getElementById('eq-toolbar').style.display='none';
   document.getElementById('eq-view').style.display='none';
   document.getElementById('lib-toolbar').style.cssText='display:flex;background:white;border-bottom:1px solid var(--grey-200);padding:.6rem 1.25rem;align-items:center;gap:.75rem;flex-wrap:wrap;';
-  document.getElementById('lib-view').style.cssText='display:flex;flex:1;flex-direction:column;overflow:auto;min-height:0;';
+  document.getElementById('lib-view').style.cssText='display:flex;flex:1;flex-direction:column;min-height:0;';
 }
 
 async function loadLibData(){
@@ -1883,6 +1882,7 @@ function renderLibCatalogue(){
       ${show('purchased')?`<td class="lib-piece-stat">${p.date_purchased?p.date_purchased.slice(0,7):'—'}</td>`:''}
       ${show('usage')?`<td class="lib-piece-stat">${borrows>0?'Borrowed '+borrows+'x, incl. '+perfs+' perf.':'Not used'}</td>`:''}
       <td style="white-space:nowrap;">
+        ${p.notes?`<span title="${esc(p.notes)}" style="font-size:.9rem;cursor:default;margin-right:.3rem;" >📋</span>`:''}
         <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openLibBorrowModal('${p.id}')">Borrow</button>
         <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openLibPerfModal('${p.id}')">Perform</button>
       </td>
@@ -1964,7 +1964,7 @@ function renderLibPieceForm(p=null){
               We don't own this piece
             </label>
             <div id="lib-borrowed-from-wrap" style="display:${!p?.owned?'block':'none'};">
-              <input type="text" id="lib-borrowed-from" value="${esc(p?.notes?.match(/Borrowed from: ([^|]+)/)?.[1]?.trim()||'')}" placeholder="Borrowed from (e.g. Queensland SO)" ${isEdit?'onblur="autoSaveLibPiece()"':''}/>
+              <input type="text" id="lib-borrowed-from" value="${esc(p?.borrowed_from||'')}" placeholder="Borrowed from (e.g. Queensland SO)" ${isEdit?'onblur="autoSaveLibPiece()"':''}/>
             </div>
           </div>`
       }
@@ -2001,14 +2001,7 @@ async function autoSaveLibPiece(){
   const borrowedFrom=document.getElementById('lib-borrowed-from')?.value.trim()||'';
   const link=document.getElementById('lib-link')?.value.trim();
   let notes=document.getElementById('lib-notes')?.value.trim()||'';
-  if(!owned&&borrowedFrom){
-    notes=notes.replace(/Borrowed from:[^|]*/,'').replace(/^\s*\|\s*/,'').trim();
-    notes=notes?`Borrowed from: ${borrowedFrom} | ${notes}`:`Borrowed from: ${borrowedFrom}`;
-  }else{
-    notes=notes.replace(/Borrowed from:[^|]*/,'').replace(/^\s*\|\s*/,'').trim();
-  }
-  const payload={title,composer:composer||null,category,level:level?parseFloat(level):null,date_purchased:datePurchased||null,owned,external_link:link||null,notes:notes||null};
-  await db.from('library_pieces').update(payload).eq('id',libEditPieceId);
+  const payload={title,composer:composer||null,category,level:level?parseFloat(level):null,date_purchased:datePurchased||null,owned,borrowed_from:(!owned&&borrowedFrom)?borrowedFrom:null,external_link:link||null,notes:notes||null};
   libPieces=libPieces.map(p=>p.id===libEditPieceId?{...p,...payload}:p);
   renderLibCatalogue();
   showToast('Saved ✓');
@@ -2051,15 +2044,9 @@ async function submitLibPiece(){
   const borrowedFrom=document.getElementById('lib-borrowed-from')?.value.trim()||'';
   const link=document.getElementById('lib-link').value.trim();
   let notes=document.getElementById('lib-notes').value.trim();
-  if(!owned&&borrowedFrom){
-    notes=notes.replace(/Borrowed from:[^\|]*/,'').replace(/^\s*\|\s*/,'').trim();
-    notes=notes?`Borrowed from: ${borrowedFrom} | ${notes}`:`Borrowed from: ${borrowedFrom}`;
-  }else{
-    notes=notes.replace(/Borrowed from:[^\|]*/,'').replace(/^\s*\|\s*/,'').trim();
-  }
   if(!title){showToast('Title required');return;}
   if(!category){showToast('Category required');return;}
-  const payload={title,composer:composer||null,category,level:level?parseFloat(level):null,date_purchased:datePurchased||null,owned,external_link:link||null,notes:notes||null};
+  const payload={title,composer:composer||null,category,level:level?parseFloat(level):null,date_purchased:datePurchased||null,owned,borrowed_from:(!owned&&borrowedFrom)?borrowedFrom:null,external_link:link||null,notes:notes||null};
   if(libEditPieceId){await db.from('library_pieces').update(payload).eq('id',libEditPieceId);}
   else{await db.from('library_pieces').insert(payload);}
   closeModal('lib-piece-modal');
@@ -2079,7 +2066,7 @@ function openLibDetail(pieceId){
     <div class="field-row"><div class="field-label">Composer</div><div class="field-val">${esc(p.composer||'—')}</div></div>
     <div class="field-row"><div class="field-label">Category</div><div class="field-val">${esc(p.category)}</div></div>
     <div class="field-row"><div class="field-label">Level</div><div class="field-val">${fmtLevel(p.level)}</div></div>
-    <div class="field-row"><div class="field-label">Owned</div><div class="field-val">${p.owned?'Yes':'No — not in library'}</div></div>
+    <div class="field-row"><div class="field-label">Owned</div><div class="field-val">${p.owned?'Yes':('No'+(p.borrowed_from?` — borrowed from ${esc(p.borrowed_from)}`:''))}</div></div>
     <div class="field-row"><div class="field-label">Date Purchased</div><div class="field-val">${p.date_purchased||'—'}</div></div>
     <div class="field-row"><div class="field-label">Notes</div><div class="field-val">${esc(p.notes||'—')}</div></div>
     <div class="field-row"><div class="field-label">Usage</div><div class="field-val">Borrowed ${borrows.length}x, including ${perfs.length} performance${perfs.length!==1?'s':''}</div></div>
