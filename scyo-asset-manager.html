@@ -181,6 +181,19 @@
     .bulk-piece-option:hover{background:var(--grey-50);}
     .bulk-piece-option .piece-cat{font-size:.72rem;color:var(--grey-400);font-style:italic;}
     .bulk-piece-selected{background:var(--grey-50);border-color:var(--navy)!important;color:var(--navy);font-weight:600;}
+    /* STOCK */
+    #stk-view{display:none;flex:1;overflow:auto;min-height:0;}
+    .stk-toolbar{background:white;border-bottom:1px solid var(--grey-200);padding:.6rem 1.25rem;display:none;align-items:center;gap:.75rem;flex-wrap:wrap;}
+    .stk-table{width:100%;border-collapse:collapse;}
+    .stk-group-header td{background:var(--grey-50);font-weight:700;color:var(--navy);font-size:.88rem;padding:.6rem 1.25rem;border-bottom:1px solid var(--grey-200);border-top:2px solid var(--grey-200);}
+    .stk-row td{padding:.55rem 1.25rem;border-bottom:1px solid var(--grey-100);font-size:.85rem;}
+    .stk-row:hover td{background:var(--grey-50);cursor:pointer;}
+    .stk-variant-name{color:var(--grey-700);padding-left:2.5rem!important;}
+    .stk-qty{font-weight:700;color:var(--navy);}
+    .stk-low{color:var(--danger)!important;}
+    .stk-warn{font-size:.8rem;color:var(--danger);font-weight:700;}
+    .stk-th{padding:.5rem 1.25rem;text-align:left;font-size:.72rem;font-weight:700;color:var(--grey-500);text-transform:uppercase;letter-spacing:.04em;background:var(--grey-50);border-bottom:2px solid var(--grey-200);position:sticky;top:0;z-index:5;white-space:nowrap;}
+
     .lib-view-btn{padding:.45rem 1rem;border:1.5px solid var(--grey-200);border-radius:var(--radius);background:white;font-family:'Inter',sans-serif;font-size:.82rem;font-weight:600;color:var(--grey-600);cursor:pointer;}
     .lib-view-btn.active{background:var(--navy);color:white;border-color:var(--navy);}
     .lib-cat-tab{padding:.6rem 1.1rem;border:none;border-bottom:2.5px solid transparent;background:none;font-family:'Inter',sans-serif;font-size:.82rem;font-weight:600;color:var(--grey-500);cursor:pointer;transition:color .15s;}
@@ -279,6 +292,29 @@
       </table>
     </div>
   </main>
+
+  <!-- STOCK VIEW -->
+  <div class="stk-toolbar" id="stk-toolbar">
+    <div class="search-wrap" style="flex:1;min-width:180px;">
+      <span class="si">🔍</span>
+      <input type="text" id="stk-search" placeholder="Search stock..." oninput="renderStockView()" style="padding-left:2.2rem;"/>
+    </div>
+    <button class="btn btn-primary" onclick="openAddStockItemModal()">+ Add Item</button>
+  </div>
+  <div id="stk-view">
+    <table class="stk-table" id="stk-table">
+      <thead>
+        <tr>
+          <th class="stk-th">Item / Variant</th>
+          <th class="stk-th" style="width:80px;">Qty</th>
+          <th class="stk-th" style="width:80px;">Min</th>
+          <th class="stk-th">Notes</th>
+          <th class="stk-th" style="width:80px;"></th>
+        </tr>
+      </thead>
+      <tbody id="stk-tbody"></tbody>
+    </table>
+  </div>
 
   <!-- PERCUSSION & EQUIPMENT VIEW -->
   <div id="perc-toolbar" style="display:none;background:white;border-bottom:1px solid var(--grey-200);padding:.6rem 1.25rem;align-items:center;gap:.75rem;flex-wrap:wrap;">
@@ -616,6 +652,45 @@
   </div>
 </div>
 
+<!-- ADD/EDIT STOCK ITEM MODAL -->
+<div class="modal-backdrop" id="stk-item-modal">
+  <div class="modal" style="max-width:500px;">
+    <div class="modal-header">
+      <span class="modal-title" id="stk-item-modal-title">Add Item</span>
+      <button class="btn-close" onclick="closeModal('stk-item-modal')">✕</button>
+    </div>
+    <div style="padding:1.25rem;overflow-y:auto;max-height:80vh;" id="stk-item-form"></div>
+  </div>
+</div>
+
+<!-- STOCK DETAIL MODAL -->
+<div class="modal-backdrop wide-modal" id="stk-detail-modal">
+  <div class="modal" style="max-width:780px;">
+    <div class="modal-header">
+      <span class="modal-title" id="stk-detail-title">Stock Item</span>
+      <button class="btn-close" onclick="closeModal('stk-detail-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-fields" id="stk-detail-fields" style="overflow-y:auto;"></div>
+      <div style="width:280px;padding:1.25rem;overflow-y:auto;background:var(--grey-50);border-left:1px solid var(--grey-100);">
+        <div class="hist-title">History</div>
+        <div id="stk-detail-history"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- STOCK QTY ADJUST MODAL -->
+<div class="modal-backdrop" id="stk-adj-modal">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header">
+      <span class="modal-title" id="stk-adj-title">Adjust Quantity</span>
+      <button class="btn-close" onclick="closeModal('stk-adj-modal')">✕</button>
+    </div>
+    <div style="padding:1.25rem;" id="stk-adj-form"></div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -685,6 +760,7 @@ async function loadCategoryData(){
   const prefix=(cat?.prefix||'INS').toUpperCase();
   if(prefix==='PRC'){await loadPercData();return;}
   if(prefix==='LIB'){await loadLibData();return;}
+  if(prefix==='STK'){await loadStockData();return;}
   const{assets:aTable,log:lTable}=getCatTables();
   const[{data:assets},{data:log}]=await Promise.all([
     db.from(aTable).select('*').order('created_at'),
@@ -1380,6 +1456,8 @@ let percTypes=[],percAssets=[],percLog=[],percLocations=[];
 function showPercView(){
   document.querySelector('.toolbar').style.display='none';
   document.querySelector('main').style.display='none';
+  document.getElementById('stk-toolbar').style.display='none';
+  document.getElementById('stk-view').style.display='none';
   document.getElementById('lib-toolbar').style.cssText='display:none;';
   document.getElementById('lib-view').style.cssText='display:none;';
   document.getElementById('perc-toolbar').style.display='flex';
@@ -1792,6 +1870,8 @@ let libActiveCat=(()=>{const s=sessionStorage.getItem('scyo-lib-cat');return['Ba
 function showLibView(){
   document.querySelector('.toolbar').style.display='none';
   document.querySelector('main').style.display='none';
+  document.getElementById('stk-toolbar').style.display='none';
+  document.getElementById('stk-view').style.display='none';
   document.getElementById('perc-toolbar').style.display='none';
   document.getElementById('perc-view').style.display='none';
   document.getElementById('lib-toolbar').style.cssText='display:flex;background:white;border-bottom:1px solid var(--grey-200);padding:.6rem 1.25rem;align-items:center;gap:.75rem;flex-wrap:wrap;';
@@ -2482,9 +2562,300 @@ async function submitBulkBorrow(){
 
 document.getElementById('lib-bulk-borrow-modal')?.addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal('lib-bulk-borrow-modal');});
 
+// ── STOCK ─────────────────────────────────────────────────────
+let stockItems=[],stockVariants=[],stockLog=[];
+let stkEditItemId=null,stkEditVariantId=null;
+
+function showStockView(){
+  document.querySelector('.toolbar').style.display='none';
+  document.querySelector('main').style.display='none';
+  document.getElementById('perc-toolbar').style.display='none';
+  document.getElementById('perc-view').style.display='none';
+  document.getElementById('lib-toolbar').style.cssText='display:none;';
+  document.getElementById('lib-view').style.cssText='display:none;';
+  document.getElementById('stk-toolbar').style.display='flex';
+  document.getElementById('stk-view').style.display='block';
+}
+
+async function loadStockData(){
+  const[{data:items},{data:variants},{data:log}]=await Promise.all([
+    db.from('stock_items').select('*').order('sort_order'),
+    db.from('stock_variants').select('*').order('sort_order'),
+    db.from('stock_log').select('*').order('timestamp',{ascending:false})
+  ]);
+  stockItems=items||[];
+  stockVariants=variants||[];
+  stockLog=log||[];
+  showStockView();
+  renderStockView();
+}
+
+function renderStockView(){
+  const q=(document.getElementById('stk-search')?.value||'').toLowerCase();
+  const tbody=document.getElementById('stk-tbody');
+  let rows='';
+
+  stockItems.forEach(item=>{
+    if(q&&!item.name.toLowerCase().includes(q)){
+      // Check if any variant matches
+      const vars=stockVariants.filter(v=>v.item_id===item.id);
+      if(!vars.some(v=>v.variant_name.toLowerCase().includes(q)))return;
+    }
+
+    if(item.has_variants){
+      const vars=stockVariants.filter(v=>v.item_id===item.id).filter(v=>!q||v.variant_name.toLowerCase().includes(q)||item.name.toLowerCase().includes(q));
+      const totalQty=vars.reduce((s,v)=>s+(v.qty||0),0);
+      const anyLow=vars.some(v=>(v.qty||0)<(v.min_qty||0));
+      // Group header
+      rows+=`<tr class="stk-group-header">
+        <td colspan="4"><span>${esc(item.name)}</span>${anyLow?'<span class="stk-warn" style="margin-left:.5rem;">⚠ Low stock</span>':''}</td>
+        <td style="text-align:right;padding:.6rem 1.25rem;">
+          <button class="btn btn-ghost btn-sm" onclick="openEditStockItem('${item.id}')">Edit</button>
+        </td>
+      </tr>`;
+      // Variant rows
+      vars.forEach(v=>{
+        const isLow=(v.qty||0)<(v.min_qty||0);
+        rows+=`<tr class="stk-row" onclick="openStockDetail('${item.id}','${v.id}')">
+          <td class="stk-variant-name">${esc(v.variant_name)}</td>
+          <td class="stk-qty ${isLow?'stk-low':''}">${v.qty||0}${isLow?'<span class="stk-warn">⚠</span>':''}</td>
+          <td style="color:var(--grey-500);font-size:.82rem;">${v.min_qty||0}</td>
+          <td style="color:var(--grey-500);font-size:.82rem;">${esc(item.notes||'')}</td>
+          <td style="text-align:right;padding:.55rem 1.25rem;"><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openStkAdj('${item.id}','${v.id}','${esc(v.variant_name)}',${v.qty||0})">Adjust</button></td>
+        </tr>`;
+      });
+      // Add variant row
+      rows+=`<tr><td colspan="5" style="padding:.3rem 1.25rem .5rem 2.5rem;">
+        <button class="btn btn-ghost btn-sm" onclick="openAddVariant('${item.id}')" style="font-size:.75rem;border:1px dashed var(--grey-200);">+ Add variant</button>
+      </td></tr>`;
+    }else{
+      // Simple item — find or create a single "default" variant
+      const v=stockVariants.find(vv=>vv.item_id===item.id);
+      const qty=v?.qty||0;
+      const minQty=v?.min_qty||0;
+      const isLow=qty<minQty;
+      rows+=`<tr class="stk-row" onclick="openStockDetail('${item.id}','${v?.id||''}')">
+        <td style="padding:.55rem 1.25rem;font-weight:600;color:var(--navy);">${esc(item.name)}${isLow?'<span class="stk-warn" style="margin-left:.4rem;">⚠</span>':''}</td>
+        <td class="stk-qty ${isLow?'stk-low':''}">${qty}</td>
+        <td style="color:var(--grey-500);font-size:.82rem;">${minQty}</td>
+        <td style="color:var(--grey-500);font-size:.82rem;">${esc(item.notes||'')}</td>
+        <td style="text-align:right;padding:.55rem 1.25rem;">
+          <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openEditStockItem('${item.id}')">Edit</button>
+          ${v?`<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openStkAdj('${item.id}','${v.id}','${esc(item.name)}',${qty})">Adjust</button>`:''}
+        </td>
+      </tr>`;
+    }
+  });
+
+  tbody.innerHTML=rows||`<tr><td colspan="5" style="text-align:center;padding:3rem;color:var(--grey-400);">No stock items yet.</td></tr>`;
+}
+
+// ── STOCK ITEM ADD/EDIT ────────────────────────────────────────
+function openAddStockItemModal(){
+  stkEditItemId=null;
+  document.getElementById('stk-item-modal-title').textContent='Add Item';
+  renderStkItemForm();
+  document.getElementById('stk-item-modal').classList.add('open');
+}
+
+function openEditStockItem(itemId){
+  stkEditItemId=itemId;
+  document.getElementById('stk-item-modal-title').textContent='Edit Item';
+  renderStkItemForm(stockItems.find(i=>i.id===itemId));
+  document.getElementById('stk-item-modal').classList.add('open');
+}
+
+function renderStkItemForm(item=null){
+  const isEdit=!!item;
+  const vars=item?stockVariants.filter(v=>v.item_id===item.id):[];
+  document.getElementById('stk-item-form').innerHTML=`
+    <div class="fg"><label>Item Name *</label><input type="text" id="stk-name" value="${esc(item?.name||'')}" placeholder="e.g. Shirts"/></div>
+    <div class="fg" style="display:flex;align-items:center;gap:.5rem;">
+      <input type="checkbox" id="stk-has-variants" ${item?.has_variants?'checked':''} style="width:auto;padding:0;border:none;" onchange="toggleStkVariants()"/>
+      <label style="text-transform:none;letter-spacing:0;font-size:.875rem;margin:0;cursor:pointer;" for="stk-has-variants">Has variants (e.g. sizes)</label>
+    </div>
+    <div class="fg" id="stk-variants-section" style="display:${item?.has_variants?'block':'none'};">
+      <label>Variants</label>
+      <div id="stk-variants-list">
+        ${vars.map(v=>`<div style="display:flex;gap:.5rem;margin-bottom:.35rem;align-items:center;">
+          <input type="text" value="${esc(v.variant_name)}" style="flex:2;" placeholder="Variant name" data-vid="${v.id}" class="stk-var-name"/>
+          <input type="number" value="${v.min_qty||0}" style="width:70px;" placeholder="Min" data-vid="${v.id}" class="stk-var-min" title="Min stock"/>
+          <button onclick="deleteStkVariant('${v.id}')" style="background:none;border:none;color:var(--grey-400);cursor:pointer;">✕</button>
+        </div>`).join('')}
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="addStkVariantRow()" style="margin-top:.35rem;border:1px dashed var(--grey-200);">+ Add variant</button>
+    </div>
+    ${!item?.has_variants?`<div class="fg" id="stk-simple-min"><label>Min Stock</label><input type="number" id="stk-min-qty" value="${vars[0]?.min_qty||0}" min="0" placeholder="0"/></div>`:''}
+    <div class="fg"><label>Notes</label><textarea id="stk-notes" style="height:60px;resize:vertical;">${esc(item?.notes||'')}</textarea></div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:.75rem;" onclick="submitStkItem()">${isEdit?'Save':'Add Item'}</button>
+    ${isEdit?`<button class="btn btn-ghost" style="width:100%;justify-content:center;margin-top:.35rem;color:var(--danger);" onclick="deleteStkItem('${item.id}')">Delete item</button>`:''}
+  `;
+}
+
+function toggleStkVariants(){
+  const checked=document.getElementById('stk-has-variants')?.checked;
+  document.getElementById('stk-variants-section').style.display=checked?'block':'none';
+  const simpleMin=document.getElementById('stk-simple-min');
+  if(simpleMin)simpleMin.style.display=checked?'none':'block';
+}
+
+function addStkVariantRow(){
+  const list=document.getElementById('stk-variants-list');
+  const div=document.createElement('div');
+  div.style.cssText='display:flex;gap:.5rem;margin-bottom:.35rem;align-items:center;';
+  div.innerHTML=`<input type="text" style="flex:2;" placeholder="Variant name" class="stk-var-name" data-vid="new"/>
+    <input type="number" style="width:70px;" placeholder="Min" class="stk-var-min" data-vid="new" title="Min stock"/>
+    <button onclick="this.parentElement.remove()" style="background:none;border:none;color:var(--grey-400);cursor:pointer;">✕</button>`;
+  list.appendChild(div);
+}
+
+async function openAddVariant(itemId){
+  stkEditItemId=itemId;
+  openEditStockItem(itemId);
+  setTimeout(()=>addStkVariantRow(),100);
+}
+
+async function submitStkItem(){
+  const name=document.getElementById('stk-name').value.trim();
+  const hasVariants=document.getElementById('stk-has-variants').checked;
+  const notes=document.getElementById('stk-notes').value.trim();
+  if(!name){showToast('Name required');return;}
+
+  let itemId=stkEditItemId;
+  if(itemId){
+    await db.from('stock_items').update({name,has_variants:hasVariants,notes:notes||null}).eq('id',itemId);
+    await db.from('stock_log').insert({item_id:itemId,user_email:currentUser.email,field:'Item',new_value:name,reason:'Edited'});
+  }else{
+    const{data,error}=await db.from('stock_items').insert({name,has_variants:hasVariants,notes:notes||null,sort_order:stockItems.length}).select().single();
+    if(error){showToast('Error: '+error.message);return;}
+    itemId=data.id;
+    await db.from('stock_log').insert({item_id:itemId,user_email:currentUser.email,field:'Item',new_value:name,reason:'Created'});
+    // For simple items, create a default variant
+    if(!hasVariants){
+      const minQty=parseInt(document.getElementById('stk-min-qty')?.value)||0;
+      await db.from('stock_variants').insert({item_id:itemId,variant_name:'default',qty:0,min_qty:minQty,sort_order:0});
+    }
+  }
+
+  // Handle variants
+  if(hasVariants){
+    const nameInputs=[...document.querySelectorAll('.stk-var-name')];
+    const minInputs=[...document.querySelectorAll('.stk-var-min')];
+    for(let i=0;i<nameInputs.length;i++){
+      const vname=nameInputs[i].value.trim();
+      const vmin=parseInt(minInputs[i].value)||0;
+      const vid=nameInputs[i].dataset.vid;
+      if(!vname)continue;
+      if(vid==='new'){
+        await db.from('stock_variants').insert({item_id:itemId,variant_name:vname,qty:0,min_qty:vmin,sort_order:i});
+      }else{
+        await db.from('stock_variants').update({variant_name:vname,min_qty:vmin}).eq('id',vid);
+      }
+    }
+    // Update simple item min if not variants
+  }else if(stkEditItemId){
+    const minQty=parseInt(document.getElementById('stk-min-qty')?.value)||0;
+    const defVar=stockVariants.find(v=>v.item_id===itemId);
+    if(defVar)await db.from('stock_variants').update({min_qty:minQty}).eq('id',defVar.id);
+  }
+
+  closeModal('stk-item-modal');
+  await loadStockData();
+  showToast(stkEditItemId?'Item updated ✓':'Item added ✓');
+}
+
+async function deleteStkVariant(variantId){
+  if(!confirm('Delete this variant?'))return;
+  await db.from('stock_variants').delete().eq('id',variantId);
+  await loadStockData();
+  if(stkEditItemId)openEditStockItem(stkEditItemId);
+  showToast('Variant removed ✓');
+}
+
+async function deleteStkItem(itemId){
+  if(!confirm('Delete this item and all its variants and history?'))return;
+  await db.from('stock_items').delete().eq('id',itemId);
+  closeModal('stk-item-modal');
+  await loadStockData();
+  showToast('Item deleted ✓');
+}
+
+// ── STOCK QTY ADJUST ──────────────────────────────────────────
+function openStkAdj(itemId,variantId,label,currentQty){
+  const item=stockItems.find(i=>i.id===itemId);
+  document.getElementById('stk-adj-title').textContent=`Adjust — ${label}`;
+  document.getElementById('stk-adj-form').innerHTML=`
+    <div style="font-size:.82rem;color:var(--grey-500);margin-bottom:.75rem;">Current qty: <strong>${currentQty}</strong></div>
+    <div class="fg"><label>New Quantity *</label><input type="number" id="stk-adj-qty" value="${currentQty}" min="0"/></div>
+    <div class="fg"><label>Reason *</label><textarea id="stk-adj-reason" placeholder="e.g. Purchased 10 new, received from supplier..." style="height:70px;resize:vertical;"></textarea></div>
+    <div class="fg"><label>Unit Price (optional)</label><input type="number" id="stk-adj-price" placeholder="0.00" min="0" step="0.01"/></div>
+    <div style="display:flex;gap:.5rem;">
+      <button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="submitStkAdj('${itemId}','${variantId}',${currentQty})">Save</button>
+      <button class="btn btn-ghost" style="flex:1;justify-content:center;" onclick="closeModal('stk-adj-modal')">Cancel</button>
+    </div>
+  `;
+  document.getElementById('stk-adj-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('stk-adj-qty').focus(),100);
+}
+
+async function submitStkAdj(itemId,variantId,oldQty){
+  const newQty=parseInt(document.getElementById('stk-adj-qty').value);
+  const reason=document.getElementById('stk-adj-reason').value.trim();
+  const unitPrice=parseFloat(document.getElementById('stk-adj-price').value)||null;
+  if(isNaN(newQty)||newQty<0){showToast('Enter a valid quantity');return;}
+  if(!reason){showToast('Reason is required');return;}
+  await db.from('stock_variants').update({qty:newQty}).eq('id',variantId);
+  await db.from('stock_log').insert({item_id:itemId,variant_id:variantId,user_email:currentUser.email,field:'qty',old_value:String(oldQty),new_value:String(newQty),reason,unit_price:unitPrice});
+  closeModal('stk-adj-modal');
+  await loadStockData();
+  showToast('Quantity updated ✓');
+}
+
+// ── STOCK DETAIL ──────────────────────────────────────────────
+function openStockDetail(itemId,variantId){
+  const item=stockItems.find(i=>i.id===itemId);
+  const variant=variantId?stockVariants.find(v=>v.id===variantId):null;
+  const label=variant&&variant.variant_name!=='default'?`${item?.name} — ${variant.variant_name}`:item?.name||'Item';
+  document.getElementById('stk-detail-title').textContent=label;
+
+  // Fields
+  document.getElementById('stk-detail-fields').innerHTML=`
+    <div class="field-row"><div class="field-label">Item</div><div class="field-val">${esc(item?.name||'')}</div></div>
+    ${variant&&variant.variant_name!=='default'?`<div class="field-row"><div class="field-label">Variant</div><div class="field-val">${esc(variant.variant_name)}</div></div>`:''}
+    <div class="field-row"><div class="field-label">Qty on Hand</div><div class="field-val"><strong>${variant?.qty||0}</strong></div></div>
+    <div class="field-row"><div class="field-label">Min Stock</div><div class="field-val">${variant?.min_qty||0}</div></div>
+    ${item?.notes?`<div class="field-row"><div class="field-label">Notes</div><div class="field-val">${esc(item.notes)}</div></div>`:''}
+    <div style="margin-top:1rem;display:flex;gap:.5rem;">
+      ${variant?`<button class="btn btn-primary btn-sm" onclick="closeModal('stk-detail-modal');openStkAdj('${itemId}','${variantId}','${esc(label)}',${variant?.qty||0})">Adjust Qty</button>`:''}
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('stk-detail-modal');openEditStockItem('${itemId}')">Edit Item</button>
+    </div>
+  `;
+
+  // History
+  const logs=stockLog.filter(l=>l.item_id===itemId&&(!variantId||l.variant_id===variantId));
+  document.getElementById('stk-detail-history').innerHTML=logs.length?logs.map(l=>{
+    const diff=l.old_value!==null&&l.new_value!==null?` (${l.old_value}→${l.new_value})`:'';
+    const price=l.unit_price?` · $${parseFloat(l.unit_price).toFixed(2)}/unit`:'';
+    return`<div class="hist-entry">
+      <div class="hist-field">${esc(l.field||'')}${diff}</div>
+      <div class="hist-val">${esc(l.reason||'')}</div>
+      <div class="hist-meta">${price?`<span style="color:var(--navy);font-weight:600;">${price}</span><br>`:''} ${esc(l.user_email||'')} · ${fmtDate(l.timestamp)}</div>
+    </div>`;
+  }).join(''):'<div style="color:var(--grey-400);font-size:.82rem;">No history yet.</div>';
+
+  document.getElementById('stk-detail-modal').classList.add('open');
+}
+
+['stk-item-modal','stk-detail-modal','stk-adj-modal'].forEach(id=>{
+  document.getElementById(id)?.addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal(id);});
+});
+
+
 initAuth();
 
 function showStandardView(){
+  document.getElementById('stk-toolbar').style.display='none';
+  document.getElementById('stk-view').style.display='none';
   document.getElementById('perc-toolbar').style.display='none';
   document.getElementById('perc-view').style.display='none';
   document.getElementById('lib-toolbar').style.cssText='display:none;';
