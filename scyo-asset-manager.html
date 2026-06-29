@@ -2750,23 +2750,11 @@ function renderStockRight(variantId){
   const item=v?stockItems.find(i=>i.id===v.item_id):null;
   if(!v||!item){panel.innerHTML='';return;}
 
-  const isLow=(v.qty||0)<(v.min_qty||0);
   const logs=stockLog.filter(l=>l.variant_id===variantId).slice(0,30);
 
   panel.innerHTML=`
-    <div style="font-size:1rem;font-weight:800;color:var(--navy);margin-bottom:.25rem;">${esc(item.name)}${v.variant_name?' — '+esc(v.variant_name):''}</div>
-    <div style="font-size:.75rem;color:var(--grey-400);font-family:monospace;margin-bottom:1rem;">${esc(v.sku||'No SKU')}</div>
-    <div style="display:flex;gap:.75rem;margin-bottom:1.25rem;">
-      <div style="flex:1;background:white;border-radius:var(--radius);border:1.5px solid var(--grey-200);padding:.85rem;text-align:center;">
-        <div style="font-size:1.6rem;font-weight:900;color:${isLow?'var(--danger)':'var(--navy)'};">${v.qty||0}</div>
-        <div style="font-size:.72rem;color:var(--grey-400);text-transform:uppercase;letter-spacing:.04em;">On Hand</div>
-      </div>
-      <div style="flex:1;background:white;border-radius:var(--radius);border:1.5px solid var(--grey-200);padding:.85rem;text-align:center;">
-        <div style="font-size:1.6rem;font-weight:900;color:var(--navy);">${v.min_qty||0}</div>
-        <div style="font-size:.72rem;color:var(--grey-400);text-transform:uppercase;letter-spacing:.04em;">Target</div>
-      </div>
-    </div>
-    <button class="btn btn-primary" style="width:100%;justify-content:center;margin-bottom:1.25rem;" onclick="openStkAdj('${item.id}','${v.id}','${esc(v.variant_name)}',${v.qty||0})">Adjust Qty</button>
+    <div style="font-size:.88rem;font-weight:700;color:var(--navy);margin-bottom:.1rem;">${esc(item.name)}${v.variant_name?' — '+esc(v.variant_name):''}</div>
+    <div style="font-size:.72rem;color:var(--grey-400);font-family:monospace;margin-bottom:1rem;">${esc(v.sku||'')}</div>
     <div style="font-size:.75rem;font-weight:700;color:var(--grey-500);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.5rem;">History</div>
     <div style="background:white;border-radius:var(--radius);border:1.5px solid var(--grey-200);overflow:hidden;">
       ${logs.length?logs.map(l=>{
