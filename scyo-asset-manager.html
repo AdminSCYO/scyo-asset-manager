@@ -184,15 +184,24 @@
     /* STOCK */
     #stk-view{display:none;flex:1;overflow:auto;min-height:0;}
     .stk-toolbar{background:white;border-bottom:1px solid var(--grey-200);padding:.6rem 1.25rem;display:none;align-items:center;gap:.75rem;flex-wrap:wrap;}
-    .stk-table{width:100%;border-collapse:collapse;}
-    .stk-group-header td{background:var(--grey-50);font-weight:700;color:var(--navy);font-size:.88rem;padding:.6rem 1.25rem;border-bottom:1px solid var(--grey-200);border-top:2px solid var(--grey-200);}
-    .stk-row td{padding:.55rem 1.25rem;border-bottom:1px solid var(--grey-100);font-size:.85rem;}
-    .stk-row:hover td{background:var(--grey-50);cursor:pointer;}
-    .stk-variant-name{color:var(--grey-700);padding-left:2.5rem!important;}
+    .stk-card{background:white;border-radius:var(--radius);border:1.5px solid var(--grey-200);overflow:hidden;}
+    .stk-card-header{display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;background:var(--grey-50);border-bottom:1.5px solid var(--grey-200);}
+    .stk-card-title{font-weight:700;color:var(--navy);font-size:.92rem;}
+    .stk-card-table{width:100%;border-collapse:collapse;}
+    .stk-card-table th{font-size:.7rem;font-weight:700;color:var(--grey-500);text-transform:uppercase;letter-spacing:.04em;padding:.4rem .75rem;background:var(--grey-50);border-bottom:1px solid var(--grey-100);text-align:center;}
+    .stk-card-table th:first-child{text-align:left;}
+    .stk-card-table td{padding:.5rem .75rem;border-bottom:1px solid var(--grey-100);font-size:.85rem;text-align:center;}
+    .stk-card-table td:first-child{text-align:left;color:var(--grey-700);}
+    .stk-card-table tr:last-child td{border-bottom:none;}
+    .stk-card-table tr:hover td{background:var(--grey-50);cursor:pointer;}
     .stk-qty{font-weight:700;color:var(--navy);}
     .stk-low{color:var(--danger)!important;}
     .stk-warn{font-size:.8rem;color:var(--danger);font-weight:700;}
-    .stk-th{padding:.5rem 1.25rem;text-align:left;font-size:.72rem;font-weight:700;color:var(--grey-500);text-transform:uppercase;letter-spacing:.04em;background:var(--grey-50);border-bottom:2px solid var(--grey-200);position:sticky;top:0;z-index:5;white-space:nowrap;}
+    .stk-card-footer{padding:.5rem .75rem;border-top:1px solid var(--grey-100);display:flex;gap:.5rem;}
+    .stk-simple-card{display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;}
+    .stk-simple-left{font-weight:700;color:var(--navy);font-size:.92rem;}
+    .stk-simple-right{display:flex;align-items:center;gap:1rem;}
+    .stk-simple-qty{font-size:1.5rem;font-weight:900;color:var(--navy);}
 
     .lib-view-btn{padding:.45rem 1rem;border:1.5px solid var(--grey-200);border-radius:var(--radius);background:white;font-family:'Inter',sans-serif;font-size:.82rem;font-weight:600;color:var(--grey-600);cursor:pointer;}
     .lib-view-btn.active{background:var(--navy);color:white;border-color:var(--navy);}
@@ -256,7 +265,7 @@
 
   <nav class="cat-nav" id="cat-nav">
     <div id="cat-nav-tabs" style="display:flex;flex:1;overflow-x:auto;scrollbar-width:none;"></div>
-    <button onclick="openSettingsModal()" style="flex-shrink:0;padding:.7rem 1.25rem;border:none;border-left:1px solid rgba(255,255,255,.08);background:none;font-family:'Inter',sans-serif;font-size:.82rem;font-weight:600;color:rgba(255,255,255,.5);cursor:pointer;white-space:nowrap;transition:color .15s;" onmouseover="this.style.color='rgba(255,255,255,.8)'" onmouseout="this.style.color='rgba(255,255,255,.5)'">⚙ Settings</button>
+    <button id="settings-btn" onclick="openSettingsModal()" style="flex-shrink:0;padding:.7rem 1.25rem;border:none;border-left:1px solid rgba(255,255,255,.08);background:none;font-family:'Inter',sans-serif;font-size:.82rem;font-weight:600;color:rgba(255,255,255,.5);cursor:pointer;white-space:nowrap;transition:color .15s;" onmouseover="this.style.color='rgba(255,255,255,.8)'" onmouseout="this.style.color='rgba(255,255,255,.5)'">⚙ Settings</button>
   </nav>
 
   <div class="toolbar">
@@ -302,18 +311,7 @@
     <button class="btn btn-primary" onclick="openAddStockItemModal()">+ Add Item</button>
   </div>
   <div id="stk-view">
-    <table class="stk-table" id="stk-table">
-      <thead>
-        <tr>
-          <th class="stk-th">Item / Variant</th>
-          <th class="stk-th" style="width:80px;">Qty</th>
-          <th class="stk-th" style="width:90px;">Target Qty</th>
-          <th class="stk-th">Notes</th>
-          <th class="stk-th" style="width:80px;"></th>
-        </tr>
-      </thead>
-      <tbody id="stk-tbody"></tbody>
-    </table>
+    <div id="stk-grid" style="padding:1.25rem;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem;align-items:start;"></div>
   </div>
 
   <!-- PERCUSSION & EQUIPMENT VIEW -->
@@ -803,7 +801,14 @@ async function selectCategoryById(id){
 
 async function selectCategory(prefix){
   const cat=allCategories.find(c=>c.prefix===prefix.toUpperCase());
-  if(cat){currentCatId=cat.id;renderCatNav();await loadCategoryData();}
+  if(cat){
+    currentCatId=cat.id;
+    renderCatNav();
+    const prefix=(cat.prefix||'').toUpperCase();
+    const btn=document.getElementById('settings-btn');
+    if(btn)btn.style.display=['PRC','LIB','STK'].includes(prefix)?'none':'';
+    await loadCategoryData();
+  }
 }
 
 // ── TABLE RENDER ──────────────────────────────────────────────
@@ -1172,6 +1177,11 @@ async function submitAddAsset(){
 // ── SETTINGS ACCORDION ────────────────────────────────────────
 function openSettingsModal(){
   const cat=allCategories.find(c=>c.id===currentCatId);
+  const prefix=(cat?.prefix||'').toUpperCase();
+  // Settings only applies to INS categories
+  if(prefix==='PRC'||prefix==='LIB'||prefix==='STK'){
+    showToast('No settings for this section');return;
+  }
   document.getElementById('settings-modal-title').textContent=`Settings — ${cat?.name||''}`;
   renderSettingsAccordion();
   document.getElementById('settings-modal').classList.add('open');
@@ -1179,16 +1189,18 @@ function openSettingsModal(){
 
 function renderSettingsAccordion(){
   const el=document.getElementById('settings-accordion');
-  if(!allCategories.length){el.innerHTML='<div style="color:var(--grey-400);font-size:.875rem;">No categories found.</div>';return;}
-  el.innerHTML=allCategories.map(c=>`
+  const cat=allCategories.find(c=>c.id===currentCatId);
+  const cats=cat?[cat]:allCategories;
+  if(!cats.length){el.innerHTML='<div style="color:var(--grey-400);font-size:.875rem;">No categories found.</div>';return;}
+  el.innerHTML=cats.map(c=>`
     <div class="acc-item" id="acc-${c.id}">
-      <div class="acc-hdr ${openAccId===c.id?'open':''}" onclick="toggleAcc('${c.id}')">
+      <div class="acc-hdr ${openAccId===c.id||cats.length===1?'open':''}" onclick="toggleAcc('${c.id}')">
         <div>
           <div class="acc-hdr-name">${esc(c.name)}</div>
           <div class="acc-hdr-meta">${c.category_fields.length} field${c.category_fields.length!==1?'s':''}</div>
         </div>
         <div class="acc-hdr-right">
-          <span class="acc-chevron ${openAccId===c.id?'open':''}">▼</span>
+          <span class="acc-chevron ${openAccId===c.id||cats.length===1?'open':''}">▼</span>
         </div>
       </div>
       <div class="acc-body ${openAccId===c.id?'open':''}" id="acc-body-${c.id}">
@@ -2592,71 +2604,108 @@ async function loadStockData(){
 
 function renderStockView(){
   const q=(document.getElementById('stk-search')?.value||'').toLowerCase();
-  const tbody=document.getElementById('stk-tbody');
-  let rows='';
+  const grid=document.getElementById('stk-grid');
+  let cards='';
 
   const sortedItems=[...stockItems].sort((a,b)=>a.name.localeCompare(b.name));
   sortedItems.forEach(item=>{
     if(q&&!item.name.toLowerCase().includes(q)){
-      // Check if any variant matches
       const vars=stockVariants.filter(v=>v.item_id===item.id);
       if(!vars.some(v=>v.variant_name.toLowerCase().includes(q)))return;
     }
 
     if(item.has_variants){
       const vars=stockVariants.filter(v=>v.item_id===item.id).filter(v=>!q||v.variant_name.toLowerCase().includes(q)||item.name.toLowerCase().includes(q));
-      const totalQty=vars.reduce((s,v)=>s+(v.qty||0),0);
       const anyLow=vars.some(v=>(v.qty||0)<(v.min_qty||0));
-      // Group header
-      rows+=`<tr class="stk-group-header">
-        <td colspan="4"><span>${esc(item.name)}</span>${anyLow?'<span class="stk-warn" style="margin-left:.5rem;">⚠ Low stock</span>':''}</td>
-        <td style="text-align:right;padding:.6rem 1.25rem;">
-          <button class="btn btn-ghost btn-sm" onclick="openEditStockItem('${item.id}')">Edit</button>
-        </td>
-      </tr>`;
-      // Variant rows
-      vars.forEach(v=>{
+      const varRows=vars.map(v=>{
         const isLow=(v.qty||0)<(v.min_qty||0);
-        rows+=`<tr class="stk-row" onclick="openStockDetail('${item.id}','${v.id}')">
-          <td class="stk-variant-name">${esc(v.variant_name)}</td>
-          <td class="stk-qty ${isLow?'stk-low':''}">${v.qty||0}${isLow?'<span class="stk-warn">⚠</span>':''}</td>
-          <td style="color:var(--grey-500);font-size:.82rem;">${v.min_qty||0}</td>
-          <td style="color:var(--grey-500);font-size:.82rem;">${esc(item.notes||'')}</td>
-          <td style="text-align:right;padding:.55rem 1.25rem;"><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openStkAdj('${item.id}','${v.id}','${esc(v.variant_name)}',${v.qty||0})">Adjust</button></td>
+        return`<tr onclick="openStockDetail('${item.id}','${v.id}')">
+          <td>${esc(v.variant_name)}</td>
+          <td class="stk-qty ${isLow?'stk-low':''}">${v.qty||0}${isLow?'<span class="stk-warn"> ⚠</span>':''}</td>
+          <td style="color:var(--grey-500);">${v.min_qty||0}</td>
+          <td><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openStkAdj('${item.id}','${v.id}','${esc(v.variant_name)}',${v.qty||0})" style="font-size:.75rem;padding:.15rem .5rem;">Adjust</button></td>
         </tr>`;
-      });
-      // Add variant row
-      rows+=`<tr><td colspan="5" style="padding:.3rem 1.25rem .5rem 2.5rem;">
-        <button class="btn btn-ghost btn-sm" onclick="openAddVariant('${item.id}')" style="font-size:.75rem;border:1px dashed var(--grey-200);">+ Add variant</button>
-      </td></tr>`;
+      }).join('');
+      cards+=`<div class="stk-card">
+        <div class="stk-card-header">
+          <span class="stk-card-title">${esc(item.name)}${anyLow?'<span class="stk-warn" style="margin-left:.5rem;font-size:.75rem;">⚠ Low</span>':''}</span>
+          <button class="btn btn-ghost btn-sm" onclick="openEditStockItem('${item.id}')">Edit</button>
+        </div>
+        <table class="stk-card-table">
+          <thead><tr><th>Variant</th><th>Qty</th><th>Target</th><th></th></tr></thead>
+          <tbody>${varRows}</tbody>
+        </table>
+        <div class="stk-card-footer">
+          <button class="btn btn-ghost btn-sm" onclick="openAddVariant('${item.id}')" style="font-size:.75rem;border:1px dashed var(--grey-200);">+ Add variant</button>
+        </div>
+      </div>`;
     }else{
-      // Simple item — find or create a single "default" variant
       const v=stockVariants.find(vv=>vv.item_id===item.id);
       const qty=v?.qty||0;
       const minQty=v?.min_qty||0;
       const isLow=qty<minQty;
-      rows+=`<tr class="stk-row" onclick="openStockDetail('${item.id}','${v?.id||''}')">
-        <td style="padding:.55rem 1.25rem;font-weight:600;color:var(--navy);">${esc(item.name)}${isLow?'<span class="stk-warn" style="margin-left:.4rem;">⚠</span>':''}</td>
-        <td class="stk-qty ${isLow?'stk-low':''}">${qty}</td>
-        <td style="color:var(--grey-500);font-size:.82rem;">${minQty}</td>
-        <td style="color:var(--grey-500);font-size:.82rem;">${esc(item.notes||'')}</td>
-        <td style="text-align:right;padding:.55rem 1.25rem;">
-          <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openEditStockItem('${item.id}')">Edit</button>
-          ${v?`<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openStkAdj('${item.id}','${v.id}','${esc(item.name)}',${qty})">Adjust</button>`:''}
-        </td>
-      </tr>`;
+      cards+=`<div class="stk-card" onclick="openStockDetail('${item.id}','${v?.id||''}')" style="cursor:pointer;">
+        <div class="stk-simple-card">
+          <div>
+            <div class="stk-simple-left">${esc(item.name)}${isLow?'<span class="stk-warn" style="margin-left:.4rem;">⚠</span>':''}</div>
+            ${item.notes?`<div style="font-size:.75rem;color:var(--grey-500);margin-top:.2rem;">${esc(item.notes)}</div>`:''}
+          </div>
+          <div class="stk-simple-right">
+            <div style="text-align:center;">
+              <div class="stk-simple-qty ${isLow?'stk-low':''}">${qty}</div>
+              <div style="font-size:.68rem;color:var(--grey-400);text-transform:uppercase;letter-spacing:.05em;">of ${minQty}</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:.3rem;">
+              <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openEditStockItem('${item.id}')">Edit</button>
+              ${v?`<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openStkAdj('${item.id}','${v.id}','${esc(item.name)}',${qty})">Adjust</button>`:''}
+            </div>
+          </div>
+        </div>
+      </div>`;
     }
   });
 
-  tbody.innerHTML=rows||`<tr><td colspan="5" style="text-align:center;padding:3rem;color:var(--grey-400);">No stock items yet.</td></tr>`;
+  grid.innerHTML=cards||'<div style="color:var(--grey-400);padding:2rem;">No stock items yet.</div>';
 }
 
 // ── STOCK ITEM ADD/EDIT ────────────────────────────────────────
+function initStkDragSort(){
+  const list=document.getElementById('stk-variants-list');
+  if(!list)return;
+  let dragging=null;
+  list.addEventListener('dragstart',e=>{
+    dragging=e.target.closest('.stk-var-row');
+    if(dragging)dragging.style.opacity='.4';
+  });
+  list.addEventListener('dragend',e=>{
+    if(dragging)dragging.style.opacity='';
+    dragging=null;
+  });
+  list.addEventListener('dragover',e=>{
+    e.preventDefault();
+    const target=e.target.closest('.stk-var-row');
+    if(target&&target!==dragging){
+      const rect=target.getBoundingClientRect();
+      const after=e.clientY>rect.top+rect.height/2;
+      list.insertBefore(dragging,after?target.nextSibling:target);
+    }
+  });
+}
+
+async function saveStkVariantOrder(){
+  const rows=[...document.querySelectorAll('.stk-var-row')];
+  const updates=rows.map((row,i)=>({id:row.dataset.vid,sort_order:i})).filter(u=>u.id&&u.id!=='new');
+  for(const u of updates){
+    await db.from('stock_variants').update({sort_order:u.sort_order}).eq('id',u.id);
+  }
+}
+
 function openAddStockItemModal(){
   stkEditItemId=null;
   document.getElementById('stk-item-modal-title').textContent='Add Item';
   renderStkItemForm();
   document.getElementById('stk-item-modal').classList.add('open');
+  setTimeout(initStkDragSort, 50);
 }
 
 function openEditStockItem(itemId){
@@ -2664,6 +2713,7 @@ function openEditStockItem(itemId){
   document.getElementById('stk-item-modal-title').textContent='Edit Item';
   renderStkItemForm(stockItems.find(i=>i.id===itemId));
   document.getElementById('stk-item-modal').classList.add('open');
+  setTimeout(initStkDragSort, 50);
 }
 
 function renderStkItemForm(item=null){
@@ -2678,7 +2728,8 @@ function renderStkItemForm(item=null){
     <div class="fg" id="stk-variants-section" style="display:${item?.has_variants?'block':'none'};">
       <label>Variants</label>
       <div id="stk-variants-list">
-        ${vars.map(v=>`<div style="display:flex;gap:.5rem;margin-bottom:.35rem;align-items:center;">
+        ${vars.map(v=>`<div class="stk-var-row" draggable="true" data-vid="${v.id}" style="display:flex;gap:.5rem;margin-bottom:.35rem;align-items:center;">
+          <span class="drag-handle" style="cursor:grab;color:var(--grey-400);font-size:.9rem;padding:0 .2rem;user-select:none;">⠿</span>
           <input type="text" value="${esc(v.variant_name)}" style="flex:2;" placeholder="Variant name" data-vid="${v.id}" class="stk-var-name"/>
           <input type="number" value="${v.min_qty||0}" style="width:70px;" placeholder="Target" data-vid="${v.id}" class="stk-var-min" title="Target qty"/>
           <button onclick="deleteStkVariant('${v.id}')" style="background:none;border:none;color:var(--grey-400);cursor:pointer;">✕</button>
@@ -2703,8 +2754,12 @@ function toggleStkVariants(){
 function addStkVariantRow(){
   const list=document.getElementById('stk-variants-list');
   const div=document.createElement('div');
+  div.className='stk-var-row';
+  div.draggable=true;
+  div.dataset.vid='new';
   div.style.cssText='display:flex;gap:.5rem;margin-bottom:.35rem;align-items:center;';
-  div.innerHTML=`<input type="text" style="flex:2;" placeholder="Variant name" class="stk-var-name" data-vid="new"/>
+  div.innerHTML=`<span class="drag-handle" style="cursor:grab;color:var(--grey-400);font-size:.9rem;padding:0 .2rem;user-select:none;">⠿</span>
+    <input type="text" style="flex:2;" placeholder="Variant name" class="stk-var-name" data-vid="new"/>
     <input type="number" style="width:70px;" placeholder="Target" class="stk-var-min" data-vid="new" title="Target qty"/>
     <button onclick="this.parentElement.remove()" style="background:none;border:none;color:var(--grey-400);cursor:pointer;">✕</button>`;
   list.appendChild(div);
@@ -2740,6 +2795,7 @@ async function submitStkItem(){
 
   // Handle variants
   if(hasVariants){
+    await saveStkVariantOrder();
     const nameInputs=[...document.querySelectorAll('.stk-var-name')];
     const minInputs=[...document.querySelectorAll('.stk-var-min')];
     for(let i=0;i<nameInputs.length;i++){
