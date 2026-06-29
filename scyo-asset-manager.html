@@ -2595,7 +2595,8 @@ function renderStockView(){
   const tbody=document.getElementById('stk-tbody');
   let rows='';
 
-  stockItems.forEach(item=>{
+  const sortedItems=[...stockItems].sort((a,b)=>a.name.localeCompare(b.name));
+  sortedItems.forEach(item=>{
     if(q&&!item.name.toLowerCase().includes(q)){
       // Check if any variant matches
       const vars=stockVariants.filter(v=>v.item_id===item.id);
