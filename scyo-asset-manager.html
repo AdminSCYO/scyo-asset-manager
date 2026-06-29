@@ -3012,7 +3012,6 @@ function openStockDetail(itemId,variantId){
     ${variant&&variant.variant_name!=='default'?`<div class="field-row"><div class="field-label">Variant</div><div class="field-val">${esc(variant.variant_name)}</div></div>`:''}
     <div class="field-row"><div class="field-label">Qty on Hand</div><div class="field-val"><strong>${variant?.qty||0}</strong></div></div>
     <div class="field-row"><div class="field-label">Target Qty</div><div class="field-val">${variant?.min_qty||0}</div></div>
-    ${item?.notes?`<div class="field-row"><div class="field-label">Notes</div><div class="field-val">${esc(item.notes)}</div></div>`:''}
     <div style="margin-top:1rem;display:flex;gap:.5rem;">
       ${variant?`<button class="btn btn-primary btn-sm" onclick="closeModal('stk-detail-modal');openStkAdj('${itemId}','${variantId}','${esc(label)}',${variant?.qty||0})">Adjust Qty</button>`:''}
       <button class="btn btn-ghost btn-sm" onclick="closeModal('stk-detail-modal');openEditStockItem('${itemId}')">Edit Item</button>
