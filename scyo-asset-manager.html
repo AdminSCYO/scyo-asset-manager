@@ -2680,33 +2680,35 @@ function renderStockMiddle(){
   if(!item){mid.innerHTML='';return;}
   const vars=stockVariants.filter(v=>v.item_id===item.id);
 
-  const header=`<div style="padding:.75rem 1rem;background:var(--grey-50);border-bottom:2px solid var(--grey-200);position:sticky;top:0;z-index:2;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem;">
+  const header=`<div>
+    <div style="padding:.75rem 1rem;background:var(--grey-50);border-bottom:1px solid var(--grey-200);position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;">
       <span style="font-weight:700;color:var(--navy);font-size:.95rem;">${esc(item.name)}</span>
       <button class="btn btn-ghost btn-sm" onclick="openEditStockItem('${item.id}')">Edit item</button>
     </div>
-    <div style="display:flex;flex-direction:column;gap:.6rem;">
-      <div>
-        <div style="font-size:.68rem;font-weight:700;color:var(--grey-400);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.2rem;">Item stored at</div>
-        <div contenteditable="true" id="stk-inline-location-${item.id}"
-          style="font-size:.85rem;color:${item.storage_location?'var(--grey-700)':'var(--grey-300)'};outline:none;min-height:1.2em;cursor:text;border-bottom:1px dashed transparent;padding-bottom:.1rem;"
-          onfocus="this.style.borderBottomColor='var(--navy)';if(this.innerText.trim()==='Not specified')this.innerText=''"
-          onblur="this.style.borderBottomColor='transparent';saveStockInlineField('${item.id}','storage_location',this.innerText.trim());if(!this.innerText.trim())this.innerText='Not specified'"
-          >${esc(item.storage_location||'Not specified')}</div>
-      </div>
-      <div style="border-top:1px solid var(--grey-200);padding-top:.6rem;">
-        <div style="font-size:.68rem;font-weight:700;color:var(--grey-400);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.2rem;">Restock instructions</div>
-        <div contenteditable="true" id="stk-inline-reorder-${item.id}"
-          style="font-size:.85rem;color:${item.reorder_notes?'var(--grey-700)':'var(--grey-300)'};outline:none;min-height:1.2em;cursor:text;white-space:pre-wrap;border-bottom:1px dashed transparent;padding-bottom:.1rem;"
-          onfocus="this.style.borderBottomColor='var(--navy)';if(this.innerText.trim()==='Not specified')this.innerText=''"
-          onblur="this.style.borderBottomColor='transparent';saveStockInlineField('${item.id}','reorder_notes',this.innerText.trim());if(!this.innerText.trim())this.innerText='Not specified'"
-          >${esc(item.reorder_notes||'Not specified')}</div>
+    <div style="padding:.75rem 1rem;background:var(--grey-50);border-bottom:2px solid var(--grey-200);">
+      <div style="display:flex;flex-direction:column;gap:.6rem;">
+        <div>
+          <div style="font-size:.68rem;font-weight:700;color:var(--grey-400);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.2rem;">Item stored at</div>
+          <div contenteditable="true" id="stk-inline-location-${item.id}"
+            style="font-size:.85rem;color:${item.storage_location?'var(--grey-700)':'var(--grey-300)'};outline:none;min-height:1.2em;cursor:text;border-bottom:1px dashed transparent;padding-bottom:.1rem;"
+            onfocus="this.style.borderBottomColor='var(--navy)';if(this.innerText.trim()==='Not specified')this.innerText=''"
+            onblur="this.style.borderBottomColor='transparent';saveStockInlineField('${item.id}','storage_location',this.innerText.trim());if(!this.innerText.trim())this.innerText='Not specified'"
+            >${esc(item.storage_location||'Not specified')}</div>
+        </div>
+        <div style="border-top:1px solid var(--grey-200);padding-top:.6rem;">
+          <div style="font-size:.68rem;font-weight:700;color:var(--grey-400);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.2rem;">Restock instructions</div>
+          <div contenteditable="true" id="stk-inline-reorder-${item.id}"
+            style="font-size:.85rem;color:${item.reorder_notes?'var(--grey-700)':'var(--grey-300)'};outline:none;min-height:1.2em;cursor:text;white-space:pre-wrap;border-bottom:1px dashed transparent;padding-bottom:.1rem;"
+            onfocus="this.style.borderBottomColor='var(--navy)';if(this.innerText.trim()==='Not specified')this.innerText=''"
+            onblur="this.style.borderBottomColor='transparent';saveStockInlineField('${item.id}','reorder_notes',this.innerText.trim());if(!this.innerText.trim())this.innerText='Not specified'"
+            >${esc(item.reorder_notes||'Not specified')}</div>
+        </div>
       </div>
     </div>
   </div>`;
   const hasVars=vars.some(v=>v.variant_name!==null);
   if(hasVars){
-    const thStyle='padding:.45rem .85rem;text-align:left;font-size:.7rem;font-weight:700;color:var(--grey-500);text-transform:uppercase;letter-spacing:.04em;background:var(--grey-50);border-bottom:1.5px solid var(--grey-200);';
+    const thStyle='padding:.45rem .85rem;text-align:left;font-size:.7rem;font-weight:700;color:var(--grey-500);text-transform:uppercase;letter-spacing:.04em;background:var(--grey-50);border-bottom:1.5px solid var(--grey-200);position:sticky;top:41px;z-index:1;';
     const rows=vars.map(v=>{
       const isLow=(v.qty||0)<(v.min_qty||0);
       const isActive=v.id===stkSelectedVariantId;
@@ -2851,30 +2853,13 @@ function openEditStockItem(itemId){
 
 function renderStkItemForm(item=null){
   const isEdit=!!item;
-  const vars=item?stockVariants.filter(v=>v.item_id===item.id):[];
   document.getElementById('stk-item-form').innerHTML=`
     <div class="fg"><label>Item Name *</label><input type="text" id="stk-name" value="${esc(item?.name||'')}" placeholder="e.g. Shirts"/></div>
     <div class="fg" style="display:flex;align-items:center;gap:.5rem;">
-      <input type="checkbox" id="stk-has-variants" ${item?.has_variants?'checked':''} style="width:auto;padding:0;border:none;" onchange="toggleStkVariants()"/>
+      <input type="checkbox" id="stk-has-variants" ${item?.has_variants?'checked':''} style="width:auto;padding:0;border:none;"/>
       <label style="text-transform:none;letter-spacing:0;font-size:.875rem;margin:0;cursor:pointer;" for="stk-has-variants">Has variants (e.g. sizes)</label>
     </div>
-    <div class="fg" id="stk-variants-section" style="display:${item&&vars.some(v=>v.variant_name!==null)?'block':'none'};">
-      <label>Variants</label>
-      <div id="stk-variants-list">
-        ${vars.map(v=>`<div class="stk-var-row" draggable="true" data-vid="${v.id}" style="display:flex;gap:.5rem;margin-bottom:.35rem;align-items:center;">
-          <span class="drag-handle" style="cursor:grab;color:var(--grey-400);font-size:.9rem;padding:0 .2rem;user-select:none;">⠿</span>
-          <input type="text" value="${esc(v.variant_name)}" style="flex:2;" placeholder="Variant name" data-vid="${v.id}" class="stk-var-name"/>
-          <input type="number" value="${v.min_qty||0}" style="width:70px;" placeholder="Target" data-vid="${v.id}" class="stk-var-min" title="Target qty"/>
-          <button onclick="deleteStkVariant('${v.id}')" style="background:none;border:none;color:var(--grey-400);cursor:pointer;">✕</button>
-        </div>`).join('')}
-      </div>
-      <button class="btn btn-ghost btn-sm" onclick="addStkVariantRow()" style="margin-top:.35rem;border:1px dashed var(--grey-200);">+ Add variant</button>
-    </div>
-    ${!(item&&vars.some(v=>v.variant_name!==null))?`<div class="fg" id="stk-simple-min"><label>Target Qty</label><input type="number" id="stk-min-qty" value="${vars[0]?.min_qty||0}" min="0" placeholder="0"/></div>`:''}
-    <div class="fg"><label>Notes</label><textarea id="stk-notes" style="height:60px;resize:vertical;">${esc(item?.notes||'')}</textarea></div>
-    <div class="fg"><label>Reorder Info</label><textarea id="stk-reorder-notes" style="height:80px;resize:vertical;" placeholder="Supplier contact, ordering instructions, links...">${esc(item?.reorder_notes||'')}</textarea></div>
-    <div class="fg"><label>Storage Location</label><input type="text" id="stk-storage-location" value="${esc(item?.storage_location||'')}" placeholder="e.g. Office cupboard, top shelf"/></div>
-    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:.75rem;" onclick="submitStkItem()">${isEdit?'Save':'Add Item'}</button>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:.75rem;margin-top:.5rem;" onclick="submitStkItem()">${isEdit?'Save':'Add Item'}</button>
     ${isEdit?`<button class="btn btn-ghost" style="width:100%;justify-content:center;margin-top:.35rem;color:var(--danger);" onclick="deleteStkItem('${item.id}')">Delete item</button>`:''}
   `;
 }
@@ -2909,54 +2894,25 @@ async function openAddVariant(itemId){
 async function submitStkItem(){
   const name=document.getElementById('stk-name').value.trim();
   const hasVariants=document.getElementById('stk-has-variants').checked;
-  const notes=document.getElementById('stk-notes').value.trim();
-  const reorderNotes=document.getElementById('stk-reorder-notes').value.trim();
-  const storageLocation=document.getElementById('stk-storage-location').value.trim();
   if(!name){showToast('Name required');return;}
-
   let itemId=stkEditItemId;
   if(itemId){
-    await db.from('stock_items').update({name,has_variants:hasVariants,notes:notes||null,reorder_notes:reorderNotes||null,storage_location:storageLocation||null}).eq('id',itemId);
+    await db.from('stock_items').update({name,has_variants:hasVariants}).eq('id',itemId);
     await db.from('stock_log').insert({item_id:itemId,user_email:currentUser.email,field:'Item',new_value:name,reason:'Edited'});
   }else{
-    const{data,error}=await db.from('stock_items').insert({name,has_variants:hasVariants,notes:notes||null,reorder_notes:reorderNotes||null,storage_location:storageLocation||null,sort_order:stockItems.length}).select().single();
+    const{data,error}=await db.from('stock_items').insert({name,has_variants:hasVariants,sort_order:stockItems.length}).select().single();
     if(error){showToast('Error: '+error.message);return;}
     itemId=data.id;
     await db.from('stock_log').insert({item_id:itemId,user_email:currentUser.email,field:'Item',new_value:name,reason:'Created'});
-    // For simple items, create a default variant
     if(!hasVariants){
-      const minQty=parseInt(document.getElementById('stk-min-qty')?.value)||0;
       const sku=genSku(name,'unit');
-      await db.from('stock_variants').insert({item_id:itemId,variant_name:null,qty:0,min_qty:minQty,sort_order:0,sku});
+      await db.from('stock_variants').insert({item_id:itemId,variant_name:null,qty:0,min_qty:0,sort_order:0,sku});
     }
   }
-
-  // Handle variants
-  if(hasVariants){
-    await saveStkVariantOrder();
-    const nameInputs=[...document.querySelectorAll('.stk-var-name')];
-    const minInputs=[...document.querySelectorAll('.stk-var-min')];
-    for(let i=0;i<nameInputs.length;i++){
-      const vname=nameInputs[i].value.trim();
-      const vmin=parseInt(minInputs[i].value)||0;
-      const vid=nameInputs[i].dataset.vid;
-      if(!vname)continue;
-      if(vid==='new'){
-        const sku=genSku(name,vname);
-        await db.from('stock_variants').insert({item_id:itemId,variant_name:vname,qty:0,min_qty:vmin,sort_order:i,sku});
-      }else{
-        await db.from('stock_variants').update({variant_name:vname,min_qty:vmin}).eq('id',vid);
-      }
-    }
-    // Update simple item min if not variants
-  }else if(stkEditItemId){
-    const minQty=parseInt(document.getElementById('stk-min-qty')?.value)||0;
-    const defVar=stockVariants.find(v=>v.item_id===itemId);
-    if(defVar)await db.from('stock_variants').update({min_qty:minQty}).eq('id',defVar.id);
-  }
-
   closeModal('stk-item-modal');
   await loadStockData();
+  stkSelectedItemId=itemId;
+  renderStockMiddle();
   showToast(stkEditItemId?'Item updated ✓':'Item added ✓');
 }
 
