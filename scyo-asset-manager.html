@@ -2647,10 +2647,11 @@ function renderStockSidebar(){
     const anyLow=vars.some(v=>(v.qty||0)<(v.min_qty||0));
     const totalQty=vars.reduce((s,v)=>s+(v.qty||0),0);
     const isActive=item.id===stkSelectedItemId;
+    const hasVars=vars.some(v=>v.variant_name!==null);
     return`<div class="stk-sidebar-item ${isActive?'active':''}" onclick="selectStkItem('${item.id}')">
       <div>
         <div class="stk-sidebar-name">${esc(item.name)}</div>
-        <div class="stk-sidebar-meta">${item.has_variants?`${vars.length} variants · ${totalQty} total`:`Qty: ${totalQty}`}</div>
+        <div class="stk-sidebar-meta">${hasVars?`${vars.length} variants · ${totalQty} total`:`Qty: ${totalQty}`}</div>
       </div>
       ${anyLow?'<span class="stk-sidebar-warn">⚠</span>':''}
     </div>`;
@@ -2684,7 +2685,8 @@ function renderStockMiddle(){
     <button class="btn btn-ghost btn-sm" onclick="openEditStockItem('${item.id}')">Edit</button>
   </div>`;
 
-  if(item.has_variants){
+  const hasVars=vars.some(v=>v.variant_name!==null);
+  if(hasVars){
     const thStyle='padding:.45rem .85rem;text-align:left;font-size:.7rem;font-weight:700;color:var(--grey-500);text-transform:uppercase;letter-spacing:.04em;background:var(--grey-50);border-bottom:1.5px solid var(--grey-200);';
     const rows=vars.map(v=>{
       const isLow=(v.qty||0)<(v.min_qty||0);
@@ -2719,14 +2721,13 @@ function renderStockMiddle(){
     mid.innerHTML=header+`<div style="padding:1.25rem;">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem;background:var(--grey-50);border-radius:var(--radius);border:1.5px solid var(--grey-200);margin-bottom:.75rem;">
         <div>
+          <div style="font-size:.72rem;color:var(--grey-400);font-family:monospace;margin-bottom:.25rem;">${esc(v?.sku||'')}</div>
           <div style="font-size:2rem;font-weight:900;color:${isLow?'var(--danger)':'var(--navy)'};">${qty}${isLow?' ⚠':''}</div>
           <div style="font-size:.78rem;color:var(--grey-400);">of ${minQty} target</div>
         </div>
         ${v?`<button class="btn btn-primary" onclick="openStkAdj('${item.id}','${v.id}','${esc(item.name)}',${qty})">Adjust Qty</button>`:''}
       </div>
-      <button class="btn btn-ghost btn-sm" onclick="selectStkVariant('${v?.id||''}')" style="width:100%;justify-content:center;">View History</button>
     </div>`;
-    // Auto-select the single variant
     if(v)selectStkVariant(v.id);
   }
 }
@@ -2753,7 +2754,7 @@ function renderStockRight(variantId){
   const logs=stockLog.filter(l=>l.variant_id===variantId).slice(0,30);
 
   panel.innerHTML=`
-    <div style="font-size:1rem;font-weight:800;color:var(--navy);margin-bottom:.25rem;">${esc(item.name)} — ${esc(v.variant_name)}</div>
+    <div style="font-size:1rem;font-weight:800;color:var(--navy);margin-bottom:.25rem;">${esc(item.name)}${v.variant_name?' — '+esc(v.variant_name):''}</div>
     <div style="font-size:.75rem;color:var(--grey-400);font-family:monospace;margin-bottom:1rem;">${esc(v.sku||'No SKU')}</div>
     <div style="display:flex;gap:.75rem;margin-bottom:1.25rem;">
       <div style="flex:1;background:white;border-radius:var(--radius);border:1.5px solid var(--grey-200);padding:.85rem;text-align:center;">
@@ -2841,7 +2842,7 @@ function renderStkItemForm(item=null){
       <input type="checkbox" id="stk-has-variants" ${item?.has_variants?'checked':''} style="width:auto;padding:0;border:none;" onchange="toggleStkVariants()"/>
       <label style="text-transform:none;letter-spacing:0;font-size:.875rem;margin:0;cursor:pointer;" for="stk-has-variants">Has variants (e.g. sizes)</label>
     </div>
-    <div class="fg" id="stk-variants-section" style="display:${item?.has_variants?'block':'none'};">
+    <div class="fg" id="stk-variants-section" style="display:${item&&vars.some(v=>v.variant_name!==null)?'block':'none'};">
       <label>Variants</label>
       <div id="stk-variants-list">
         ${vars.map(v=>`<div class="stk-var-row" draggable="true" data-vid="${v.id}" style="display:flex;gap:.5rem;margin-bottom:.35rem;align-items:center;">
@@ -2853,7 +2854,7 @@ function renderStkItemForm(item=null){
       </div>
       <button class="btn btn-ghost btn-sm" onclick="addStkVariantRow()" style="margin-top:.35rem;border:1px dashed var(--grey-200);">+ Add variant</button>
     </div>
-    ${!item?.has_variants?`<div class="fg" id="stk-simple-min"><label>Target Qty</label><input type="number" id="stk-min-qty" value="${vars[0]?.min_qty||0}" min="0" placeholder="0"/></div>`:''}
+    ${!(item&&vars.some(v=>v.variant_name!==null))?`<div class="fg" id="stk-simple-min"><label>Target Qty</label><input type="number" id="stk-min-qty" value="${vars[0]?.min_qty||0}" min="0" placeholder="0"/></div>`:''}
     <div class="fg"><label>Notes</label><textarea id="stk-notes" style="height:60px;resize:vertical;">${esc(item?.notes||'')}</textarea></div>
     <button class="btn btn-primary" style="width:100%;justify-content:center;padding:.75rem;" onclick="submitStkItem()">${isEdit?'Save':'Add Item'}</button>
     ${isEdit?`<button class="btn btn-ghost" style="width:100%;justify-content:center;margin-top:.35rem;color:var(--danger);" onclick="deleteStkItem('${item.id}')">Delete item</button>`:''}
@@ -2906,7 +2907,7 @@ async function submitStkItem(){
     if(!hasVariants){
       const minQty=parseInt(document.getElementById('stk-min-qty')?.value)||0;
       const sku=genSku(name,'unit');
-      await db.from('stock_variants').insert({item_id:itemId,variant_name:'default',qty:0,min_qty:minQty,sort_order:0,sku});
+      await db.from('stock_variants').insert({item_id:itemId,variant_name:null,qty:0,min_qty:minQty,sort_order:0,sku});
     }
   }
 
