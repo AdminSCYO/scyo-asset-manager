@@ -442,6 +442,26 @@
   </div>
 </div>
 
+<!-- PERC LOCATIONS MODAL -->
+<div class="modal-backdrop" id="perc-locations-modal">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header">
+      <span class="modal-title">Manage Locations</span>
+      <button class="btn-close" onclick="closeModal('perc-locations-modal')">✕</button>
+    </div>
+    <div style="padding:1.25rem;overflow-y:auto;max-height:75vh;">
+      <div id="perc-locations-list"></div>
+      <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--grey-100);">
+        <div style="font-size:.82rem;font-weight:700;color:var(--grey-600);margin-bottom:.5rem;">Add Location</div>
+        <div style="display:flex;gap:.5rem;">
+          <input type="text" id="perc-new-location-name" placeholder="e.g. Main Hall" style="flex:1;"/>
+          <button class="btn btn-primary btn-sm" onclick="submitAddPercLocation()">Add</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- PERC TYPES MODAL -->
 <div class="modal-backdrop" id="perc-types-modal">
   <div class="modal" style="max-width:560px;">
@@ -1354,7 +1374,7 @@ function parsePercStatus(status){
 }
 
 // ── PERCUSSION & EQUIPMENT ────────────────────────────────────
-let percTypes=[],percAssets=[],percLog=[];
+let percTypes=[],percAssets=[],percLog=[],percLocations=[];
 
 function showPercView(){
   document.querySelector('.toolbar').style.display='none';
@@ -1367,14 +1387,16 @@ function showPercView(){
 }
 
 async function loadPercData(){
-  const[{data:types},{data:assets},{data:log}]=await Promise.all([
+  const[{data:types},{data:assets},{data:log},{data:locations}]=await Promise.all([
     db.from('perc_types').select('*').order('sort_order'),
     db.from('perc_assets').select('*').order('created_at'),
-    db.from('perc_log').select('*').order('timestamp',{ascending:false})
+    db.from('perc_log').select('*').order('timestamp',{ascending:false}),
+    db.from('perc_locations').select('*').order('sort_order')
   ]);
   percTypes=types||[];
   percAssets=assets||[];
   percLog=log||[];
+  percLocations=locations||[];
   showPercView();
   renderPercView();
 }
@@ -1532,7 +1554,7 @@ function openAddPercModal(presetTypeId=''){
   document.getElementById('perc-add-lastsighted').value='';
   document.getElementById('perc-add-lastserviced').value='';
   document.getElementById('perc-add-status').value='In Storage';
-  document.getElementById('perc-add-status-detail').innerHTML='<input type="text" id="perc-add-location" placeholder="Location (e.g. Storage Shed)"/>';
+  renderPercAddStatusDetail();
 
   document.getElementById('perc-add-modal').classList.add('open');
   setTimeout(()=>document.getElementById('perc-add-type').focus(),100);
@@ -1542,7 +1564,13 @@ function renderPercAddStatusDetail(){
   const status=document.getElementById('perc-add-status').value;
   const detail=document.getElementById('perc-add-status-detail');
   if(status==='In Storage'){
-    detail.innerHTML='<input type="text" id="perc-add-location" placeholder="Location (e.g. Storage Shed)"/>';
+    detail.innerHTML=`<div style="display:flex;gap:.5rem;margin-top:.35rem;">
+      <select id="perc-add-location" style="flex:1;padding:.45rem .6rem;border:1.5px solid var(--grey-200);border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:.85rem;outline:none;">
+        <option value="">Select location…</option>
+        ${percLocations.map(l=>`<option value="${esc(l.name)}">${esc(l.name)}</option>`).join('')}
+      </select>
+      <button class="btn btn-ghost btn-sm" onclick="openPercLocationsModal()">⚙ Manage</button>
+    </div>`;
   }else{
     detail.innerHTML='';
   }
@@ -1618,6 +1646,19 @@ function openPercItemModal(assetId){
           </div>
         </div>`;
       }
+      if(f.name==='Location'){
+        const locOpts=percLocations.map(l=>`<option value="${esc(l.name)}" ${val===l.name?'selected':''}>${esc(l.name)}</option>`).join('');
+        return`<div class="field-row">
+          <div class="field-label">Location</div>
+          <div class="field-val" style="display:flex;gap:.5rem;align-items:center;">
+            <select id="perc-loc-select-${assetId}" style="flex:1;padding:.35rem .5rem;border:1.5px solid var(--grey-200);border-radius:4px;font-family:'Inter',sans-serif;font-size:.85rem;outline:none;" onchange="savePercField('${assetId}','Location',this.value)">
+              <option value="">Select location…</option>
+              ${locOpts}
+            </select>
+            <button class="btn btn-ghost btn-sm" onclick="openPercLocationsModal()">⚙</button>
+          </div>
+        </div>`;
+      }
       return`<div class="field-row">
         <div class="field-label">${esc(f.name)}</div>
         <div class="field-val">
@@ -1648,6 +1689,44 @@ async function savePercField(assetId,field,value){
   renderPercView();
   showToast(`${field} updated ✓`);
 }
+
+// ── PERC LOCATIONS ────────────────────────────────────────────
+async function openPercLocationsModal(){
+  renderPercLocationsList();
+  document.getElementById('perc-locations-modal').classList.add('open');
+}
+
+function renderPercLocationsList(){
+  document.getElementById('perc-locations-list').innerHTML=percLocations.length?percLocations.map(l=>`
+    <div style="display:flex;align-items:center;gap:.75rem;padding:.5rem 0;border-bottom:1px solid var(--grey-100);">
+      <div style="flex:1;font-size:.875rem;font-weight:500;">${esc(l.name)}</div>
+      <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deletePercLocation('${l.id}','${esc(l.name)}')">✕</button>
+    </div>
+  `).join(''):'<div style="color:var(--grey-400);font-size:.82rem;padding:.5rem 0;">No locations yet.</div>';
+}
+
+async function submitAddPercLocation(){
+  const name=document.getElementById('perc-new-location-name').value.trim();
+  if(!name){showToast('Name required');return;}
+  const{error}=await db.from('perc_locations').insert({name,sort_order:percLocations.length});
+  if(error){showToast('Error: '+error.message);return;}
+  document.getElementById('perc-new-location-name').value='';
+  const{data}=await db.from('perc_locations').select('*').order('sort_order');
+  percLocations=data||[];
+  renderPercLocationsList();
+  showToast('Location added ✓');
+}
+
+async function deletePercLocation(id,name){
+  if(!confirm(`Delete "${name}"?`))return;
+  await db.from('perc_locations').delete().eq('id',id);
+  const{data}=await db.from('perc_locations').select('*').order('sort_order');
+  percLocations=data||[];
+  renderPercLocationsList();
+  showToast('Location removed ✓');
+}
+
+document.getElementById('perc-locations-modal')?.addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal('perc-locations-modal');});
 
 // ── PERC TYPES ────────────────────────────────────────────────
 async function openPercTypesModal(){
