@@ -2788,7 +2788,8 @@ function openStkAdj(itemId,variantId,label,currentQty){
   document.getElementById('stk-adj-form').innerHTML=`
     <div style="font-size:.82rem;color:var(--grey-500);margin-bottom:.75rem;">Current qty: <strong>${currentQty}</strong></div>
     <div class="fg"><label>New Quantity *</label><input type="number" id="stk-adj-qty" value="${currentQty}" min="0"/></div>
-    <div class="fg"><label>Reason *</label><textarea id="stk-adj-reason" placeholder="e.g. Purchased 10 new, received from supplier..." style="height:70px;resize:vertical;"></textarea></div>
+    <div class="fg"><label>Supplier</label><input type="text" id="stk-adj-reason" placeholder="e.g. Officeworks, BCF..."/></div>
+    <div class="fg"><label>Notes</label><textarea id="stk-adj-notes" placeholder="e.g. Found extra box in storeroom..." style="height:60px;resize:vertical;"></textarea></div>
     <div class="fg"><label>Unit Price (optional)</label><input type="number" id="stk-adj-price" placeholder="0.00" min="0" step="0.01"/></div>
     <div style="display:flex;gap:.5rem;">
       <button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="submitStkAdj('${itemId}','${variantId}',${currentQty})">Save</button>
@@ -2801,10 +2802,11 @@ function openStkAdj(itemId,variantId,label,currentQty){
 
 async function submitStkAdj(itemId,variantId,oldQty){
   const newQty=parseInt(document.getElementById('stk-adj-qty').value);
-  const reason=document.getElementById('stk-adj-reason').value.trim();
+  const supplier=document.getElementById('stk-adj-reason').value.trim();
+  const notes=document.getElementById('stk-adj-notes').value.trim();
   const unitPrice=parseFloat(document.getElementById('stk-adj-price').value)||null;
   if(isNaN(newQty)||newQty<0){showToast('Enter a valid quantity');return;}
-  if(!reason){showToast('Reason is required');return;}
+  const reason=[supplier?`Supplier: ${supplier}`:'',notes].filter(Boolean).join(' — ')||'Qty adjusted';
   await db.from('stock_variants').update({qty:newQty}).eq('id',variantId);
   await db.from('stock_log').insert({item_id:itemId,variant_id:variantId,user_email:currentUser.email,field:'qty',old_value:String(oldQty),new_value:String(newQty),reason,unit_price:unitPrice});
   closeModal('stk-adj-modal');
