@@ -1532,7 +1532,8 @@ function renderPercView(){
     const state=getPercAssetState(a.display_id);
     return a.display_id.toLowerCase().includes(q)||
       (state['Item']||'').toLowerCase().includes(q)||
-      (state['Location']||'').toLowerCase().includes(q);
+      (state['Status']||'').toLowerCase().includes(q)||
+      parsePercStatus(state['Status']||'').location.toLowerCase().includes(q);
   });
 
   let rows='';
@@ -1576,10 +1577,12 @@ function renderPercView(){
     if(!typeAssets.length&&q)return;
     const count=typeAssets.length;
 
-    // Location summary
+    // Location summary — derived from Status field, same as individual rows
     const locMap={};
     typeAssets.forEach(a=>{
-      const loc=getPercAssetState(a.display_id)['Location']||'Unknown';
+      const status=getPercAssetState(a.display_id)['Status']||'In Storage';
+      const {location}=parsePercStatus(status);
+      const loc=location||'Unknown location';
       locMap[loc]=(locMap[loc]||0)+1;
     });
     const locSummary=Object.entries(locMap).map(([l,c])=>`<div style="font-size:.82rem;color:var(--grey-600);">${esc(l)}: ${c}</div>`).join('')||'—';
@@ -1687,10 +1690,9 @@ async function submitAddPercAsset(){
 
   const logEntries=[
     {asset_id:displayId,user_email:currentUser.email,field:'Item',data:item},
-    {asset_id:displayId,user_email:currentUser.email,field:'Status',data:status+(location?` at ${location}`:'')},
+    {asset_id:displayId,user_email:currentUser.email,field:'Status',data:status==='In Storage'?(location?`In Storage at ${location}`:'In Storage'):status},
   ];
   if(serial)logEntries.push({asset_id:displayId,user_email:currentUser.email,field:'Serial Number',data:serial});
-  if(location)logEntries.push({asset_id:displayId,user_email:currentUser.email,field:'Location',data:location});
   if(lastSighted)logEntries.push({asset_id:displayId,user_email:currentUser.email,field:'Last Sighted',data:lastSighted});
   if(lastServiced)logEntries.push({asset_id:displayId,user_email:currentUser.email,field:'Last Serviced',data:lastServiced});
   if(value)logEntries.push({asset_id:displayId,user_email:currentUser.email,field:'Replacement Value (Insurance)',data:value});
@@ -1713,12 +1715,15 @@ function openPercItemModal(assetId){
     {name:'Item',type:'text'},
     {name:'Serial Number',type:'text'},
     {name:'Status',type:'status'},
-    {name:'Location',type:'text'},
     {name:'Last Sighted',type:'date'},
     {name:'Last Serviced',type:'date'},
     {name:'Replacement Value (Insurance)',type:'number'},
     {name:'Notes',type:'text'},
   ];
+
+  // Parse current location from status
+  const currentStatus=state['Status']||'In Storage';
+  const {location:currentLoc}=parsePercStatus(currentStatus);
 
   document.getElementById('perc-item-fields').innerHTML=`
     <div class="field-row"><div class="field-label">Asset ID</div><div class="field-val" style="font-family:monospace;font-size:.85rem;">${esc(assetId)}</div></div>
@@ -1726,27 +1731,23 @@ function openPercItemModal(assetId){
     ${percFields.map(f=>{
       const val=state[f.name]||'';
       if(f.type==='status'){
+        const isStorage=currentStatus==='In Storage'||currentStatus.startsWith('In Storage at');
+        const locOpts=percLocations.map(l=>`<option value="${esc(l.name)}" ${currentLoc===l.name?'selected':''}>${esc(l.name)}</option>`).join('');
         return`<div class="field-row">
           <div class="field-label">Status</div>
-          <div class="field-val">
-            <select onchange="savePercField('${assetId}','Status',this.value);renderPercStatusLoc('${assetId}',this.value)" style="padding:.35rem .5rem;border:1.5px solid var(--grey-200);border-radius:4px;font-family:'Inter',sans-serif;font-size:.85rem;outline:none;">
-              <option ${val==='In Storage'||val.startsWith('In Storage')?'selected':''}>In Storage</option>
-              <option ${val==='Missing'?'selected':''}>Missing</option>
-              <option ${val==='Retired'?'selected':''}>Retired</option>
+          <div class="field-val" style="display:flex;flex-direction:column;gap:.4rem;">
+            <select id="perc-status-sel-${assetId}" onchange="savePercStatus('${assetId}')" style="padding:.35rem .5rem;border:1.5px solid var(--grey-200);border-radius:4px;font-family:'Inter',sans-serif;font-size:.85rem;outline:none;">
+              <option value="In Storage" ${isStorage?'selected':''}>In Storage</option>
+              <option value="Missing" ${currentStatus==='Missing'?'selected':''}>Missing</option>
+              <option value="Retired" ${currentStatus==='Retired'?'selected':''}>Retired</option>
             </select>
-          </div>
-        </div>`;
-      }
-      if(f.name==='Location'){
-        const locOpts=percLocations.map(l=>`<option value="${esc(l.name)}" ${val===l.name?'selected':''}>${esc(l.name)}</option>`).join('');
-        return`<div class="field-row">
-          <div class="field-label">Location</div>
-          <div class="field-val" style="display:flex;gap:.5rem;align-items:center;">
-            <select id="perc-loc-select-${assetId}" style="flex:1;padding:.35rem .5rem;border:1.5px solid var(--grey-200);border-radius:4px;font-family:'Inter',sans-serif;font-size:.85rem;outline:none;" onchange="savePercField('${assetId}','Location',this.value)">
-              <option value="">Select location…</option>
-              ${locOpts}
-            </select>
-            <button class="btn btn-ghost btn-sm" onclick="openPercLocationsModal()">⚙</button>
+            <div id="perc-loc-row-${assetId}" style="display:${isStorage?'flex':'none'};gap:.5rem;align-items:center;">
+              <select id="perc-loc-sel-${assetId}" onchange="savePercStatus('${assetId}')" style="flex:1;padding:.35rem .5rem;border:1.5px solid var(--grey-200);border-radius:4px;font-family:'Inter',sans-serif;font-size:.85rem;outline:none;">
+                <option value="">No specific location</option>
+                ${locOpts}
+              </select>
+              <button class="btn btn-ghost btn-sm" onclick="openPercLocationsModal()">⚙</button>
+            </div>
           </div>
         </div>`;
       }
@@ -1770,6 +1771,18 @@ function openPercItemModal(assetId){
   `).join(''):'<div style="color:var(--grey-400);font-size:.82rem;">No history yet.</div>';
 
   document.getElementById('perc-item-modal').classList.add('open');
+}
+
+async function savePercStatus(assetId){
+  const statusSel=document.getElementById(`perc-status-sel-${assetId}`);
+  const locSel=document.getElementById(`perc-loc-sel-${assetId}`);
+  const locRow=document.getElementById(`perc-loc-row-${assetId}`);
+  const status=statusSel?.value||'In Storage';
+  const isStorage=status==='In Storage';
+  if(locRow)locRow.style.display=isStorage?'flex':'none';
+  const loc=locSel?.value||'';
+  const combined=isStorage?(loc?`In Storage at ${loc}`:'In Storage'):status;
+  await savePercField(assetId,'Status',combined);
 }
 
 async function savePercField(assetId,field,value){
