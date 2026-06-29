@@ -1364,12 +1364,13 @@ let _tt;function showToast(m){const t=document.getElementById('toast');t.textCon
 });
 
 function parsePercStatus(status){
+  const cap=s=>s?s.charAt(0).toUpperCase()+s.slice(1):s;
   if(!status||status==='In Storage')return{cls:'storage',label:'In Storage',location:''};
-  if(status.toLowerCase().startsWith('in storage at ')){return{cls:'storage',label:'In Storage',location:status.slice(14)};}
-  if(status.toLowerCase().startsWith('stored at ')){return{cls:'storage',label:'In Storage',location:status.slice(10)};}
+  if(status.toLowerCase().startsWith('in storage at ')){return{cls:'storage',label:'In Storage',location:cap(status.slice(14))};}
+  if(status.toLowerCase().startsWith('stored at ')){return{cls:'storage',label:'In Storage',location:cap(status.slice(10))};}
   if(status==='Missing')return{cls:'missing',label:'Missing',location:''};
   if(status==='Retired')return{cls:'retired',label:'Retired',location:''};
-  if(status.toLowerCase().startsWith('loaned to ')){return{cls:'loan',label:'On Loan',location:status.slice(10)};}
+  if(status.toLowerCase().startsWith('loaned to ')){return{cls:'loan',label:'On Loan',location:cap(status.slice(10))};}
   return{cls:'storage',label:'In Storage',location:status};
 }
 
