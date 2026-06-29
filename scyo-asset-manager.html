@@ -219,13 +219,27 @@
     .lib-catalogue-table thead th{position:sticky;top:0;background:var(--grey-50);border-bottom:2px solid var(--grey-200);padding:.4rem 1rem;text-align:left;font-size:.72rem;font-weight:700;color:var(--grey-500);text-transform:uppercase;letter-spacing:.04em;cursor:pointer;user-select:none;white-space:nowrap;z-index:5;}
     .lib-catalogue-table thead th:hover{color:var(--navy);}
     .lib-sort-arrow{margin-left:.25rem;font-size:.65rem;}
-    .lib-year-block{margin-bottom:2rem;}
-    .lib-year-title{font-size:1.1rem;font-weight:800;color:var(--navy);padding:.75rem 1.25rem;border-bottom:2px solid var(--grey-200);background:var(--grey-50);}
-    .lib-event-block{padding:.75rem 1.25rem;border-bottom:1px solid var(--grey-100);}
-    .lib-event-title{font-size:.82rem;font-weight:700;color:var(--grey-600);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.4rem;}
-    .lib-event-ensemble{font-size:.82rem;color:var(--grey-800);margin:.2rem 0;}
-    .lib-rehearsed-block{padding:.75rem 1.25rem;background:#fafbfc;border-top:1.5px dashed var(--grey-200);}
-    .lib-rehearsed-title{font-size:.78rem;font-weight:700;color:var(--grey-400);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.4rem;}
+    /* Performance History grid */
+    .lib-hist-filters{display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;padding:.75rem 1.25rem;border-bottom:1px solid var(--grey-200);background:white;position:sticky;top:0;z-index:10;}
+    .lib-hist-filter-group{display:flex;flex-direction:column;gap:.2rem;}
+    .lib-hist-filter-label{font-size:.68rem;font-weight:700;color:var(--grey-400);text-transform:uppercase;letter-spacing:.05em;}
+    .lib-hist-filter-group select{font-family:'Inter',sans-serif;font-size:.8rem;color:var(--grey-800);border:1.5px solid var(--grey-200);border-radius:6px;padding:.3rem .6rem;background:white;cursor:pointer;min-width:130px;}
+    .lib-hist-filter-group select:focus{outline:none;border-color:var(--navy);}
+    .lib-hist-body{padding:1.25rem;overflow:auto;flex:1;}
+    .lib-year-block{margin-bottom:2.5rem;}
+    .lib-year-title{font-size:1rem;font-weight:800;color:var(--navy);margin-bottom:.75rem;padding-bottom:.4rem;border-bottom:2px solid var(--navy);}
+    .lib-hist-grid{width:100%;border-collapse:separate;border-spacing:0;}
+    .lib-hist-grid th{font-size:.75rem;font-weight:700;color:var(--grey-600);text-align:left;padding:.4rem .75rem .6rem;white-space:nowrap;border-bottom:1.5px solid var(--grey-200);}
+    .lib-hist-grid th.col-event{color:var(--grey-400);font-weight:600;min-width:140px;}
+    .lib-hist-grid td{vertical-align:top;padding:.4rem .5rem;}
+    .lib-hist-grid td.cell-event{font-size:.78rem;font-weight:700;color:var(--grey-600);white-space:nowrap;padding:.4rem .75rem .4rem 0;vertical-align:top;padding-top:.6rem;}
+    .lib-hist-cell{background:white;border:1.5px solid var(--grey-200);border-radius:6px;box-shadow:var(--shadow);padding:.5rem .65rem;min-width:130px;min-height:2.5rem;}
+    .lib-hist-cell-piece{font-size:.78rem;color:var(--grey-800);padding:.15rem 0;border-bottom:1px solid var(--grey-100);}
+    .lib-hist-cell-piece:last-child{border-bottom:none;}
+    .lib-hist-empty{color:var(--grey-200);font-size:.72rem;}
+    .lib-rehearsed-block{margin-top:.75rem;padding:.65rem .9rem;background:#fafbfc;border:1.5px dashed var(--grey-200);border-radius:6px;}
+    .lib-rehearsed-title{font-size:.72rem;font-weight:700;color:var(--grey-400);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.35rem;}
+    .lib-rehearsed-piece{font-size:.8rem;color:var(--grey-600);padding:.1rem 0;}
 
   </style>
 </head>
@@ -263,7 +277,7 @@
 
   <nav class="cat-nav" id="cat-nav">
     <div id="cat-nav-tabs" style="display:flex;flex:1;overflow-x:auto;scrollbar-width:none;"></div>
-    <button id="settings-btn" onclick="openSettingsModal()" style="flex-shrink:0;padding:.7rem 1.25rem;border:none;border-left:1px solid rgba(255,255,255,.08);background:none;font-family:'Inter',sans-serif;font-size:.82rem;font-weight:600;color:rgba(255,255,255,.5);cursor:pointer;white-space:nowrap;transition:color .15s;" onmouseover="this.style.color='rgba(255,255,255,.8)'" onmouseout="this.style.color='rgba(255,255,255,.5)'">⚙ Settings</button>
+
   </nav>
 
   <div class="toolbar">
@@ -362,7 +376,7 @@
       <button class="lib-cat-tab" data-cat="Jazz Band" onclick="switchLibCat('Jazz Band')">Jazz Band</button>
     </div>
     <div id="lib-catalogue" style="display:block;overflow:auto;flex:1;min-height:0;"></div>
-    <div id="lib-history" style="display:none;padding:1.25rem;overflow:auto;flex:1;min-height:0;"></div>
+    <div id="lib-history" style="display:none;flex:1;min-height:0;flex-direction:column;overflow:hidden;"></div>
   </div>
 
 </div>
@@ -810,8 +824,6 @@ async function selectCategory(prefix){
     currentCatId=cat.id;
     renderCatNav();
     const prefix=(cat.prefix||'').toUpperCase();
-    const btn=document.getElementById('settings-btn');
-    if(btn)btn.style.display=['PRC','LIB','STK'].includes(prefix)?'none':'';
     await loadCategoryData();
   }
 }
@@ -1926,7 +1938,7 @@ async function loadLibData(){
 function switchLibView(view){
   libActiveView=view;
   document.getElementById('lib-catalogue').style.display=view==='catalogue'?'block':'none';
-  document.getElementById('lib-history').style.display=view==='history'?'block':'none';
+  document.getElementById('lib-history').style.display=view==='history'?'flex':'none';
   document.getElementById('lib-search-wrap').style.display=view==='catalogue'?'flex':'none';
   document.getElementById('lib-add-btn').style.display=view==='catalogue'?'':'none';
   document.getElementById('lib-bulk-borrow-btn').style.display=view==='catalogue'?'':'none';
@@ -2056,31 +2068,150 @@ function renderLibCatalogue(){
 
 function renderLibHistory(){
   const container=document.getElementById('lib-history');
-  const years=[...new Set(libPerformances.map(p=>new Date(p.date).getFullYear()))].sort((a,b)=>b-a);
-  if(!years.length){container.innerHTML='<div style="color:var(--grey-400);padding:2rem;">No performance history yet.</div>';return;}
-  container.innerHTML=years.map(year=>{
-    const yearPerfs=libPerformances.filter(p=>new Date(p.date).getFullYear()===year);
-    const yearBorrows=libBorrows.filter(b=>new Date(b.date).getFullYear()===year);
-    const eventMap={};
-    yearPerfs.forEach(p=>{
-      const key=`${p.date}|${p.event_type}|${p.workshop_name||''}`;
-      if(!eventMap[key])eventMap[key]={date:p.date,event_type:p.event_type,workshop_name:p.workshop_name,ensembles:{}};
-      const ens=libEnsembles.find(e=>e.id===p.ensemble_id);
-      const ensName=ens?.name||'Unknown';
-      const piece=libPieces.find(pc=>pc.id===p.piece_id);
-      if(!eventMap[key].ensembles[ensName])eventMap[key].ensembles[ensName]=[];
-      eventMap[key].ensembles[ensName].push(piece?.title||'Unknown');
-    });
-    const eventBlocks=Object.values(eventMap).sort((a,b)=>a.date.localeCompare(b.date)).map(ev=>{
-      const eventLabel=ev.event_type==='Workshop'?`Workshop — ${ev.workshop_name||''}`:ev.event_type;
-      const ensLines=Object.entries(ev.ensembles).map(([ens,titles])=>`<div class="lib-event-ensemble"><strong>${esc(ens)}:</strong> ${titles.map(t=>esc(t)).join(', ')}</div>`).join('');
-      return`<div class="lib-event-block"><div class="lib-event-title">${esc(eventLabel)} <span style="font-weight:400;color:var(--grey-400);">· ${new Date(ev.date+'T00:00:00').toLocaleDateString('en-AU',{month:'short',day:'numeric'})}</span></div>${ensLines}</div>`;
+
+  // --- collect available years and event types for filters ---
+  const allYears=[...new Set([
+    ...libPerformances.map(p=>new Date(p.date).getFullYear()),
+    ...libBorrows.map(b=>new Date(b.date).getFullYear())
+  ])].sort((a,b)=>b-a);
+  const allEventTypes=[...new Set(libPerformances.map(p=>p.event_type))].sort();
+
+  // read current filter values (or default to 'all')
+  const selYear=container._fYear||'all';
+  const selEvent=container._fEvent||'all';
+  const selEns=container._fEns||'all';
+
+  // --- build filter bar HTML ---
+  const yearOpts=`<option value="all">All years</option>`+allYears.map(y=>`<option value="${y}"${selYear==y?'selected':''}>${y}</option>`).join('');
+  const eventOpts=`<option value="all">All events</option>`+allEventTypes.map(t=>`<option value="${t}"${selEvent===t?'selected':''}>${esc(t)}</option>`).join('');
+  const ensOpts=`<option value="all">All ensembles</option>`+libEnsembles.map(e=>`<option value="${e.id}"${selEns==e.id?'selected':''}>${esc(e.name)}</option>`).join('');
+
+  // --- filter data ---
+  let perfs=libPerformances;
+  let borrows=libBorrows;
+  if(selYear!=='all'){
+    const y=parseInt(selYear);
+    perfs=perfs.filter(p=>new Date(p.date).getFullYear()===y);
+    borrows=borrows.filter(b=>new Date(b.date).getFullYear()===y);
+  }
+  if(selEvent!=='all') perfs=perfs.filter(p=>p.event_type===selEvent);
+  if(selEns!=='all'){
+    const eid=selEns;
+    perfs=perfs.filter(p=>String(p.ensemble_id)===String(eid));
+    borrows=borrows.filter(b=>String(b.ensemble_id)===String(eid));
+  }
+
+  // --- determine ensemble columns (only those present in filtered perfs) ---
+  const ensIdSet=new Set(perfs.map(p=>p.ensemble_id));
+  const ensColumns=libEnsembles.filter(e=>ensIdSet.has(e.id));
+
+  // --- group years ---
+  const years=[...new Set([
+    ...perfs.map(p=>new Date(p.date).getFullYear()),
+    ...borrows.map(b=>new Date(b.date).getFullYear())
+  ])].sort((a,b)=>b-a);
+
+  let bodyHTML='';
+  if(!years.length){
+    bodyHTML='<div style="color:var(--grey-400);padding:2rem;">No performance history for the selected filters.</div>';
+  } else {
+    bodyHTML=years.map(year=>{
+      const yearPerfs=perfs.filter(p=>new Date(p.date).getFullYear()===year);
+      const yearBorrows=borrows.filter(b=>new Date(b.date).getFullYear()===year);
+
+      // build event map: key = date|type|workshop
+      const eventMap={};
+      yearPerfs.forEach(p=>{
+        const key=`${p.date}|${p.event_type}|${p.workshop_name||''}`;
+        if(!eventMap[key])eventMap[key]={date:p.date,event_type:p.event_type,workshop_name:p.workshop_name,cells:{}};
+        const ensId=p.ensemble_id;
+        const piece=libPieces.find(pc=>pc.id===p.piece_id);
+        if(!eventMap[key].cells[ensId])eventMap[key].cells[ensId]=[];
+        eventMap[key].cells[ensId].push(piece?.title||'Unknown');
+      });
+
+      const events=Object.values(eventMap).sort((a,b)=>a.date.localeCompare(b.date));
+
+      // grid: only render if there are performances
+      let gridHTML='';
+      if(events.length && ensColumns.length){
+        const headerCells=ensColumns.map(e=>`<th>${esc(e.name)}</th>`).join('');
+        const rows=events.map(ev=>{
+          const eventLabel=ev.event_type==='Workshop'
+            ?`Workshop${ev.workshop_name?` — ${ev.workshop_name}`:''}`
+            :ev.event_type;
+          const dateStr=new Date(ev.date+'T00:00:00').toLocaleDateString('en-AU',{month:'short',day:'numeric'});
+          const cells=ensColumns.map(e=>{
+            const titles=ev.cells[e.id]||[];
+            const inner=titles.length
+              ?titles.map(t=>`<div class="lib-hist-cell-piece">${esc(t)}</div>`).join('')
+              :`<span class="lib-hist-empty">—</span>`;
+            return`<td><div class="lib-hist-cell">${inner}</div></td>`;
+          }).join('');
+          return`<tr>
+            <td class="cell-event">${esc(eventLabel)}<br><span style="font-weight:400;color:var(--grey-400);font-size:.72rem;">${dateStr}</span></td>
+            ${cells}
+          </tr>`;
+        }).join('');
+        gridHTML=`<div style="overflow-x:auto;">
+          <table class="lib-hist-grid">
+            <thead><tr><th class="col-event"></th>${headerCells}</tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>`;
+      }
+
+      // rehearsed but not performed (borrows with no matching performance that year, ignoring event-type filter)
+      // use unfiltered-by-event perfs for this year so we don't show pieces that *were* performed under another event type
+      const allYearPerfIds=new Set(
+        (selEns!=='all'
+          ? libPerformances.filter(p=>new Date(p.date).getFullYear()===year && String(p.ensemble_id)===String(selEns))
+          : libPerformances.filter(p=>new Date(p.date).getFullYear()===year)
+        ).map(p=>p.piece_id)
+      );
+      const rehearsedIds=[...new Set(yearBorrows.filter(b=>!allYearPerfIds.has(b.piece_id)).map(b=>b.piece_id))];
+      const rehearsedBlock=rehearsedIds.length?`
+        <div class="lib-rehearsed-block">
+          <div class="lib-rehearsed-title">Rehearsed but not performed</div>
+          ${rehearsedIds.map(id=>{
+            const pc=libPieces.find(pc=>pc.id===id);
+            return`<div class="lib-rehearsed-piece">${esc(pc?.title||'Unknown')}</div>`;
+          }).join('')}
+        </div>`:'';
+
+      return`<div class="lib-year-block">
+        <div class="lib-year-title">${year}</div>
+        ${gridHTML}
+        ${rehearsedBlock}
+      </div>`;
     }).join('');
-    const performedPieceIds=new Set(yearPerfs.map(p=>p.piece_id));
-    const rehearsedPieceIds=[...new Set(yearBorrows.filter(b=>!performedPieceIds.has(b.piece_id)).map(b=>b.piece_id))];
-    const rehearsedBlock=rehearsedPieceIds.length?`<div class="lib-rehearsed-block"><div class="lib-rehearsed-title">Rehearsed but not performed</div><div style="font-size:.82rem;color:var(--grey-600);">${rehearsedPieceIds.map(id=>esc(libPieces.find(pc=>pc.id===id)?.title||'Unknown')).join(', ')}</div></div>`:'';
-    return`<div class="lib-year-block"><div class="lib-year-title">${year}</div>${eventBlocks}${rehearsedBlock}</div>`;
-  }).join('');
+  }
+
+  container.innerHTML=`
+    <div class="lib-hist-filters">
+      <div class="lib-hist-filter-group">
+        <div class="lib-hist-filter-label">Filter</div>
+        <select onchange="libHistSetFilter('year',this.value)">${yearOpts}</select>
+      </div>
+      <div class="lib-hist-filter-group">
+        <div class="lib-hist-filter-label">Filter</div>
+        <select onchange="libHistSetFilter('event',this.value)">${eventOpts}</select>
+      </div>
+      <div class="lib-hist-filter-group">
+        <div class="lib-hist-filter-label">Filter</div>
+        <select onchange="libHistSetFilter('ens',this.value)">${ensOpts}</select>
+      </div>
+    </div>
+    <div class="lib-hist-body">${bodyHTML}</div>
+  `;
+}
+
+function libHistSetFilter(key,value){
+  const container=document.getElementById('lib-history');
+  if(key==='year') container._fYear=value;
+  if(key==='event') container._fEvent=value;
+  if(key==='ens') container._fEns=value;
+  renderLibHistory();
 }
 
 function renderLibPieceHistory(pieceId){
