@@ -1472,7 +1472,7 @@ function showPercView(){
   document.querySelector('.toolbar').style.display='none';
   document.querySelector('main').style.display='none';
   document.getElementById('stk-toolbar').style.display='none';
-  document.getElementById('stk-view').style.display='none';
+  document.getElementById('stk-view').style.cssText='display:none;';
   document.getElementById('lib-toolbar').style.cssText='display:none;';
   document.getElementById('lib-view').style.cssText='display:none;';
   document.getElementById('perc-toolbar').style.display='flex';
@@ -1899,7 +1899,7 @@ function showLibView(){
   document.querySelector('.toolbar').style.display='none';
   document.querySelector('main').style.display='none';
   document.getElementById('stk-toolbar').style.display='none';
-  document.getElementById('stk-view').style.display='none';
+  document.getElementById('stk-view').style.cssText='display:none;';
   document.getElementById('perc-toolbar').style.display='none';
   document.getElementById('perc-view').style.display='none';
   document.getElementById('lib-toolbar').style.cssText='display:flex;background:white;border-bottom:1px solid var(--grey-200);padding:.6rem 1.25rem;align-items:center;gap:.75rem;flex-wrap:wrap;';
@@ -2602,7 +2602,7 @@ function showStockView(){
   document.getElementById('lib-toolbar').style.cssText='display:none;';
   document.getElementById('lib-view').style.cssText='display:none;';
   document.getElementById('stk-toolbar').style.display='flex';
-  document.getElementById('stk-view').style.display='block';
+  document.getElementById('stk-view').style.cssText='display:flex;flex:1;flex-direction:row;min-height:0;overflow:hidden;';
 }
 
 async function loadStockData(){
@@ -2991,7 +2991,7 @@ initAuth();
 
 function showStandardView(){
   document.getElementById('stk-toolbar').style.display='none';
-  document.getElementById('stk-view').style.display='none';
+  document.getElementById('stk-view').style.cssText='display:none;';
   document.getElementById('perc-toolbar').style.display='none';
   document.getElementById('perc-view').style.display='none';
   document.getElementById('lib-toolbar').style.cssText='display:none;';
