@@ -307,7 +307,7 @@
         <tr>
           <th class="stk-th">Item / Variant</th>
           <th class="stk-th" style="width:80px;">Qty</th>
-          <th class="stk-th" style="width:80px;">Min</th>
+          <th class="stk-th" style="width:90px;">Target Qty</th>
           <th class="stk-th">Notes</th>
           <th class="stk-th" style="width:80px;"></th>
         </tr>
@@ -2680,13 +2680,13 @@ function renderStkItemForm(item=null){
       <div id="stk-variants-list">
         ${vars.map(v=>`<div style="display:flex;gap:.5rem;margin-bottom:.35rem;align-items:center;">
           <input type="text" value="${esc(v.variant_name)}" style="flex:2;" placeholder="Variant name" data-vid="${v.id}" class="stk-var-name"/>
-          <input type="number" value="${v.min_qty||0}" style="width:70px;" placeholder="Min" data-vid="${v.id}" class="stk-var-min" title="Min stock"/>
+          <input type="number" value="${v.min_qty||0}" style="width:70px;" placeholder="Target" data-vid="${v.id}" class="stk-var-min" title="Target qty"/>
           <button onclick="deleteStkVariant('${v.id}')" style="background:none;border:none;color:var(--grey-400);cursor:pointer;">✕</button>
         </div>`).join('')}
       </div>
       <button class="btn btn-ghost btn-sm" onclick="addStkVariantRow()" style="margin-top:.35rem;border:1px dashed var(--grey-200);">+ Add variant</button>
     </div>
-    ${!item?.has_variants?`<div class="fg" id="stk-simple-min"><label>Min Stock</label><input type="number" id="stk-min-qty" value="${vars[0]?.min_qty||0}" min="0" placeholder="0"/></div>`:''}
+    ${!item?.has_variants?`<div class="fg" id="stk-simple-min"><label>Target Qty</label><input type="number" id="stk-min-qty" value="${vars[0]?.min_qty||0}" min="0" placeholder="0"/></div>`:''}
     <div class="fg"><label>Notes</label><textarea id="stk-notes" style="height:60px;resize:vertical;">${esc(item?.notes||'')}</textarea></div>
     <button class="btn btn-primary" style="width:100%;justify-content:center;padding:.75rem;" onclick="submitStkItem()">${isEdit?'Save':'Add Item'}</button>
     ${isEdit?`<button class="btn btn-ghost" style="width:100%;justify-content:center;margin-top:.35rem;color:var(--danger);" onclick="deleteStkItem('${item.id}')">Delete item</button>`:''}
@@ -2705,7 +2705,7 @@ function addStkVariantRow(){
   const div=document.createElement('div');
   div.style.cssText='display:flex;gap:.5rem;margin-bottom:.35rem;align-items:center;';
   div.innerHTML=`<input type="text" style="flex:2;" placeholder="Variant name" class="stk-var-name" data-vid="new"/>
-    <input type="number" style="width:70px;" placeholder="Min" class="stk-var-min" data-vid="new" title="Min stock"/>
+    <input type="number" style="width:70px;" placeholder="Target" class="stk-var-min" data-vid="new" title="Target qty"/>
     <button onclick="this.parentElement.remove()" style="background:none;border:none;color:var(--grey-400);cursor:pointer;">✕</button>`;
   list.appendChild(div);
 }
@@ -2787,7 +2787,15 @@ function openStkAdj(itemId,variantId,label,currentQty){
   document.getElementById('stk-adj-title').textContent=`Adjust — ${label}`;
   document.getElementById('stk-adj-form').innerHTML=`
     <div style="font-size:.82rem;color:var(--grey-500);margin-bottom:.75rem;">Current qty: <strong>${currentQty}</strong></div>
-    <div class="fg"><label>New Quantity *</label><input type="number" id="stk-adj-qty" value="${currentQty}" min="0"/></div>
+    <div class="fg">
+      <label>Change *</label>
+      <div style="display:flex;gap:.5rem;align-items:center;">
+        <button onclick="setStkSign(-1)" id="stk-sign-minus" class="btn btn-ghost btn-sm" style="font-size:1.1rem;font-weight:700;min-width:36px;">−</button>
+        <button onclick="setStkSign(1)" id="stk-sign-plus" class="btn btn-primary btn-sm" style="font-size:1.1rem;font-weight:700;min-width:36px;">+</button>
+        <input type="number" id="stk-adj-delta" min="0" placeholder="0" style="flex:1;font-size:1rem;font-weight:700;"/>
+        <span id="stk-adj-preview" style="font-size:.82rem;color:var(--grey-500);white-space:nowrap;">= ${currentQty}</span>
+      </div>
+    </div>
     <div class="fg"><label>Supplier</label><input type="text" id="stk-adj-reason" placeholder="e.g. Officeworks, BCF..."/></div>
     <div class="fg"><label>Notes</label><textarea id="stk-adj-notes" placeholder="e.g. Found extra box in storeroom..." style="height:60px;resize:vertical;"></textarea></div>
     <div class="fg"><label>Unit Price (optional)</label><input type="number" id="stk-adj-price" placeholder="0.00" min="0" step="0.01"/></div>
@@ -2796,19 +2804,44 @@ function openStkAdj(itemId,variantId,label,currentQty){
       <button class="btn btn-ghost" style="flex:1;justify-content:center;" onclick="closeModal('stk-adj-modal')">Cancel</button>
     </div>
   `;
+  document.getElementById('stk-adj-delta').addEventListener('input',()=>{
+    const delta=parseInt(document.getElementById('stk-adj-delta').value)||0;
+    const sign=window._stkSign||1;
+    const newQty=Math.max(0,currentQty+(sign*delta));
+    document.getElementById('stk-adj-preview').textContent=`= ${newQty}`;
+  });
+  window._stkSign=1;
+  window._stkOldQty=currentQty;
   document.getElementById('stk-adj-modal').classList.add('open');
   setTimeout(()=>document.getElementById('stk-adj-qty').focus(),100);
 }
 
+function setStkSign(sign){
+  window._stkSign=sign;
+  document.getElementById('stk-sign-plus').className=sign===1?'btn btn-primary btn-sm':'btn btn-ghost btn-sm';
+  document.getElementById('stk-sign-minus').className=sign===-1?'btn btn-primary btn-sm':'btn btn-ghost btn-sm';
+  document.getElementById('stk-sign-plus').style.cssText='font-size:1.1rem;font-weight:700;min-width:36px;';
+  document.getElementById('stk-sign-minus').style.cssText='font-size:1.1rem;font-weight:700;min-width:36px;';
+  const delta=parseInt(document.getElementById('stk-adj-delta')?.value)||0;
+  const currentQty=parseInt(document.getElementById('stk-adj-preview')?.textContent?.replace('= ',''))||0;
+  // Recalculate preview from stored old qty
+  const preview=document.getElementById('stk-adj-preview');
+  if(preview)preview.textContent=`= ${Math.max(0,window._stkOldQty+(sign*delta))}`;
+}
+
 async function submitStkAdj(itemId,variantId,oldQty){
-  const newQty=parseInt(document.getElementById('stk-adj-qty').value);
+  window._stkOldQty=oldQty;
+  const delta=parseInt(document.getElementById('stk-adj-delta')?.value)||0;
+  const sign=window._stkSign||1;
+  const newQty=Math.max(0,oldQty+(sign*delta));
   const supplier=document.getElementById('stk-adj-reason').value.trim();
   const notes=document.getElementById('stk-adj-notes').value.trim();
   const unitPrice=parseFloat(document.getElementById('stk-adj-price').value)||null;
-  if(isNaN(newQty)||newQty<0){showToast('Enter a valid quantity');return;}
+  if(delta===0){showToast('Enter a change amount');return;}
+  const changeStr=sign===1?`+${delta}`:`-${delta}`;
   const reason=[supplier?`Supplier: ${supplier}`:'',notes].filter(Boolean).join(' — ')||'Qty adjusted';
   await db.from('stock_variants').update({qty:newQty}).eq('id',variantId);
-  await db.from('stock_log').insert({item_id:itemId,variant_id:variantId,user_email:currentUser.email,field:'qty',old_value:String(oldQty),new_value:String(newQty),reason,unit_price:unitPrice});
+  await db.from('stock_log').insert({item_id:itemId,variant_id:variantId,user_email:currentUser.email,field:`qty (${changeStr})`,old_value:String(oldQty),new_value:String(newQty),reason,unit_price:unitPrice});
   closeModal('stk-adj-modal');
   await loadStockData();
   showToast('Quantity updated ✓');
@@ -2826,7 +2859,7 @@ function openStockDetail(itemId,variantId){
     <div class="field-row"><div class="field-label">Item</div><div class="field-val">${esc(item?.name||'')}</div></div>
     ${variant&&variant.variant_name!=='default'?`<div class="field-row"><div class="field-label">Variant</div><div class="field-val">${esc(variant.variant_name)}</div></div>`:''}
     <div class="field-row"><div class="field-label">Qty on Hand</div><div class="field-val"><strong>${variant?.qty||0}</strong></div></div>
-    <div class="field-row"><div class="field-label">Min Stock</div><div class="field-val">${variant?.min_qty||0}</div></div>
+    <div class="field-row"><div class="field-label">Target Qty</div><div class="field-val">${variant?.min_qty||0}</div></div>
     ${item?.notes?`<div class="field-row"><div class="field-label">Notes</div><div class="field-val">${esc(item.notes)}</div></div>`:''}
     <div style="margin-top:1rem;display:flex;gap:.5rem;">
       ${variant?`<button class="btn btn-primary btn-sm" onclick="closeModal('stk-detail-modal');openStkAdj('${itemId}','${variantId}','${esc(label)}',${variant?.qty||0})">Adjust Qty</button>`:''}
