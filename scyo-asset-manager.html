@@ -1961,6 +1961,8 @@ function switchLibView(view){
 
 function switchLibCat(cat){
   libActiveCat=cat;
+  libShuffled=false;
+  libPieces.forEach(p=>delete p.__shuffleKey);
   sessionStorage.setItem('scyo-lib-cat',cat);
   renderLibCatTabs();
   renderLibCatalogue();
@@ -1974,7 +1976,7 @@ function renderLibCatTabs(){
 
 function fmtLevel(l){if(l===null||l===undefined)return'—';if(l===99)return'Prof';return l;}
 
-let libSortCol='title',libSortAsc=true;
+let libSortCol='title',libSortAsc=true,libShuffled=false;
 
 const LIB_COLS=[
   {id:'composer',label:'Composer'},
@@ -2007,9 +2009,36 @@ function toggleLibCol(colId,visible){
 }
 
 function libSortBy(col){
+  libShuffled=false;
+  libPieces.forEach(p=>delete p.__shuffleKey);
   if(libSortCol===col)libSortAsc=!libSortAsc;
   else{libSortCol=col;libSortAsc=true;}
   renderLibCatalogue();
+}
+
+function libShuffle(){
+  libShuffled=true;
+  libPieces.forEach(p=>p.__shuffleKey=Math.random());
+  closeLibCtxMenu();
+  renderLibCatalogue();
+}
+
+function showLibCtxMenu(e){
+  e.preventDefault();
+  closeLibCtxMenu();
+  const menu=document.createElement('div');
+  menu.id='lib-ctx-menu';
+  menu.style.cssText=`position:fixed;top:${e.clientY}px;left:${e.clientX}px;background:white;border:1.5px solid var(--grey-200);border-radius:var(--radius);box-shadow:var(--shadow);z-index:9999;min-width:160px;padding:.3rem 0;font-family:'Inter',sans-serif;`;
+  menu.innerHTML=`
+    <div onclick="libShuffle()" style="padding:.5rem 1rem;font-size:.82rem;font-weight:600;color:var(--navy);cursor:pointer;display:flex;align-items:center;gap:.5rem;" onmouseover="this.style.background='var(--grey-50)'" onmouseout="this.style.background=''">🔀 Shuffle ${libActiveCat}</div>
+    ${libShuffled?`<div onclick="libSortBy('title');closeLibCtxMenu();" style="padding:.5rem 1rem;font-size:.82rem;color:var(--grey-600);cursor:pointer;" onmouseover="this.style.background='var(--grey-50)'" onmouseout="this.style.background=''">↕ Clear shuffle</div>`:''}
+  `;
+  document.body.appendChild(menu);
+  setTimeout(()=>document.addEventListener('click',closeLibCtxMenu,{once:true}),0);
+}
+
+function closeLibCtxMenu(){
+  document.getElementById('lib-ctx-menu')?.remove();
 }
 
 function renderLibCatalogue(){
@@ -2024,6 +2053,12 @@ function renderLibCatalogue(){
   });
 
   filtered=[...filtered].sort((a,b)=>{
+    if(libShuffled){
+      // stable shuffle stored on each piece temporarily
+      if(a.__shuffleKey===undefined)a.__shuffleKey=Math.random();
+      if(b.__shuffleKey===undefined)b.__shuffleKey=Math.random();
+      return a.__shuffleKey-b.__shuffleKey;
+    }
     let av,bv;
     if(libSortCol==='title'){av=a.title.toLowerCase();bv=b.title.toLowerCase();}
     else if(libSortCol==='composer'){av=(a.composer||'').toLowerCase();bv=(b.composer||'').toLowerCase();}
@@ -2065,11 +2100,11 @@ function renderLibCatalogue(){
   }).join('');
 
   container.innerHTML=`<table class="lib-catalogue-table"><thead><tr>
-    <th onclick="libSortBy('title')">Title<span class="lib-sort-arrow">${arr('title')}</span></th>
-    ${show('composer')?`<th onclick="libSortBy('composer')">Composer<span class="lib-sort-arrow">${arr('composer')}</span></th>`:''}
-    ${show('level')?`<th onclick="libSortBy('level')">Level<span class="lib-sort-arrow">${arr('level')}</span></th>`:''}
-    ${show('purchased')?`<th onclick="libSortBy('purchased')">Purchased<span class="lib-sort-arrow">${arr('purchased')}</span></th>`:''}
-    ${show('usage')?`<th onclick="libSortBy('usage')">Usage in last 10 years<span class="lib-sort-arrow">${arr('usage')}</span></th>`:''}
+    <th onclick="libSortBy('title')" oncontextmenu="showLibCtxMenu(event)">Title${libShuffled?'<span class="lib-sort-arrow">🔀</span>':`<span class="lib-sort-arrow">${arr('title')}</span>`}</th>
+    ${show('composer')?`<th onclick="libSortBy('composer')" oncontextmenu="showLibCtxMenu(event)">Composer<span class="lib-sort-arrow">${arr('composer')}</span></th>`:''}
+    ${show('level')?`<th onclick="libSortBy('level')" oncontextmenu="showLibCtxMenu(event)">Level<span class="lib-sort-arrow">${arr('level')}</span></th>`:''}
+    ${show('purchased')?`<th onclick="libSortBy('purchased')" oncontextmenu="showLibCtxMenu(event)">Purchased<span class="lib-sort-arrow">${arr('purchased')}</span></th>`:''}
+    ${show('usage')?`<th onclick="libSortBy('usage')" oncontextmenu="showLibCtxMenu(event)">Usage in last 10 years<span class="lib-sort-arrow">${arr('usage')}</span></th>`:''}
     <th></th>
     <th></th>
   </tr></thead><tbody>${rows}</tbody></table>`;
@@ -2342,16 +2377,18 @@ function toggleLibResearch(){
 }
 
 function libResearch(type){
-  const title=encodeURIComponent((document.getElementById('lib-title')?.value||'').trim());
-  const composer=encodeURIComponent((document.getElementById('lib-composer')?.value||'').trim());
-  const q=composer?`${title}+${composer}`:title;
+  const title=(document.getElementById('lib-title')?.value||'').trim();
+  const composer=(document.getElementById('lib-composer')?.value||'').trim();
+  const raw=composer?`${title} ${composer}`:title;
+  const qPlus=encodeURIComponent(raw).replace(/%20/g,'+');
+  const qEnc=encodeURIComponent(raw);
   const urls={
-    img:`https://www.google.com/search?q=${q}&tbm=isch`,
-    grade:`https://www.google.com/search?q=${q}+grade+level+sheet+music`,
-    yt:`https://www.youtube.com/results?search_query=${q}+sheet+music`,
-    jwp:`https://www.jwpepper.com/search.jsp?keywords=${q}`,
-    hl:`https://www.halleonard.com/search/search.action?keywords=${q}`,
-    alfred:`https://www.alfred.com/search/?q=${q}`
+    img:`https://www.google.com/search?q=${qEnc}&tbm=isch`,
+    grade:`https://www.google.com/search?q=${qEnc}+grade+level+sheet+music`,
+    yt:`https://www.youtube.com/results?search_query=${qPlus}+sheet+music`,
+    jwp:`https://www.jwpepper.com/s?q=${qPlus}&fuzzy=0&operator=and&facets=fuzzy%2Coperator&sort=score_desc&page=0`,
+    hl:`https://www.halleonard.com/search/search.action?keywords=${qPlus}`,
+    alfred:`https://www.alfred.com/search/?q=${qPlus}`
   };
   if(urls[type])window.open(urls[type],'_blank');
 }
