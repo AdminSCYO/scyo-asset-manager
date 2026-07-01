@@ -273,13 +273,19 @@
     .lib-hist-grid th.col-event{color:var(--grey-400);font-weight:600;min-width:140px;}
     .lib-hist-grid td{vertical-align:top;padding:.4rem .5rem;}
     .lib-hist-grid td.cell-event{font-size:.78rem;font-weight:700;color:var(--grey-600);white-space:nowrap;padding:.4rem .75rem .4rem 0;vertical-align:top;padding-top:.6rem;}
-    .lib-hist-cell{background:white;border:1.5px solid var(--grey-200);border-radius:6px;box-shadow:var(--shadow);padding:.5rem .65rem;min-width:130px;min-height:2.5rem;}
-    .lib-hist-cell-piece{font-size:.78rem;color:var(--grey-800);padding:.15rem 0;border-bottom:1px solid var(--grey-100);}
+    .lib-hist-cell{background:white;border:1.5px solid var(--grey-200);border-radius:6px;box-shadow:var(--shadow);min-width:160px;width:100%;min-height:2.5rem;overflow:hidden;}
+    .lib-hist-cell-header{background:var(--navy);color:white;font-size:.7rem;font-weight:700;padding:.3rem .65rem;letter-spacing:.03em;}
+    .lib-hist-cell-body{padding:.4rem .65rem;}
+    .lib-hist-cell-piece{font-size:.78rem;color:var(--grey-800);padding:.15rem 0;border-bottom:1px solid var(--grey-100);display:flex;align-items:baseline;gap:.25rem;min-width:0;}
     .lib-hist-cell-piece:last-child{border-bottom:none;}
+    .lib-hist-piece-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;}
+    .lib-hist-piece-level{flex-shrink:0;white-space:nowrap;color:var(--grey-400);font-style:italic;font-size:.7rem;}
     .lib-hist-empty{color:var(--grey-200);font-size:.72rem;}
     .lib-rehearsed-block{margin-top:.75rem;padding:.65rem .9rem;background:#fafbfc;border:1.5px dashed var(--grey-200);border-radius:6px;}
     .lib-rehearsed-title{font-size:.72rem;font-weight:700;color:var(--grey-400);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.35rem;}
-    .lib-rehearsed-piece{font-size:.8rem;color:var(--grey-600);padding:.1rem 0;}
+    .lib-rehearsed-piece{font-size:.8rem;color:var(--grey-600);padding:.1rem 0;display:flex;align-items:baseline;gap:.25rem;min-width:0;}
+    .lib-rehearsed-piece-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;}
+    .lib-rehearsed-piece-level{flex-shrink:0;white-space:nowrap;color:var(--grey-400);font-style:italic;font-size:.7rem;}
 
   </style>
 </head>
@@ -2276,21 +2282,20 @@ function renderLibHistory(){
             ?`${ev.event_type}${ev.workshop_name?` — ${ev.workshop_name}`:''}`
             :ev.event_type;
           const dateStr=new Date(ev.date+'T00:00:00').toLocaleDateString('en-AU',{month:'short',day:'numeric'});
+          const cellHeader=`<div class="lib-hist-cell-header">${esc(eventLabel)} · ${dateStr}</div>`;
           const cells=visibleEns.map(e=>{
             const pieces=ev.cells[e.id]||[];
             const inner=pieces.length
-              ?pieces.map(p=>`<div class="lib-hist-cell-piece">${esc(p?.title||'Unknown')}${p?.level!=null?`<span style="color:var(--grey-400);font-style:italic;font-size:.7rem;"> [${p.level===99?'Prof':p.level}]</span>`:''}</div>`).join('')
-              :`<span class="lib-hist-empty">—</span>`;
-            return`<td><div class="lib-hist-cell">${inner}</div></td>`;
+              ?pieces.map(p=>`<div class="lib-hist-cell-piece"><span class="lib-hist-piece-title">${esc(p?.title||'Unknown')}</span>${p?.level!=null?`<span class="lib-hist-piece-level">[${p.level===99?'Prof':p.level}]</span>`:''}</div>`).join('')
+              :`<div class="lib-hist-cell-body"><span class="lib-hist-empty">—</span></div>`;
+            const body=pieces.length?`<div class="lib-hist-cell-body">${inner}</div>`:`<div class="lib-hist-cell-body"><span class="lib-hist-empty">—</span></div>`;
+            return`<td><div class="lib-hist-cell">${cellHeader}${body}</div></td>`;
           }).join('');
-          return`<tr>
-            <td class="cell-event">${esc(eventLabel)}<br><span style="font-weight:400;color:var(--grey-400);font-size:.72rem;">${dateStr}</span></td>
-            ${cells}
-          </tr>`;
+          return`<tr>${cells}</tr>`;
         }).join('');
         gridHTML=`<div style="overflow-x:auto;">
-          <table class="lib-hist-grid">
-            <thead><tr><th class="col-event"></th>${headerCells}</tr></thead>
+          <table class="lib-hist-grid" style="table-layout:fixed;width:100%;">
+            <thead><tr>${headerCells}</tr></thead>
             <tbody>${rows}</tbody>
           </table>
         </div>`;
@@ -2325,21 +2330,22 @@ function renderLibHistory(){
         <div class="lib-rehearsed-block">
           <div class="lib-rehearsed-title">Rehearsed but not performed</div>
           <div style="overflow-x:auto;">
-            <table class="lib-hist-grid">
+            <table class="lib-hist-grid" style="table-layout:fixed;width:100%;">
               <thead><tr>
-                <th class="col-event"></th>
                 ${visibleEns.map(e=>`<th>${esc(e.name)}</th>`).join('')}
               </tr></thead>
               <tbody><tr>
-                <td class="cell-event" style="color:var(--grey-400);font-size:.72rem;font-style:italic;">Not performed</td>
                 ${visibleEns.map(e=>{
                   const rows=rehearsedByEns[e.id];
-                  if(!rows.length)return`<td><div class="lib-hist-cell" style="border-style:dashed;"><span class="lib-hist-empty">—</span></div></td>`;
+                  if(!rows||!rows.length)return`<td><div class="lib-hist-cell" style="border-style:dashed;"><div class="lib-hist-cell-header" style="background:var(--grey-400);">Not performed</div><div class="lib-hist-cell-body"><span class="lib-hist-empty">—</span></div></div></td>`;
                   const tileKey=`${year}_${e.id}`;
                   window._rehTileRegistry[tileKey]=rows.map(({borrow,piece})=>({id:borrow.id,date:borrow.date,title:piece.title,level:piece.level}));
                   return`<td>
                     <div class="lib-hist-cell" style="border-style:dashed;cursor:pointer;" onclick="openBorrowDateModal('${esc(e.name)}','${tileKey}')">
-                      ${rows.map(({piece})=>`<div class="lib-rehearsed-piece">${esc(piece.title)}${piece.level!=null?`<span style="color:var(--grey-400);font-style:italic;font-size:.7rem;"> [${piece.level===99?'Prof':piece.level}]</span>`:''}</div>`).join('')}
+                      <div class="lib-hist-cell-header" style="background:var(--grey-500);">Not performed</div>
+                      <div class="lib-hist-cell-body">
+                        ${rows.map(({piece})=>`<div class="lib-rehearsed-piece"><span class="lib-rehearsed-piece-title">${esc(piece.title)}</span>${piece.level!=null?`<span class="lib-rehearsed-piece-level">[${piece.level===99?'Prof':piece.level}]</span>`:''}</div>`).join('')}
+                      </div>
                     </div>
                   </td>`;
                 }).join('')}
