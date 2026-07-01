@@ -2765,7 +2765,7 @@ async function submitLibPiece(){
   if(!category){showToast('Category required');return;}
   const payload={title,composer:composer||null,category,level:level?parseFloat(level):null,date_purchased:datePurchased||null,owned,borrowed_from:(!owned&&borrowedFrom)?borrowedFrom:null,external_link:link||null,notes:notes||null};
   if(libEditPieceId){await db.from('library_pieces').update(payload).eq('id',libEditPieceId);}
-  else{await db.from('library_pieces').insert(payload);}
+  else{const{data:np}=await db.from('library_pieces').insert(payload).select().single();window._lastAddedPieceId=np?.id;}
   closeModal('lib-piece-modal');
   await loadLibData();
   showToast(libEditPieceId?'Piece updated ✓':'Piece added ✓');
@@ -3094,13 +3094,14 @@ function renderBorrowAndLinkForm(eventId, passedEnsId){
 let _postAddPieceCallback=null;
 
 function openAddLibModalFromEvent(eventId, ensId, date){
-  // close the events modal temporarily, open the add piece modal
-  // after adding, reload and re-open borrow & link form
   _postAddPieceCallback=async()=>{
-    await loadLibData();
     openManageEventsModal();
     renderLinkPiecesView(eventId);
-    renderBorrowAndLinkForm(eventId);
+    renderBorrowAndLinkForm(eventId, ensId);
+    if(window._lastAddedPieceId){
+      selectBalPiece(window._lastAddedPieceId);
+      window._lastAddedPieceId=null;
+    }
   };
   closeModal('lib-events-modal');
   openAddLibModal();
