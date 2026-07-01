@@ -266,18 +266,23 @@
     .lib-hist-filter-group select{font-family:'Inter',sans-serif;font-size:.8rem;color:var(--grey-800);border:1.5px solid var(--grey-200);border-radius:6px;padding:.3rem .6rem;background:white;cursor:pointer;min-width:130px;}
     .lib-hist-filter-group select:focus{outline:none;border-color:var(--navy);}
     .lib-hist-scroll-outer{flex:1;overflow:auto;min-height:0;}
-    /* pivot table */
-    .lib-hist-pivot{border-collapse:separate;border-spacing:0;table-layout:auto;}
-    .lib-hist-pivot thead th{position:sticky;top:0;z-index:10;background:white;border-bottom:2px solid var(--grey-200);padding:.55rem .75rem .6rem;font-size:.78rem;font-weight:700;color:var(--navy);text-align:left;white-space:nowrap;box-shadow:0 2px 0 var(--grey-200);}
-    .lib-hist-yr-row td{padding:1.5rem .75rem .35rem;font-size:1rem;font-weight:800;color:var(--navy);border-bottom:2px solid var(--navy);}
-    .lib-hist-ev-row td{background:#1B3A6B;color:white;font-size:.75rem;font-weight:700;padding:.4rem .75rem;cursor:pointer;letter-spacing:.02em;border-radius:4px;overflow:hidden;}
-    .lib-hist-ev-row:hover td[colspan]{background:#24508a;}
-    .lib-hist-np-row td{background:#6b7280;color:white;font-size:.75rem;font-weight:700;padding:.4rem .75rem;letter-spacing:.02em;}
-    .lib-hist-pc-row td{vertical-align:top;padding:.45rem .75rem;border-bottom:1px solid var(--grey-100);cursor:pointer;}
-    .lib-hist-pc-row td:hover{background:#f0f4fb;}
-    .lib-hist-np-pc-row td{vertical-align:top;padding:.45rem .75rem;border-bottom:1px solid var(--grey-100);background:#fafbfc;cursor:pointer;}
-    .lib-hist-np-pc-row td:hover{background:#f0f2f5;}
-    .lib-hist-np-pc-row td:hover{background:#f0f2f5;}
+    /* tile-based performance history layout */
+    .lh-inner{width:auto;}
+    .lh-ens-header{display:grid;position:sticky;top:0;z-index:10;background:white;border-bottom:2px solid var(--grey-200);box-shadow:0 2px 0 var(--grey-200);}
+    .lh-ens-col{padding:.55rem .75rem;font-size:.78rem;font-weight:700;color:var(--navy);white-space:nowrap;}
+    .lh-body{padding:.5rem .5rem 1.5rem;}
+    .lib-hist-year-divider{padding:1.5rem .75rem .4rem;font-size:1rem;font-weight:800;color:var(--navy);border-bottom:2px solid var(--navy);margin-bottom:.5rem;}
+    .lh-cols-row{display:grid;gap:.5rem;align-items:start;margin-bottom:.5rem;}
+    .lh-col{display:flex;flex-direction:column;gap:.5rem;min-width:0;}
+    .lh-tile{border:1.5px solid var(--grey-200);border-radius:6px;overflow:hidden;cursor:pointer;transition:border-color .12s;}
+    .lh-tile-ev:hover{border-color:#1B3A6B;}
+    .lh-tile-np:hover{border-color:#6b7280;}
+    .lh-tile-hd{background:#1B3A6B;color:white;padding:.3rem .65rem;font-size:.72rem;font-weight:700;display:flex;align-items:center;gap:.4rem;min-width:0;}
+    .lh-tile-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;}
+    .lh-tile-date{flex-shrink:0;opacity:.75;white-space:nowrap;}
+    .lh-tile-hd-np{background:#6b7280;color:white;padding:.3rem .65rem;font-size:.72rem;font-weight:700;}
+    .lh-tile-body{padding:.35rem .65rem;}
+    .lh-tile-body-np{background:#fafbfc;}
     /* solo-hint: when all ensembles selected, checkboxes look unchecked to hint click=solo */
     #hdd-ens[data-all-selected] .hist-chk-item input[type="checkbox"]:checked{appearance:none;-webkit-appearance:none;width:13px;height:13px;border:1.5px solid var(--grey-300);border-radius:3px;background:white;flex-shrink:0;}
     #hdd-ens[data-all-selected] .hist-chk-item:hover input[type="checkbox"]{appearance:auto;-webkit-appearance:auto;accent-color:var(--navy);}
@@ -641,7 +646,7 @@
 
 <!-- BORROW DATE EDIT MODAL -->
 <div class="modal-backdrop" id="lib-borrow-date-modal">
-  <div class="modal" style="max-width:680px;">
+  <div class="modal" style="max-width:820px;">
     <div class="modal-header">
       <span class="modal-title" id="lib-borrow-date-modal-title">Edit Borrow Dates</span>
       <button class="btn-close" onclick="closeModal('lib-borrow-date-modal')">✕</button>
@@ -2203,67 +2208,49 @@ function renderLibHistory(){
 
   window._rehTileRegistry={};
 
-  const colCount=visibleEns.length||1;
-  let tableRows='';
+  const n=visibleEns.length||1;
+  const performedBorrowIds=new Set(libBorrowPerfs.map(bp=>bp.borrow_id));
+
+  let bodyHTML='';
   if(!visibleYears.length){
-    tableRows=`<tr><td colspan="${colCount}" style="color:var(--grey-400);padding:2rem;">No data for the selected filters.</td></tr>`;
+    bodyHTML='<div style="color:var(--grey-400);padding:2rem;">No data for the selected filters.</div>';
   } else {
     visibleYears.forEach(year=>{
-      // year divider
-      tableRows+=`<tr class="lib-hist-yr-row"><td colspan="${colCount}">${year}</td></tr>`;
-
       if(!visibleEns.length){
-        tableRows+=`<tr><td style="color:var(--grey-400);padding:1rem .75rem;font-size:.82rem;">No ensembles visible.</td></tr>`;
+        bodyHTML+=`<div class="lib-hist-year-divider">${year}</div><div style="color:var(--grey-400);padding:1rem .75rem;font-size:.82rem;">No ensembles visible.</div>`;
         return;
       }
-
-      // events in this year
       const yearEvents=libEvents.filter(e=>{
         if(!visibleEventIds.has(e.id))return false;
         if(new Date(e.date).getFullYear()!==year)return false;
         return true;
       }).sort((a,b)=>a.date.localeCompare(b.date));
 
-      yearEvents.forEach(ev=>{
-        const linkedBorrowIds=new Set(libBorrowPerfs.filter(bp=>bp.event_id===ev.id).map(bp=>bp.borrow_id));
-        const evDate=new Date(ev.date+'T00:00:00').toLocaleDateString('en-AU',{month:'short',day:'numeric'});
+      const yearBorrows=libBorrows.filter(b=>new Date(b.date).getFullYear()===year);
 
-        // find which ensemble indices have pieces for this event
-        const ensHasPieces=visibleEns.map(e=>libBorrows.some(b=>String(b.ensemble_id)===String(e.id)&&linkedBorrowIds.has(b.id)));
-        const firstIdx=ensHasPieces.indexOf(true);
-        const lastIdx=ensHasPieces.lastIndexOf(true);
+      const colsHTML=visibleEns.map(e=>{
+        let tiles='';
 
-        // skip event entirely if no visible ensemble has pieces for it
-        if(firstIdx===-1) return;
-
-        let evCells='';
-        if(firstIdx>0) evCells+=`<td colspan="${firstIdx}" style="background:transparent;"></td>`;
-        evCells+=`<td colspan="${lastIdx-firstIdx+1}" onclick="openManageEventsModal();renderLinkPiecesView('${ev.id}')"><div style="display:flex;align-items:center;gap:.5rem;min-width:0;"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;">${esc(ev.name)}</span><span style="flex-shrink:0;white-space:nowrap;opacity:.75;">${evDate}</span></div></td>`;
-        if(lastIdx<visibleEns.length-1) evCells+=`<td colspan="${visibleEns.length-lastIdx-1}" style="background:transparent;"></td>`;
-        tableRows+=`<tr class="lib-hist-ev-row">${evCells}</tr>`;
-
-        // pieces row
-        const pieceCells=visibleEns.map(e=>{
+        // one tile per event that has pieces for this ensemble
+        yearEvents.forEach(ev=>{
+          const linkedBorrowIds=new Set(libBorrowPerfs.filter(bp=>bp.event_id===ev.id).map(bp=>bp.borrow_id));
           const pieces=libBorrows
             .filter(b=>String(b.ensemble_id)===String(e.id)&&linkedBorrowIds.has(b.id))
             .map(b=>libPieces.find(p=>p.id===b.piece_id))
             .filter(Boolean)
             .sort((a,b)=>a.title.localeCompare(b.title));
-          const body=pieces.length
-            ?pieces.map(p=>`<div class="lib-hist-cell-piece"><span class="lib-hist-piece-title">${esc(p.title)}</span>${p.level!=null?`<span class="lib-hist-piece-level">[${p.level===99?'Prof':p.level}]</span>`:''}</div>`).join('')
-            :`<span class="lib-hist-empty">—</span>`;
-          return`<td onclick="openManageEventsModal();renderLinkPiecesView('${ev.id}');showRightPanel('${ev.id}',${year},'${e.id}')">${body}</td>`;
-        }).join('');
-        tableRows+=`<tr class="lib-hist-pc-row">${pieceCells}</tr>`;
-      });
+          if(!pieces.length)return;
+          const evDate=new Date(ev.date+'T00:00:00').toLocaleDateString('en-AU',{month:'short',day:'numeric'});
+          const piecesHTML=pieces.map(p=>`<div class="lib-hist-cell-piece"><span class="lib-hist-piece-title">${esc(p.title)}</span>${p.level!=null?`<span class="lib-hist-piece-level">[${p.level===99?'Prof':p.level}]</span>`:''}</div>`).join('');
+          tiles+=`<div class="lh-tile lh-tile-ev" onclick="openManageEventsModal();renderLinkPiecesView('${ev.id}');showRightPanel('${ev.id}',${year},'${e.id}')">
+            <div class="lh-tile-hd"><span class="lh-tile-name">${esc(ev.name)}</span><span class="lh-tile-date">${evDate}</span></div>
+            <div class="lh-tile-body">${piecesHTML}</div>
+          </div>`;
+        });
 
-      // rehearsed but not performed
-      const yearBorrows=libBorrows.filter(b=>new Date(b.date).getFullYear()===year);
-      const performedBorrowIds=new Set(libBorrowPerfs.map(bp=>bp.borrow_id));
-      const rehearsedByEns={};
-      ensColumns.forEach(e=>{
+        // rehearsed but not performed tile
         const seen=new Set();
-        rehearsedByEns[e.id]=yearBorrows
+        const rehearsed=yearBorrows
           .filter(b=>String(b.ensemble_id)===String(e.id)&&!performedBorrowIds.has(b.id))
           .filter(b=>!seen.has(b.piece_id)&&seen.add(b.piece_id))
           .map(b=>({borrow:b,piece:libPieces.find(p=>p.id===b.piece_id)}))
@@ -2274,22 +2261,21 @@ function renderLibHistory(){
             if(la!==lb)return la-lb;
             return a.piece.title.localeCompare(b.piece.title);
           });
-      });
-
-      const hasAnyRehearsed=visibleEns.some(e=>rehearsedByEns[e.id]?.length>0);
-      if(hasAnyRehearsed){
-        tableRows+=`<tr class="lib-hist-np-row"><td colspan="${colCount}">Rehearsed but Not Performed</td></tr>`;
-        const npCells=visibleEns.map(e=>{
-          const rows=rehearsedByEns[e.id];
-          if(!rows||!rows.length)return`<td class="lib-hist-np-pc-row-empty"><span class="lib-hist-empty">—</span></td>`;
+        if(rehearsed.length){
           const tileKey=`${year}_${e.id}`;
-          window._rehTileRegistry[tileKey]=rows.map(({borrow,piece})=>({id:borrow.id,date:borrow.date,title:piece.title,level:piece.level}));
-          return`<td onclick="openBorrowTileModal('${esc(e.name)}','${tileKey}','${e.id}')">
-            ${rows.map(({piece})=>`<div class="lib-rehearsed-piece"><span class="lib-rehearsed-piece-title">${esc(piece.title)}</span>${piece.level!=null?`<span class="lib-rehearsed-piece-level">[${piece.level===99?'Prof':piece.level}]</span>`:''}</div>`).join('')}
-          </td>`;
-        }).join('');
-        tableRows+=`<tr class="lib-hist-np-pc-row">${npCells}</tr>`;
-      }
+          window._rehTileRegistry[tileKey]=rehearsed.map(({borrow,piece})=>({id:borrow.id,date:borrow.date,title:piece.title,level:piece.level}));
+          const rHTML=rehearsed.map(({piece})=>`<div class="lib-rehearsed-piece"><span class="lib-rehearsed-piece-title">${esc(piece.title)}</span>${piece.level!=null?`<span class="lib-rehearsed-piece-level">[${piece.level===99?'Prof':piece.level}]</span>`:''}</div>`).join('');
+          tiles+=`<div class="lh-tile lh-tile-np" onclick="openBorrowTileModal('${esc(e.name)}','${tileKey}','${e.id}')">
+            <div class="lh-tile-hd-np">Rehearsed but Not Performed</div>
+            <div class="lh-tile-body lh-tile-body-np">${rHTML}</div>
+          </div>`;
+        }
+
+        return`<div class="lh-col">${tiles||''}</div>`;
+      }).join('');
+
+      bodyHTML+=`<div class="lib-hist-year-divider">${year}</div>
+        <div class="lh-cols-row" style="grid-template-columns:repeat(${n},1fr);">${colsHTML}</div>`;
     });
   }
 
@@ -2304,7 +2290,7 @@ function renderLibHistory(){
   const hiddenEventCount=container._hiddenEventIds.size;
   const hiddenEnsCount=container._hiddenEns.size;
 
-  const ensHeaderCells=visibleEns.map(e=>`<th>${esc(e.name)}</th>`).join('');
+  const ensHeaderCells=visibleEns.map(e=>`<div class="lh-ens-col">${esc(e.name)}</div>`).join('');
   container.innerHTML=`
     <div class="lib-hist-filters" style="justify-content:space-between;">
       <div style="display:flex;gap:.75rem;align-items:center;">
@@ -2320,10 +2306,10 @@ function renderLibHistory(){
       </div>
     </div>
     <div class="lib-hist-scroll-outer">
-      <table class="lib-hist-pivot" style="min-width:${Math.max(visibleEns.length,1)*130}px;">
-        <thead><tr>${ensHeaderCells||`<th style="color:var(--grey-400);font-weight:400;">No ensembles visible</th>`}</tr></thead>
-        <tbody>${tableRows}</tbody>
-      </table>
+      <div class="lh-inner" style="min-width:${n*130}px;">
+        <div class="lh-ens-header" style="grid-template-columns:repeat(${n},1fr);">${ensHeaderCells||`<div class="lh-ens-col" style="color:var(--grey-400);font-weight:400;">No ensembles visible</div>`}</div>
+        <div class="lh-body">${bodyHTML}</div>
+      </div>
     </div>
   `;
   ['hdd-year','hdd-event','hdd-ens'].forEach(id=>{const el=document.getElementById(id);if(el)el.remove();});
@@ -2336,17 +2322,16 @@ function renderLibHistory(){
   panelEns.innerHTML=hintRow+ensItems+`<div style="border-top:1px solid var(--grey-100);margin-top:.3rem;padding-top:.3rem;">${selectAllRow}<button onclick="openManageEnsembles();document.querySelectorAll('.hist-chk-panel').forEach(p=>p.classList.remove('open'));" style="font-family:'Inter',sans-serif;font-size:.78rem;color:var(--grey-500);background:none;border:none;cursor:pointer;padding:.35rem .75rem;width:100%;text-align:left;">⚙ Manage ensembles</button></div>`;
   document.body.appendChild(panelEns);
 
-  // Two-pass sizing: if natural content width < container, keep auto (content-fit columns);
-  // if wider, switch to fixed+100% so columns divide the space equally and scroll kicks in.
+  // Two-pass sizing: if natural content width < container, fill it; else scroll.
   requestAnimationFrame(()=>{
     const outer=container.querySelector('.lib-hist-scroll-outer');
-    const tbl=container.querySelector('.lib-hist-pivot');
-    if(!outer||!tbl)return;
-    const naturalW=tbl.scrollWidth;
-    const availW=outer.clientWidth;
-    if(naturalW>=availW){
-      tbl.style.tableLayout='fixed';
-      tbl.style.width='100%';
+    const inner=container.querySelector('.lh-inner');
+    if(!outer||!inner)return;
+    if(inner.scrollWidth>=outer.clientWidth){
+      inner.style.width='100%';
+      container.querySelectorAll('.lh-cols-row,.lh-ens-header').forEach(el=>{
+        el.style.gridTemplateColumns=`repeat(${n},1fr)`;
+      });
     }
   });
 }
@@ -2416,7 +2401,7 @@ function openBorrowTileModal(ensName, tileKey, ensId){
                 ${linkedEventIds.length?`<button class="btn btn-ghost btn-sm" style="padding:.2rem .5rem;font-size:.72rem;color:var(--danger);" onclick="unlinkBorrowFromEvents(${i})">Unlink all</button>`:''}
               </div>
             </td>
-            <td style="padding:.5rem 0 .5rem .35rem;">
+            <td style="padding:.5rem 0 .5rem .35rem;width:28px;flex-shrink:0;">
               <button class="btn btn-ghost btn-sm" style="padding:.2rem .4rem;font-size:.72rem;color:var(--danger);" onclick="deleteBorrowFromTile('${r.id}')" title="Delete this borrow">✕</button>
             </td>
           </tr>`;
