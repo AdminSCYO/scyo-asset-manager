@@ -2237,6 +2237,9 @@ function renderLibHistory(){
     ...borrows.map(b=>new Date(b.date).getFullYear())
   ])].sort((a,b)=>b-a);
 
+  // registry for tile data (avoids JSON in onclick attributes)
+  window._rehTileRegistry={};
+
   let bodyHTML='';
   if(!years.length){
     bodyHTML='<div style="color:var(--grey-400);padding:2rem;">No performance history for the selected filters.</div>';
@@ -2320,10 +2323,10 @@ function renderLibHistory(){
                 ${ensColumns.map(e=>{
                   const rows=rehearsedByEns[e.id];
                   if(!rows.length)return`<td><div class="lib-hist-cell" style="border-style:dashed;"><span class="lib-hist-empty">—</span></div></td>`;
-                  const tileId=`tile-${year}-${e.id}`;
-                  const borrowsJson=JSON.stringify(rows.map(({borrow,piece})=>({id:borrow.id,date:borrow.date,title:piece.title,level:piece.level}))).replace(/'/g,'&#39;');
+                  const tileKey=`${year}_${e.id}`;
+                  window._rehTileRegistry[tileKey]=rows.map(({borrow,piece})=>({id:borrow.id,date:borrow.date,title:piece.title,level:piece.level}));
                   return`<td>
-                    <div class="lib-hist-cell" style="border-style:dashed;cursor:pointer;" onclick="openBorrowDateModal('${esc(e.name)}',${borrowsJson})">
+                    <div class="lib-hist-cell" style="border-style:dashed;cursor:pointer;" onclick="openBorrowDateModal('${esc(e.name)}','${tileKey}')">
                       ${rows.map(({piece})=>`<div class="lib-rehearsed-piece">${esc(piece.title)}${piece.level!=null?`<span style="color:var(--grey-400);font-style:italic;font-size:.7rem;"> [${piece.level===99?'Prof':piece.level}]</span>`:''}</div>`).join('')}
                       <div style="margin-top:.35rem;font-size:.68rem;color:var(--grey-400);">Click to edit dates</div>
                     </div>
@@ -2363,7 +2366,9 @@ function renderLibHistory(){
 
 let _borrowDateModalRows=[];
 
-function openBorrowDateModal(ensName, rows){
+function openBorrowDateModal(ensName, tileKey){
+  const rows=window._rehTileRegistry?.[tileKey]||[];
+  if(!rows.length)return;
   _borrowDateModalRows=rows;
   document.getElementById('lib-borrow-date-modal-title').textContent=`Edit Borrow Dates — ${ensName}`;
   document.getElementById('lib-borrow-date-body').innerHTML=`
