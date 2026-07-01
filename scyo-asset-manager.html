@@ -2683,6 +2683,11 @@ async function submitLibPiece(){
   closeModal('lib-piece-modal');
   await loadLibData();
   showToast(libEditPieceId?'Piece updated ✓':'Piece added ✓');
+  if(!libEditPieceId&&_postAddPieceCallback){
+    const cb=_postAddPieceCallback;
+    _postAddPieceCallback=null;
+    await cb();
+  }
 }
 
 function openLibDetail(pieceId){
@@ -2988,7 +2993,11 @@ function renderBorrowAndLinkForm(eventId){
       </div>
       <div id="bal-selected" style="margin-top:.35rem;font-size:.82rem;color:var(--navy);font-weight:600;"></div>
     </div>
-    <div style="display:flex;gap:.5rem;margin-top:.75rem;">
+    <div style="font-size:.78rem;color:var(--grey-400);margin:.5rem 0;">
+      Piece not in the library yet?
+      <button onclick="openAddLibModalFromEvent('${eventId}','${ensId}','${event.date}')" style="background:none;border:none;color:var(--navy);font-size:.78rem;font-weight:600;cursor:pointer;padding:0;text-decoration:underline;">Add it to the catalogue</button>
+    </div>
+    <div style="display:flex;gap:.5rem;margin-top:1rem;">
       <button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="submitBorrowAndLink('${eventId}','${ensId}','${event.date}')">Log borrow & link</button>
       <button class="btn btn-ghost" style="flex:1;justify-content:center;" onclick="renderLinkPiecesView('${eventId}')">Cancel</button>
     </div>
@@ -2996,7 +3005,22 @@ function renderBorrowAndLinkForm(eventId){
   document.getElementById('bal-piece-input')?.focus();
 }
 
-let _balSelectedPieceId=null;
+let _postAddPieceCallback=null;
+
+function openAddLibModalFromEvent(eventId, ensId, date){
+  // close the events modal temporarily, open the add piece modal
+  // after adding, reload and re-open borrow & link form
+  _postAddPieceCallback=async()=>{
+    await loadLibData();
+    openManageEventsModal();
+    renderLinkPiecesView(eventId);
+    renderBorrowAndLinkForm(eventId);
+  };
+  closeModal('lib-events-modal');
+  openAddLibModal();
+}
+
+
 
 function filterBalPieces(){
   _balSelectedPieceId=null;
