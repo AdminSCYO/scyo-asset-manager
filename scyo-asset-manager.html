@@ -2212,7 +2212,7 @@ function renderLibHistory(){
   // --- build filter bar HTML ---
   const yearOpts=`<option value="all">All years</option>`+allYears.map(y=>`<option value="${y}"${selYear==y?'selected':''}>${y}</option>`).join('');
   const eventOpts=`<option value="all">All events</option>`+allEventTypes.map(t=>`<option value="${t}"${selEvent===t?'selected':''}>${esc(t)}</option>`).join('');
-  const ensOpts=`<option value="all">All ensembles</option>`+libEnsembles.map(e=>`<option value="${e.id}"${selEns==e.id?'selected':''}>${esc(e.name)}</option>`).join('');
+  const ensOpts=`<option value="all">All ensembles</option>`+libEnsembles.filter(e=>!e.name.toLowerCase().startsWith('external')).map(e=>`<option value="${e.id}"${selEns==e.id?'selected':''}>${esc(e.name)}</option>`).join('');
 
   // --- filter data ---
   let perfs=libPerformances;
@@ -2231,7 +2231,7 @@ function renderLibHistory(){
 
   // --- determine ensemble columns (from both perfs and borrows, always all ensembles with data across ALL years not just filtered) ---
   const ensIdSet=new Set([...libPerformances.map(p=>p.ensemble_id),...libBorrows.map(b=>b.ensemble_id)]);
-  const ensColumns=libEnsembles.filter(e=>ensIdSet.has(e.id));
+  const ensColumns=libEnsembles.filter(e=>ensIdSet.has(e.id) && !e.name.toLowerCase().startsWith('external'));
 
   // --- group years ---
   const years=[...new Set([
@@ -2307,7 +2307,12 @@ function renderLibHistory(){
           .filter(b=>!seen.has(b.piece_id) && seen.add(b.piece_id))
           .map(b=>({borrow:b,piece:libPieces.find(pc=>pc.id===b.piece_id)}))
           .filter(r=>r.piece)
-          .sort((a,b)=>a.piece.title.localeCompare(b.piece.title));
+          .sort((a,b)=>{
+            const la=a.piece.level===99?999:(a.piece.level??-1);
+            const lb=b.piece.level===99?999:(b.piece.level??-1);
+            if(la!==lb)return la-lb;
+            return a.piece.title.localeCompare(b.piece.title);
+          });
         rehearsedByEns[e.id]=borrows;
       });
 
