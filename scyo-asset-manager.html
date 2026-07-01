@@ -664,6 +664,8 @@
 
 <div class="modal-backdrop" id="lib-borrow-modal">
   <div class="modal" style="max-width:420px;">
+    <div class="modal-header">
+      <span class="modal-title">Log Borrow</span>
       <button class="btn-close" onclick="closeModal('lib-borrow-modal')">✕</button>
     </div>
     <div style="padding:1.25rem;" id="lib-borrow-form"></div>
@@ -2227,8 +2229,8 @@ function renderLibHistory(){
     borrows=borrows.filter(b=>String(b.ensemble_id)===String(eid));
   }
 
-  // --- determine ensemble columns (from both perfs and borrows) ---
-  const ensIdSet=new Set([...perfs.map(p=>p.ensemble_id),...borrows.map(b=>b.ensemble_id)]);
+  // --- determine ensemble columns (from both perfs and borrows, always all ensembles with data across ALL years not just filtered) ---
+  const ensIdSet=new Set([...libPerformances.map(p=>p.ensemble_id),...libBorrows.map(b=>b.ensemble_id)]);
   const ensColumns=libEnsembles.filter(e=>ensIdSet.has(e.id));
 
   // --- group years ---
@@ -2304,7 +2306,8 @@ function renderLibHistory(){
           .filter(b=>String(b.ensemble_id)===String(e.id) && !performedSet.has(`${b.piece_id}|${b.ensemble_id}`))
           .filter(b=>!seen.has(b.piece_id) && seen.add(b.piece_id))
           .map(b=>({borrow:b,piece:libPieces.find(pc=>pc.id===b.piece_id)}))
-          .filter(r=>r.piece);
+          .filter(r=>r.piece)
+          .sort((a,b)=>a.piece.title.localeCompare(b.piece.title));
         rehearsedByEns[e.id]=borrows;
       });
 
@@ -2328,7 +2331,6 @@ function renderLibHistory(){
                   return`<td>
                     <div class="lib-hist-cell" style="border-style:dashed;cursor:pointer;" onclick="openBorrowDateModal('${esc(e.name)}','${tileKey}')">
                       ${rows.map(({piece})=>`<div class="lib-rehearsed-piece">${esc(piece.title)}${piece.level!=null?`<span style="color:var(--grey-400);font-style:italic;font-size:.7rem;"> [${piece.level===99?'Prof':piece.level}]</span>`:''}</div>`).join('')}
-                      <div style="margin-top:.35rem;font-size:.68rem;color:var(--grey-400);">Click to edit dates</div>
                     </div>
                   </td>`;
                 }).join('')}
@@ -2406,6 +2408,7 @@ async function saveBorrowDateModal(){
         .eq('id',_borrowDateModalRows[i].id);
     }
   }
+  if(btn){btn.textContent='Save changes';btn.disabled=false;}
   closeModal('lib-borrow-date-modal');
   await loadLibData();
   showToast('Dates updated ✓');
