@@ -2212,6 +2212,10 @@ function renderLibHistory(){
   const yearOpts=`<option value="all">All years</option>`+allYears.map(y=>`<option value="${y}"${selYear==y?'selected':''}>${y}</option>`).join('');
   const eventOpts=`<option value="all">All events</option>`+allEventTypes.map(t=>`<option value="${t}"${selEvent===t?'selected':''}>${esc(t)}</option>`).join('');
   // ensemble checkboxes — persist hidden set on container
+  // --- determine ensemble columns (from both perfs and borrows, always all ensembles with data across ALL years not just filtered) ---
+  const ensIdSet=new Set([...libPerformances.map(p=>p.ensemble_id),...libBorrows.map(b=>b.ensemble_id)]);
+  const ensColumns=libEnsembles.filter(e=>ensIdSet.has(e.id) && !e.name.toLowerCase().startsWith('external'));
+
   if(!container._hiddenEns) container._hiddenEns=new Set();
   const ensCheckboxes=ensColumns.map(e=>`
     <label style="display:flex;align-items:center;gap:.3rem;font-size:.8rem;color:var(--grey-700);cursor:pointer;white-space:nowrap;">
@@ -2232,10 +2236,6 @@ function renderLibHistory(){
     borrows=borrows.filter(b=>new Date(b.date).getFullYear()===y);
   }
   if(selEvent!=='all') perfs=perfs.filter(p=>p.event_type===selEvent);
-
-  // --- determine ensemble columns (from both perfs and borrows, always all ensembles with data across ALL years not just filtered) ---
-  const ensIdSet=new Set([...libPerformances.map(p=>p.ensemble_id),...libBorrows.map(b=>b.ensemble_id)]);
-  const ensColumns=libEnsembles.filter(e=>ensIdSet.has(e.id) && !e.name.toLowerCase().startsWith('external'));
 
   // --- group years ---
   const years=[...new Set([
