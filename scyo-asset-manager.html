@@ -260,30 +260,29 @@
     .hist-chk-item{display:flex;align-items:center;gap:.5rem;padding:.35rem .75rem;font-size:.82rem;color:var(--grey-800);cursor:pointer;white-space:nowrap;}
     .hist-chk-item:hover{background:var(--grey-50);}
     .hist-chk-item input{accent-color:var(--navy);}
-    .lib-hist-filters{display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;padding:.75rem 1.25rem;border-bottom:1px solid var(--grey-200);background:white;position:sticky;top:0;}
+    .lib-hist-filters{display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;padding:.75rem 1.25rem;border-bottom:1px solid var(--grey-200);background:white;flex-shrink:0;}
     .lib-hist-filter-group{display:flex;flex-direction:column;gap:.2rem;}
     .lib-hist-filter-label{font-size:.68rem;font-weight:700;color:var(--grey-400);text-transform:uppercase;letter-spacing:.05em;}
     .lib-hist-filter-group select{font-family:'Inter',sans-serif;font-size:.8rem;color:var(--grey-800);border:1.5px solid var(--grey-200);border-radius:6px;padding:.3rem .6rem;background:white;cursor:pointer;min-width:130px;}
     .lib-hist-filter-group select:focus{outline:none;border-color:var(--navy);}
-    .lib-hist-body{padding:1.25rem;overflow:auto;flex:1;}
-    .lib-year-block{margin-bottom:2.5rem;}
-    .lib-year-title{font-size:1rem;font-weight:800;color:var(--navy);margin-bottom:.75rem;padding-bottom:.4rem;border-bottom:2px solid var(--navy);}
-    .lib-hist-grid{width:100%;border-collapse:separate;border-spacing:0;}
-    .lib-hist-grid th{font-size:.75rem;font-weight:700;color:var(--grey-600);text-align:left;padding:.4rem .75rem .6rem;white-space:nowrap;border-bottom:1.5px solid var(--grey-200);}
-    .lib-hist-grid th.col-event{color:var(--grey-400);font-weight:600;min-width:140px;}
-    .lib-hist-grid td{vertical-align:top;padding:.4rem .5rem;}
-    .lib-hist-grid td.cell-event{font-size:.78rem;font-weight:700;color:var(--grey-600);white-space:nowrap;padding:.4rem .75rem .4rem 0;vertical-align:top;padding-top:.6rem;}
-    .lib-hist-cell{background:white;border:1.5px solid var(--grey-200);border-radius:6px;box-shadow:var(--shadow);min-width:160px;width:100%;min-height:2.5rem;overflow:hidden;}
-    .lib-hist-cell-header{background:#1B3A6B;color:#ffffff;font-size:.7rem;font-weight:700;padding:.3rem .65rem;letter-spacing:.03em;line-height:1.4;}
-    .lib-hist-cell-body{padding:.4rem .65rem;}
+    .lib-hist-scroll-outer{flex:1;overflow:auto;min-height:0;}
+    /* pivot table */
+    .lib-hist-pivot{border-collapse:separate;border-spacing:0;width:100%;}
+    .lib-hist-pivot thead th{position:sticky;top:0;z-index:10;background:white;border-bottom:2px solid var(--grey-200);padding:.55rem .75rem .6rem;font-size:.78rem;font-weight:700;color:var(--navy);text-align:left;white-space:nowrap;min-width:190px;box-shadow:0 2px 0 var(--grey-200);}
+    .lib-hist-yr-row td{padding:1.5rem .75rem .35rem;font-size:1rem;font-weight:800;color:var(--navy);border-bottom:2px solid var(--navy);white-space:nowrap;}
+    .lib-hist-ev-row td{background:#1B3A6B;color:white;font-size:.75rem;font-weight:700;padding:.4rem .75rem;cursor:pointer;letter-spacing:.02em;}
+    .lib-hist-ev-row:hover td{background:#24508a;}
+    .lib-hist-np-row td{background:#6b7280;color:white;font-size:.75rem;font-weight:700;padding:.4rem .75rem;letter-spacing:.02em;}
+    .lib-hist-pc-row td{vertical-align:top;padding:.45rem .75rem;border-bottom:1px solid var(--grey-100);min-width:190px;}
+    .lib-hist-np-pc-row td{vertical-align:top;padding:.45rem .75rem;border-bottom:1px solid var(--grey-100);min-width:190px;background:#fafbfc;cursor:pointer;}
+    .lib-hist-np-pc-row td:hover{background:#f0f2f5;}
     .lib-hist-cell-piece{font-size:.78rem;color:var(--grey-800);padding:.15rem 0;border-bottom:1px solid var(--grey-100);display:flex;align-items:baseline;gap:.25rem;min-width:0;}
     .lib-hist-cell-piece:last-child{border-bottom:none;}
     .lib-hist-piece-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;}
     .lib-hist-piece-level{flex-shrink:0;white-space:nowrap;color:var(--grey-400);font-style:italic;font-size:.7rem;}
-    .lib-hist-empty{color:var(--grey-200);font-size:.72rem;}
-    .lib-rehearsed-block{margin-top:.75rem;padding:.65rem .9rem;background:#fafbfc;border:1.5px dashed var(--grey-200);border-radius:6px;}
-    .lib-rehearsed-title{font-size:.72rem;font-weight:700;color:var(--grey-400);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.35rem;}
-    .lib-rehearsed-piece{font-size:.8rem;color:var(--grey-600);padding:.1rem 0;display:flex;align-items:baseline;gap:.25rem;min-width:0;}
+    .lib-hist-empty{color:var(--grey-300);font-size:.72rem;}
+    .lib-rehearsed-piece{font-size:.78rem;color:var(--grey-700);padding:.15rem 0;border-bottom:1px solid var(--grey-100);display:flex;align-items:baseline;gap:.25rem;min-width:0;}
+    .lib-rehearsed-piece:last-child{border-bottom:none;}
     .lib-rehearsed-piece-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;}
     .lib-rehearsed-piece-level{flex-shrink:0;white-space:nowrap;color:var(--grey-400);font-style:italic;font-size:.7rem;}
 
@@ -2199,50 +2198,48 @@ function renderLibHistory(){
 
   window._rehTileRegistry={};
 
-  let bodyHTML='';
+  const colCount=visibleEns.length||1;
+  let tableRows='';
   if(!visibleYears.length){
-    bodyHTML='<div style="color:var(--grey-400);padding:2rem;">No data for the selected filters.</div>';
+    tableRows=`<tr><td colspan="${colCount}" style="color:var(--grey-400);padding:2rem;">No data for the selected filters.</td></tr>`;
   } else {
-    bodyHTML=visibleYears.map(year=>{
-      // events that have at least one borrow linked in this year, filtered by visibility
+    visibleYears.forEach(year=>{
+      // year divider
+      tableRows+=`<tr class="lib-hist-yr-row"><td colspan="${colCount}">${year}</td></tr>`;
+
+      if(!visibleEns.length){
+        tableRows+=`<tr><td style="color:var(--grey-400);padding:1rem .75rem;font-size:.82rem;">No ensembles visible.</td></tr>`;
+        return;
+      }
+
+      // events in this year
       const yearEvents=libEvents.filter(e=>{
         if(!visibleEventIds.has(e.id))return false;
         if(new Date(e.date).getFullYear()!==year)return false;
         return true;
       }).sort((a,b)=>a.date.localeCompare(b.date));
 
-      // borrows in this year
-      const yearBorrows=libBorrows.filter(b=>new Date(b.date).getFullYear()===year);
-
-      // performance grid: rows=events, cols=ensembles
-      // for each event, find borrows linked to it, group by ensemble
-      let gridHTML='';
-      if(yearEvents.length&&visibleEns.length){
-        const headerCells=visibleEns.map(e=>`<th>${esc(e.name)}</th>`).join('');
-        const rows=yearEvents.map(ev=>{
-          // find borrow_ids linked to this event
-          const linkedBorrowIds=new Set(libBorrowPerfs.filter(bp=>bp.event_id===ev.id).map(bp=>bp.borrow_id));
-          const cellHeader=`<div class="lib-hist-cell-header" style="cursor:pointer;" onclick="openManageEventsModal();renderLinkPiecesView('${ev.id}')">${esc(ev.name)} · ${new Date(ev.date+'T00:00:00').toLocaleDateString('en-AU',{month:'short',day:'numeric'})}</div>`;
-          const cells=visibleEns.map(e=>{
-            // pieces performed by this ensemble at this event
-            const pieces=libBorrows
-              .filter(b=>String(b.ensemble_id)===String(e.id)&&linkedBorrowIds.has(b.id))
-              .map(b=>libPieces.find(p=>p.id===b.piece_id))
-              .filter(Boolean);
-            const body=pieces.length
-              ?pieces.map(p=>`<div class="lib-hist-cell-piece"><span class="lib-hist-piece-title">${esc(p.title)}</span>${p.level!=null?`<span class="lib-hist-piece-level">[${p.level===99?'Prof':p.level}]</span>`:''}</div>`).join('')
-              :`<span class="lib-hist-empty">—</span>`;
-            return`<td><div class="lib-hist-cell">${cellHeader}<div class="lib-hist-cell-body">${body}</div></div></td>`;
-          }).join('');
-          return`<tr>${cells}</tr>`;
+      yearEvents.forEach(ev=>{
+        const linkedBorrowIds=new Set(libBorrowPerfs.filter(bp=>bp.event_id===ev.id).map(bp=>bp.borrow_id));
+        const evDate=new Date(ev.date+'T00:00:00').toLocaleDateString('en-AU',{month:'short',day:'numeric'});
+        // event header row (clickable — opens manage events)
+        tableRows+=`<tr class="lib-hist-ev-row" onclick="openManageEventsModal();renderLinkPiecesView('${ev.id}')"><td colspan="${colCount}">${esc(ev.name)} · ${evDate}</td></tr>`;
+        // pieces row
+        const pieceCells=visibleEns.map(e=>{
+          const pieces=libBorrows
+            .filter(b=>String(b.ensemble_id)===String(e.id)&&linkedBorrowIds.has(b.id))
+            .map(b=>libPieces.find(p=>p.id===b.piece_id))
+            .filter(Boolean);
+          const body=pieces.length
+            ?pieces.map(p=>`<div class="lib-hist-cell-piece"><span class="lib-hist-piece-title">${esc(p.title)}</span>${p.level!=null?`<span class="lib-hist-piece-level">[${p.level===99?'Prof':p.level}]</span>`:''}</div>`).join('')
+            :`<span class="lib-hist-empty">—</span>`;
+          return`<td>${body}</td>`;
         }).join('');
-        gridHTML=`<div style="overflow-x:auto;"><table class="lib-hist-grid" style="table-layout:fixed;width:100%;min-width:${visibleEns.length*180}px;">
-          <thead><tr>${headerCells}</tr></thead>
-          <tbody>${rows}</tbody>
-        </table></div>`;
-      }
+        tableRows+=`<tr class="lib-hist-pc-row">${pieceCells}</tr>`;
+      });
 
-      // rehearsed but not performed: borrows with no linked events this year
+      // rehearsed but not performed
+      const yearBorrows=libBorrows.filter(b=>new Date(b.date).getFullYear()===year);
       const performedBorrowIds=new Set(libBorrowPerfs.map(bp=>bp.borrow_id));
       const rehearsedByEns={};
       ensColumns.forEach(e=>{
@@ -2261,31 +2258,20 @@ function renderLibHistory(){
       });
 
       const hasAnyRehearsed=visibleEns.some(e=>rehearsedByEns[e.id]?.length>0);
-      const rehearsedBlock=hasAnyRehearsed?`
-        <div class="lib-rehearsed-block">
-          <div style="overflow-x:auto;">
-            <table class="lib-hist-grid" style="table-layout:fixed;width:100%;min-width:${visibleEns.length*180}px;">
-              <thead><tr>${visibleEns.map(e=>`<th>${esc(e.name)}</th>`).join('')}</tr></thead>
-              <tbody><tr>
-                ${visibleEns.map(e=>{
-                  const rows=rehearsedByEns[e.id];
-                  if(!rows||!rows.length)return`<td><div class="lib-hist-cell" style="border-style:dashed;"><div class="lib-hist-cell-header" style="background:#9ca3af;">Not performed</div><div class="lib-hist-cell-body"><span class="lib-hist-empty">—</span></div></div></td>`;
-                  const tileKey=`${year}_${e.id}`;
-                  window._rehTileRegistry[tileKey]=rows.map(({borrow,piece})=>({id:borrow.id,date:borrow.date,title:piece.title,level:piece.level}));
-                  return`<td><div class="lib-hist-cell" style="border-style:dashed;cursor:pointer;" onclick="openBorrowTileModal('${esc(e.name)}','${tileKey}','${e.id}')">
-                    <div class="lib-hist-cell-header" style="background:#6b7280;">Not performed</div>
-                    <div class="lib-hist-cell-body">
-                      ${rows.map(({piece})=>`<div class="lib-rehearsed-piece"><span class="lib-rehearsed-piece-title">${esc(piece.title)}</span>${piece.level!=null?`<span class="lib-rehearsed-piece-level">[${piece.level===99?'Prof':piece.level}]</span>`:''}</div>`).join('')}
-                    </div>
-                  </div></td>`;
-                }).join('')}
-              </tr></tbody>
-            </table>
-          </div>
-        </div>`:'';
-
-      return`<div class="lib-year-block"><div class="lib-year-title">${year}</div>${gridHTML}${rehearsedBlock}</div>`;
-    }).join('');
+      if(hasAnyRehearsed){
+        tableRows+=`<tr class="lib-hist-np-row"><td colspan="${colCount}">Not performed</td></tr>`;
+        const npCells=visibleEns.map(e=>{
+          const rows=rehearsedByEns[e.id];
+          if(!rows||!rows.length)return`<td class="lib-hist-np-pc-row-empty"><span class="lib-hist-empty">—</span></td>`;
+          const tileKey=`${year}_${e.id}`;
+          window._rehTileRegistry[tileKey]=rows.map(({borrow,piece})=>({id:borrow.id,date:borrow.date,title:piece.title,level:piece.level}));
+          return`<td onclick="openBorrowTileModal('${esc(e.name)}','${tileKey}','${e.id}')">
+            ${rows.map(({piece})=>`<div class="lib-rehearsed-piece"><span class="lib-rehearsed-piece-title">${esc(piece.title)}</span>${piece.level!=null?`<span class="lib-rehearsed-piece-level">[${piece.level===99?'Prof':piece.level}]</span>`:''}</div>`).join('')}
+          </td>`;
+        }).join('');
+        tableRows+=`<tr class="lib-hist-np-pc-row">${npCells}</tr>`;
+      }
+    });
   }
 
   // build filter UI
@@ -2297,6 +2283,7 @@ function renderLibHistory(){
   const hiddenEventCount=container._hiddenEventIds.size;
   const hiddenEnsCount=container._hiddenEns.size;
 
+  const ensHeaderCells=visibleEns.map(e=>`<th>${esc(e.name)}</th>`).join('');
   container.innerHTML=`
     <div class="lib-hist-filters" style="justify-content:space-between;">
       <div style="display:flex;gap:.75rem;align-items:center;">
@@ -2311,7 +2298,12 @@ function renderLibHistory(){
         </div>
       </div>
     </div>
-    <div class="lib-hist-body">${bodyHTML}</div>
+    <div class="lib-hist-scroll-outer">
+      <table class="lib-hist-pivot" style="min-width:${Math.max(visibleEns.length,1)*190}px;">
+        <thead><tr>${ensHeaderCells||`<th style="color:var(--grey-400);font-weight:400;">No ensembles visible</th>`}</tr></thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    </div>
   `;
   ['hdd-year','hdd-event','hdd-ens'].forEach(id=>{const el=document.getElementById(id);if(el)el.remove();});
   const panelYear=document.createElement('div');panelYear.className='hist-chk-panel';panelYear.id='hdd-year';panelYear.innerHTML=yearItems||'<span style="color:var(--grey-400);font-size:.8rem;padding:.5rem .75rem;display:block;">No data yet</span>';document.body.appendChild(panelYear);
