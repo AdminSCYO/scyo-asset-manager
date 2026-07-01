@@ -379,6 +379,7 @@
       <input type="text" id="lib-search" placeholder="Search pieces..." oninput="renderLibCatalogue()" style="padding-left:2.2rem;"/>
     </div>
     <button class="btn btn-primary" id="lib-add-btn" onclick="openAddLibModal()">+ Add Piece</button>
+    <button class="btn btn-ghost" id="lib-bulk-borrow-btn" onclick="openBulkBorrowModal()">Bulk Borrow</button>
     <button class="btn btn-ghost" id="lib-hist-bulk-borrow-btn" style="display:none;" onclick="openBulkBorrowModal()">Bulk Borrow</button>
     <button class="btn btn-primary" id="lib-hist-log-perf-btn" style="display:none;" onclick="openLogEventModal()">+ Log Performance</button>
     <button class="btn btn-ghost" id="lib-hist-log-history-btn" style="display:none;" onclick="openLogHistoryModal()">Log History</button>
@@ -2004,7 +2005,8 @@ function switchLibView(view){
   document.getElementById('lib-history').style.display=view==='history'?'flex':'none';
   document.getElementById('lib-search-wrap').style.display=view==='catalogue'?'flex':'none';
   document.getElementById('lib-add-btn').style.display=view==='catalogue'?'':'none';
-  document.getElementById('lib-bulk-borrow-btn').style.display=view==='catalogue'?'':'none';
+  const bulkBorrowBtn=document.getElementById('lib-bulk-borrow-btn');
+  if(bulkBorrowBtn)bulkBorrowBtn.style.display=view==='catalogue'?'':'none';
   document.getElementById('lib-hist-bulk-borrow-btn').style.display=view==='history'?'':'none';
   document.getElementById('lib-hist-log-perf-btn').style.display=view==='history'?'':'none';
   document.getElementById('lib-hist-log-history-btn').style.display=view==='history'?'':'none';
