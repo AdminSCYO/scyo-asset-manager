@@ -229,6 +229,16 @@
     .lib-rbtn{display:flex;align-items:center;gap:.35rem;font-family:'Inter',sans-serif;font-size:.75rem;font-weight:600;color:var(--navy);background:white;border:1.5px solid #c5d0e6;border-radius:var(--radius);padding:.4rem .55rem;cursor:pointer;white-space:nowrap;transition:background .12s;}
     .lib-rbtn:hover{background:#dce6f5;}
     .lib-rbtn-hint{font-size:.68rem;color:var(--grey-400);line-height:1.3;margin-top:.2rem;}
+    .reh-tile-collapsed{cursor:pointer;padding:.5rem .65rem;}
+    .reh-tile-collapsed:hover{background:var(--grey-50);}
+    .reh-tile-expanded{padding:.5rem .65rem;}
+    .reh-tile-row{display:flex;align-items:center;justify-content:space-between;gap:.5rem;padding:.2rem 0;border-bottom:1px solid var(--grey-100);}
+    .reh-tile-row:last-child{border-bottom:none;}
+    .reh-tile-piece{font-size:.78rem;color:var(--grey-800);flex:1;min-width:0;}
+    .reh-tile-level{color:var(--grey-400);font-style:italic;font-size:.7rem;}
+    .reh-tile-date{font-size:.75rem;padding:.2rem .35rem;border:1.5px solid var(--grey-200);border-radius:4px;width:120px;flex-shrink:0;font-family:'Inter',sans-serif;}
+    .reh-tile-date:focus{outline:none;border-color:var(--navy);}
+    .reh-tile-actions{display:flex;gap:.4rem;margin-top:.5rem;padding-top:.4rem;border-top:1px solid var(--grey-100);}
     .log-hist-tile{border:1.5px solid var(--grey-200);border-radius:var(--radius);margin-bottom:.75rem;overflow:hidden;}
     .log-hist-tile-header{display:flex;align-items:center;justify-content:space-between;padding:.6rem .85rem;background:var(--grey-50);cursor:pointer;gap:.5rem;}
     .log-hist-tile-header:hover{background:var(--grey-100);}
@@ -2272,11 +2282,12 @@ function renderLibHistory(){
       const rehearsedByEns={};
       ensColumns.forEach(e=>{
         const seen=new Set();
-        const unperformed=yearBorrows
+        const borrows=yearBorrows
           .filter(b=>String(b.ensemble_id)===String(e.id) && !performedSet.has(`${b.piece_id}|${b.ensemble_id}`))
-          .map(b=>libPieces.find(pc=>pc.id===b.piece_id))
-          .filter(p=>p && !seen.has(p.id) && seen.add(p.id));
-        rehearsedByEns[e.id]=unperformed;
+          .filter(b=>!seen.has(b.piece_id) && seen.add(b.piece_id))
+          .map(b=>({borrow:b,piece:libPieces.find(pc=>pc.id===b.piece_id)}))
+          .filter(r=>r.piece);
+        rehearsedByEns[e.id]=borrows;
       });
 
       const hasAnyRehearsed=ensColumns.some(e=>rehearsedByEns[e.id].length>0);
@@ -2292,12 +2303,29 @@ function renderLibHistory(){
               <tbody><tr>
                 <td class="cell-event" style="color:var(--grey-400);font-size:.72rem;font-style:italic;">Not performed</td>
                 ${ensColumns.map(e=>{
-                  const titles=rehearsedByEns[e.id];
-                  return`<td><div class="lib-hist-cell" style="border-style:dashed;">${
-                    titles.length
-                      ? titles.map(p=>`<div class="lib-rehearsed-piece">${esc(p?.title||'Unknown')}${p?.level!=null?`<span style="color:var(--grey-400);font-style:italic;font-size:.7rem;"> [${p.level===99?'Prof':p.level}]</span>`:''}</div>`).join('')
-                      : `<span class="lib-hist-empty">—</span>`
-                  }</div></td>`;
+                  const rows=rehearsedByEns[e.id];
+                  if(!rows.length)return`<td><div class="lib-hist-cell" style="border-style:dashed;"><span class="lib-hist-empty">—</span></div></td>`;
+                  const tileId=`tile-${year}-${e.id}`;
+                  const pieces=rows.map(({borrow,piece})=>`
+                    <div class="reh-tile-row" data-borrow-id="${borrow.id}">
+                      <div class="reh-tile-piece">${esc(piece.title)}${piece.level!=null?`<span class="reh-tile-level"> [${piece.level===99?'Prof':piece.level}]</span>`:''}
+                      </div>
+                      <input type="date" class="reh-tile-date" value="${borrow.date}" onchange="markTileDirty('${tileId}')"/>
+                    </div>`).join('');
+                  return`<td>
+                    <div class="lib-hist-cell reh-tile" style="border-style:dashed;padding:0;cursor:default;" id="${tileId}">
+                      <div class="reh-tile-collapsed" onclick="expandRehTile('${tileId}')">
+                        ${rows.map(({piece})=>`<div class="lib-rehearsed-piece">${esc(piece.title)}${piece.level!=null?`<span style="color:var(--grey-400);font-style:italic;font-size:.7rem;"> [${piece.level===99?'Prof':piece.level}]</span>`:''}</div>`).join('')}
+                      </div>
+                      <div class="reh-tile-expanded" style="display:none;">
+                        <div class="reh-tile-pieces">${pieces}</div>
+                        <div class="reh-tile-actions">
+                          <button class="btn btn-primary btn-sm" onclick="saveRehTile('${tileId}')">Save</button>
+                          <button class="btn btn-ghost btn-sm" onclick="collapseRehTile('${tileId}')">Cancel</button>
+                        </div>
+                      </div>
+                    </div>
+                  </td>`;
                 }).join('')}
               </tr></tbody>
             </table>
@@ -2331,7 +2359,45 @@ function renderLibHistory(){
   `;
 }
 
-function libHistSetFilter(key,value){
+function expandRehTile(tileId){
+  const tile=document.getElementById(tileId);
+  if(!tile)return;
+  tile.querySelector('.reh-tile-collapsed').style.display='none';
+  tile.querySelector('.reh-tile-expanded').style.display='block';
+}
+
+function collapseRehTile(tileId){
+  const tile=document.getElementById(tileId);
+  if(!tile)return;
+  tile.querySelector('.reh-tile-collapsed').style.display='block';
+  tile.querySelector('.reh-tile-expanded').style.display='none';
+}
+
+function markTileDirty(tileId){
+  const btn=document.querySelector(`#${tileId} .reh-tile-actions .btn-primary`);
+  if(btn)btn.textContent='Save';
+}
+
+async function saveRehTile(tileId){
+  const tile=document.getElementById(tileId);
+  if(!tile)return;
+  const rows=[...tile.querySelectorAll('.reh-tile-row')];
+  const updates=rows.map(row=>({
+    id:row.dataset.borrowId,
+    date:row.querySelector('.reh-tile-date').value
+  }));
+  const btn=tile.querySelector('.reh-tile-actions .btn-primary');
+  if(btn){btn.textContent='Saving…';btn.disabled=true;}
+  for(const u of updates){
+    await db.from('library_borrows')
+      .update({date:u.date,updated_at:new Date().toISOString(),updated_by:currentUser?.email||null})
+      .eq('id',u.id);
+  }
+  await loadLibData();
+  showToast('Dates updated ✓');
+}
+
+
   const container=document.getElementById('lib-history');
   if(key==='year') container._fYear=value;
   if(key==='event') container._fEvent=value;
