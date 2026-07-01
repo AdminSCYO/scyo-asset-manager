@@ -2234,7 +2234,7 @@ function renderLibHistory(){
           const body=pieces.length
             ?pieces.map(p=>`<div class="lib-hist-cell-piece"><span class="lib-hist-piece-title">${esc(p.title)}</span>${p.level!=null?`<span class="lib-hist-piece-level">[${p.level===99?'Prof':p.level}]</span>`:''}</div>`).join('')
             :`<span class="lib-hist-empty">—</span>`;
-          return`<td onclick="openManageEventsModal();renderLinkPiecesView('${ev.id}');showRightPanel('${ev.id}',${eventYear},'${e.id}')">${body}</td>`;
+          return`<td onclick="openManageEventsModal();renderLinkPiecesView('${ev.id}');showRightPanel('${ev.id}',${year},'${e.id}')">${body}</td>`;
         }).join('');
         tableRows+=`<tr class="lib-hist-pc-row">${pieceCells}</tr>`;
       });
