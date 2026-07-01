@@ -2989,7 +2989,7 @@ function renderBorrowAndLinkForm(eventId){
         <input type="text" id="bal-piece-input" placeholder="Search for a piece…" autocomplete="off"
           oninput="filterBalPieces()"
           onfocus="filterBalPieces()"/>
-        <div class="bulk-piece-dropdown" id="bal-piece-dd" style="max-height:180px;overflow-y:auto;"></div>
+        <div class="bulk-piece-dropdown" id="bal-piece-dd" style="max-height:180px;overflow-y:auto;position:fixed;z-index:99999;background:white;border:1.5px solid var(--grey-200);border-radius:var(--radius);box-shadow:0 4px 16px rgba(0,0,0,.12);display:none;"></div>
       </div>
       <div id="bal-selected" style="margin-top:.35rem;font-size:.82rem;color:var(--navy);font-weight:600;"></div>
     </div>
@@ -3028,8 +3028,13 @@ function filterBalPieces(){
   const q=(document.getElementById('bal-piece-input')?.value||'').toLowerCase();
   const matches=libPieces.filter(p=>!q||p.title.toLowerCase().includes(q)||(p.composer||'').toLowerCase().includes(q)).slice(0,20);
   const dd=document.getElementById('bal-piece-dd');
-  if(!dd)return;
+  const input=document.getElementById('bal-piece-input');
+  if(!dd||!input)return;
   if(!matches.length){dd.style.display='none';return;}
+  const rect=input.getBoundingClientRect();
+  dd.style.top=(rect.bottom+2)+'px';
+  dd.style.left=rect.left+'px';
+  dd.style.width=rect.width+'px';
   dd.innerHTML=matches.map(p=>`<div class="bulk-piece-option" onclick="selectBalPiece('${p.id}')"><span>${esc(p.title)}</span><span class="piece-cat">${esc(p.category)}</span></div>`).join('');
   dd.style.display='block';
 }
@@ -3038,10 +3043,19 @@ function selectBalPiece(pieceId){
   const piece=libPieces.find(p=>p.id===pieceId);
   if(!piece)return;
   _balSelectedPieceId=pieceId;
-  document.getElementById('bal-piece-input').value=piece.title;
-  document.getElementById('bal-piece-dd').style.display='none';
+  const input=document.getElementById('bal-piece-input');
+  if(input)input.value=piece.title;
+  const dd=document.getElementById('bal-piece-dd');
+  if(dd)dd.style.display='none';
   document.getElementById('bal-selected').textContent='';
 }
+
+// close bal dropdown when clicking outside
+document.addEventListener('click',e=>{
+  const dd=document.getElementById('bal-piece-dd');
+  const input=document.getElementById('bal-piece-input');
+  if(dd&&input&&!input.contains(e.target)&&!dd.contains(e.target)) dd.style.display='none';
+});
 
 async function submitBorrowAndLink(eventId,ensId,date){
   if(!_balSelectedPieceId){showToast('Select a piece first');return;}
