@@ -1962,7 +1962,7 @@ function switchLibView(view){
 function switchLibCat(cat){
   libActiveCat=cat;
   libShuffled=false;
-  libPieces.forEach(p=>delete p.__shuffleKey);
+  libShuffleKeys={};
   sessionStorage.setItem('scyo-lib-cat',cat);
   renderLibCatTabs();
   renderLibCatalogue();
@@ -1976,7 +1976,7 @@ function renderLibCatTabs(){
 
 function fmtLevel(l){if(l===null||l===undefined)return'—';if(l===99)return'Prof';return l;}
 
-let libSortCol='title',libSortAsc=true,libShuffled=false;
+let libSortCol='title',libSortAsc=true,libShuffled=false,libShuffleKeys={};
 
 const LIB_COLS=[
   {id:'composer',label:'Composer'},
@@ -2010,7 +2010,7 @@ function toggleLibCol(colId,visible){
 
 function libSortBy(col){
   libShuffled=false;
-  libPieces.forEach(p=>delete p.__shuffleKey);
+  libShuffleKeys={};
   if(libSortCol===col)libSortAsc=!libSortAsc;
   else{libSortCol=col;libSortAsc=true;}
   renderLibCatalogue();
@@ -2018,7 +2018,8 @@ function libSortBy(col){
 
 function libShuffle(){
   libShuffled=true;
-  libPieces.forEach(p=>p.__shuffleKey=Math.random());
+  libShuffleKeys={};
+  libPieces.forEach(p=>libShuffleKeys[p.id]=Math.random());
   closeLibCtxMenu();
   renderLibCatalogue();
 }
@@ -2054,7 +2055,7 @@ function renderLibCatalogue(){
 
   filtered=[...filtered].sort((a,b)=>{
     if(libShuffled){
-      return(a.__shuffleKey||0)-(b.__shuffleKey||0);
+      return(libShuffleKeys[a.id]||0)-(libShuffleKeys[b.id]||0);
     }
     let av,bv;
     if(libSortCol==='title'){av=a.title.toLowerCase();bv=b.title.toLowerCase();}
