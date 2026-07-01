@@ -267,15 +267,16 @@
     .lib-hist-filter-group select:focus{outline:none;border-color:var(--navy);}
     .lib-hist-scroll-outer{flex:1;overflow:auto;min-height:0;}
     /* pivot table */
-    .lib-hist-pivot{border-collapse:separate;border-spacing:0;width:auto;max-width:100%;table-layout:auto;}
-    .lib-hist-pivot thead th{position:sticky;top:0;z-index:10;background:white;border-bottom:2px solid var(--grey-200);padding:.55rem .75rem .6rem;font-size:.78rem;font-weight:700;color:var(--navy);text-align:left;white-space:nowrap;min-width:130px;box-shadow:0 2px 0 var(--grey-200);}
+    .lib-hist-pivot{border-collapse:separate;border-spacing:0;width:100%;table-layout:fixed;}
+    .lib-hist-pivot thead th{position:sticky;top:0;z-index:10;background:white;border-bottom:2px solid var(--grey-200);padding:.55rem .75rem .6rem;font-size:.78rem;font-weight:700;color:var(--navy);text-align:left;white-space:nowrap;box-shadow:0 2px 0 var(--grey-200);}
     .lib-hist-yr-row td{padding:1.5rem .75rem .35rem;font-size:1rem;font-weight:800;color:var(--navy);border-bottom:2px solid var(--navy);white-space:nowrap;}
     .lib-hist-ev-row td{background:#1B3A6B;color:white;font-size:.75rem;font-weight:700;padding:.4rem .75rem;cursor:pointer;letter-spacing:.02em;border-radius:4px;}
     .lib-hist-ev-row:hover td[colspan]{background:#24508a;}
     .lib-hist-np-row td{background:#6b7280;color:white;font-size:.75rem;font-weight:700;padding:.4rem .75rem;letter-spacing:.02em;}
-    .lib-hist-pc-row td{vertical-align:top;padding:.45rem .75rem;border-bottom:1px solid var(--grey-100);cursor:pointer;min-width:130px;}
+    .lib-hist-pc-row td{vertical-align:top;padding:.45rem .75rem;border-bottom:1px solid var(--grey-100);cursor:pointer;}
     .lib-hist-pc-row td:hover{background:#f0f4fb;}
-    .lib-hist-np-pc-row td{vertical-align:top;padding:.45rem .75rem;border-bottom:1px solid var(--grey-100);min-width:130px;background:#fafbfc;cursor:pointer;}
+    .lib-hist-np-pc-row td{vertical-align:top;padding:.45rem .75rem;border-bottom:1px solid var(--grey-100);background:#fafbfc;cursor:pointer;}
+    .lib-hist-np-pc-row td:hover{background:#f0f2f5;}
     .lib-hist-np-pc-row td:hover{background:#f0f2f5;}
     /* solo-hint: when all ensembles selected, checkboxes look unchecked to hint click=solo */
     #hdd-ens[data-all-selected] .hist-chk-item input[type="checkbox"]:checked{appearance:none;-webkit-appearance:none;width:13px;height:13px;border:1.5px solid var(--grey-300);border-radius:3px;background:white;flex-shrink:0;}
@@ -2322,10 +2323,12 @@ function renderLibHistory(){
       </div>
     </div>
     <div class="lib-hist-scroll-outer">
-      <table class="lib-hist-pivot" style="min-width:${Math.max(visibleEns.length,1)*130}px;">
-        <thead><tr>${ensHeaderCells||`<th style="color:var(--grey-400);font-weight:400;">No ensembles visible</th>`}</tr></thead>
-        <tbody>${tableRows}</tbody>
-      </table>
+      <div style="width:fit-content;max-width:100%;min-width:${Math.max(visibleEns.length,1)*130}px;">
+        <table class="lib-hist-pivot" style="width:100%;min-width:${Math.max(visibleEns.length,1)*130}px;">
+          <thead><tr>${ensHeaderCells||`<th style="color:var(--grey-400);font-weight:400;">No ensembles visible</th>`}</tr></thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </div>
     </div>
   `;
   ['hdd-year','hdd-event','hdd-ens'].forEach(id=>{const el=document.getElementById(id);if(el)el.remove();});
