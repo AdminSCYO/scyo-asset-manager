@@ -274,7 +274,7 @@
     .lib-hist-grid td{vertical-align:top;padding:.4rem .5rem;}
     .lib-hist-grid td.cell-event{font-size:.78rem;font-weight:700;color:var(--grey-600);white-space:nowrap;padding:.4rem .75rem .4rem 0;vertical-align:top;padding-top:.6rem;}
     .lib-hist-cell{background:white;border:1.5px solid var(--grey-200);border-radius:6px;box-shadow:var(--shadow);min-width:160px;width:100%;min-height:2.5rem;overflow:hidden;}
-    .lib-hist-cell-header{background:var(--navy);color:white;font-size:.7rem;font-weight:700;padding:.3rem .65rem;letter-spacing:.03em;line-height:1.4;}
+    .lib-hist-cell-header{background:#1B3A6B;color:#ffffff;font-size:.7rem;font-weight:700;padding:.3rem .65rem;letter-spacing:.03em;line-height:1.4;}
     .lib-hist-cell-body{padding:.4rem .65rem;}
     .lib-hist-cell-piece{font-size:.78rem;color:var(--grey-800);padding:.15rem 0;border-bottom:1px solid var(--grey-100);display:flex;align-items:baseline;gap:.25rem;min-width:0;}
     .lib-hist-cell-piece:last-child{border-bottom:none;}
@@ -2337,12 +2337,12 @@ function renderLibHistory(){
               <tbody><tr>
                 ${visibleEns.map(e=>{
                   const rows=rehearsedByEns[e.id];
-                  if(!rows||!rows.length)return`<td><div class="lib-hist-cell" style="border-style:dashed;"><div class="lib-hist-cell-header" style="background:var(--grey-400);">Not performed</div><div class="lib-hist-cell-body"><span class="lib-hist-empty">—</span></div></div></td>`;
+                  if(!rows||!rows.length)return`<td><div class="lib-hist-cell" style="border-style:dashed;"><div class="lib-hist-cell-header" style="background:#9ca3af;">Not performed</div><div class="lib-hist-cell-body"><span class="lib-hist-empty">—</span></div></div></td>`;
                   const tileKey=`${year}_${e.id}`;
                   window._rehTileRegistry[tileKey]=rows.map(({borrow,piece})=>({id:borrow.id,date:borrow.date,title:piece.title,level:piece.level}));
                   return`<td>
                     <div class="lib-hist-cell" style="border-style:dashed;cursor:pointer;" onclick="openBorrowDateModal('${esc(e.name)}','${tileKey}')">
-                      <div class="lib-hist-cell-header" style="background:var(--grey-500);">Not performed</div>
+                      <div class="lib-hist-cell-header" style="background:#6b7280;">Not performed</div>
                       <div class="lib-hist-cell-body">
                         ${rows.map(({piece})=>`<div class="lib-rehearsed-piece"><span class="lib-rehearsed-piece-title">${esc(piece.title)}</span>${piece.level!=null?`<span class="lib-rehearsed-piece-level">[${piece.level===99?'Prof':piece.level}]</span>`:''}</div>`).join('')}
                       </div>
