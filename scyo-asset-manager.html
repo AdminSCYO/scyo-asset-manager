@@ -270,7 +270,7 @@
     .lib-hist-pivot{border-collapse:separate;border-spacing:0;table-layout:auto;}
     .lib-hist-pivot thead th{position:sticky;top:0;z-index:10;background:white;border-bottom:2px solid var(--grey-200);padding:.55rem .75rem .6rem;font-size:.78rem;font-weight:700;color:var(--navy);text-align:left;white-space:nowrap;box-shadow:0 2px 0 var(--grey-200);}
     .lib-hist-yr-row td{padding:1.5rem .75rem .35rem;font-size:1rem;font-weight:800;color:var(--navy);border-bottom:2px solid var(--navy);}
-    .lib-hist-ev-row td{background:#1B3A6B;color:white;font-size:.75rem;font-weight:700;padding:.4rem .75rem;cursor:pointer;letter-spacing:.02em;border-radius:4px;}
+    .lib-hist-ev-row td{background:#1B3A6B;color:white;font-size:.75rem;font-weight:700;padding:.4rem .75rem;cursor:pointer;letter-spacing:.02em;border-radius:4px;overflow:hidden;}
     .lib-hist-ev-row:hover td[colspan]{background:#24508a;}
     .lib-hist-np-row td{background:#6b7280;color:white;font-size:.75rem;font-weight:700;padding:.4rem .75rem;letter-spacing:.02em;}
     .lib-hist-pc-row td{vertical-align:top;padding:.45rem .75rem;border-bottom:1px solid var(--grey-100);cursor:pointer;}
@@ -2233,16 +2233,13 @@ function renderLibHistory(){
         const firstIdx=ensHasPieces.indexOf(true);
         const lastIdx=ensHasPieces.lastIndexOf(true);
 
-        // event header: dark label spans only first→last relevant column; transparent padding cells either side
+        // skip event entirely if no visible ensemble has pieces for it
+        if(firstIdx===-1) return;
+
         let evCells='';
-        if(firstIdx===-1){
-          // no pieces linked yet — span all columns but with reduced opacity
-          evCells=`<td colspan="${colCount}" onclick="openManageEventsModal();renderLinkPiecesView('${ev.id}')" style="opacity:.6;">${esc(ev.name)} · ${evDate}</td>`;
-        } else {
-          if(firstIdx>0) evCells+=`<td colspan="${firstIdx}" style="background:transparent;"></td>`;
-          evCells+=`<td colspan="${lastIdx-firstIdx+1}" onclick="openManageEventsModal();renderLinkPiecesView('${ev.id}')">${esc(ev.name)} · ${evDate}</td>`;
-          if(lastIdx<visibleEns.length-1) evCells+=`<td colspan="${visibleEns.length-lastIdx-1}" style="background:transparent;"></td>`;
-        }
+        if(firstIdx>0) evCells+=`<td colspan="${firstIdx}" style="background:transparent;"></td>`;
+        evCells+=`<td colspan="${lastIdx-firstIdx+1}" onclick="openManageEventsModal();renderLinkPiecesView('${ev.id}')"><div style="display:flex;align-items:center;gap:.5rem;min-width:0;"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;">${esc(ev.name)}</span><span style="flex-shrink:0;white-space:nowrap;opacity:.75;">${evDate}</span></div></td>`;
+        if(lastIdx<visibleEns.length-1) evCells+=`<td colspan="${visibleEns.length-lastIdx-1}" style="background:transparent;"></td>`;
         tableRows+=`<tr class="lib-hist-ev-row">${evCells}</tr>`;
 
         // pieces row
@@ -2362,18 +2359,34 @@ function renderLibHistory(){
 
 
 let _borrowTileEnsId=null;
+let _borrowTileTileKey=null;
 
 function openBorrowTileModal(ensName, tileKey, ensId){
-  const rows=window._rehTileRegistry?.[tileKey]||[];
+  _borrowTileEnsId=ensId;
+  _borrowTileTileKey=tileKey;
+  const year=parseInt(tileKey.split('_')[0]);
+
+  // Load ALL borrows for this ensemble/year (not just unlinked)
+  const allBorrows=libBorrows.filter(b=>String(b.ensemble_id)===String(ensId)&&new Date(b.date).getFullYear()===year);
+  const byPiece={};
+  allBorrows.forEach(b=>{if(!byPiece[b.piece_id]||b.date>byPiece[b.piece_id].date)byPiece[b.piece_id]=b;});
+  const rows=Object.values(byPiece)
+    .map(b=>{const piece=libPieces.find(p=>p.id===b.piece_id);return piece?{id:b.id,date:b.date,title:piece.title,level:piece.level}:null;})
+    .filter(Boolean)
+    .sort((a,b)=>{
+      const la=a.level===99?999:(a.level??-1),lb=b.level===99?999:(b.level??-1);
+      if(la!==lb)return la-lb;
+      return a.title.localeCompare(b.title);
+    });
+
   if(!rows.length)return;
   _borrowDateModalRows=rows;
-  _borrowTileEnsId=ensId;
-  document.getElementById('lib-borrow-date-modal-title').textContent=`${ensName} — Rehearsed pieces`;
+  document.getElementById('lib-borrow-date-modal-title').textContent=`${ensName} — ${year}`;
 
   const eventOpts=[...libEvents].sort((a,b)=>a.date.localeCompare(b.date)).map(e=>`<option value="${e.id}">${esc(e.name)} (${e.date})</option>`).join('');
 
   document.getElementById('lib-borrow-date-body').innerHTML=`
-    <div style="font-size:.8rem;color:var(--grey-500);margin-bottom:.85rem;">Edit borrow dates and link pieces to a performance event.</div>
+    <div style="font-size:.8rem;color:var(--grey-500);margin-bottom:.85rem;">Edit borrow dates and link pieces to performance events. Pieces can be linked to multiple events.</div>
     <table style="width:100%;border-collapse:collapse;">
       <thead><tr>
         <th style="text-align:left;font-size:.72rem;font-weight:700;color:var(--grey-400);text-transform:uppercase;letter-spacing:.05em;padding:.3rem .5rem .5rem 0;">Piece</th>
@@ -2397,10 +2410,10 @@ function openBorrowTileModal(ensName, tileKey, ensId){
               ${linkedNames.length?`<div style="font-size:.78rem;color:var(--grey-700);margin-bottom:.25rem;">${linkedNames.map(n=>`<span style="background:#e8f0fb;color:#1B3A6B;border-radius:4px;padding:.1rem .4rem;margin-right:.25rem;font-size:.72rem;">${esc(n)}</span>`).join('')}</div>`:''}
               <div style="display:flex;gap:.35rem;align-items:center;">
                 <select id="bdm-event-${i}" style="font-family:'Inter',sans-serif;font-size:.78rem;padding:.2rem .4rem;border:1.5px solid var(--grey-200);border-radius:6px;flex:1;">
-                  <option value="">Link to event…</option>
+                  <option value="">${linkedNames.length?'Link to another event…':'Link to event…'}</option>
                   ${eventOpts}
                 </select>
-                ${linkedEventIds.length?`<button class="btn btn-ghost btn-sm" style="padding:.2rem .5rem;font-size:.72rem;color:var(--danger);" onclick="unlinkBorrowFromEvents(${i})">Unlink</button>`:''}
+                ${linkedEventIds.length?`<button class="btn btn-ghost btn-sm" style="padding:.2rem .5rem;font-size:.72rem;color:var(--danger);" onclick="unlinkBorrowFromEvents(${i})">Unlink all</button>`:''}
               </div>
             </td>
             <td style="padding:.5rem 0 .5rem .35rem;">
@@ -2417,10 +2430,8 @@ async function deleteBorrowFromTile(borrowId){
   if(!confirm('Delete this borrow record?'))return;
   await db.from('library_borrows').delete().eq('id',borrowId);
   await loadLibData();
-  // re-open modal with updated data
   const ens=libEnsembles.find(e=>String(e.id)===String(_borrowTileEnsId));
-  const tileKey=Object.keys(window._rehTileRegistry||{}).find(k=>window._rehTileRegistry[k].some(r=>r.id!==borrowId));
-  if(ens&&tileKey) openBorrowTileModal(ens.name,tileKey,_borrowTileEnsId);
+  if(ens&&_borrowTileTileKey) openBorrowTileModal(ens.name,_borrowTileTileKey,_borrowTileEnsId);
   else closeModal('lib-borrow-date-modal');
   showToast('Borrow deleted ✓');
 }
@@ -2430,15 +2441,12 @@ async function linkBorrowToEvent(rowIdx){
   const borrowId=_borrowDateModalRows[rowIdx]?.id;
   const eventId=document.getElementById(`bdm-event-${rowIdx}`)?.value;
   if(!borrowId||!eventId){showToast('Select an event first');return;}
-  // check not already linked
   const already=libBorrowPerfs.some(bp=>bp.borrow_id===borrowId&&bp.event_id===eventId);
   if(already){showToast('Already linked');return;}
   await db.from('library_borrow_performances').insert({borrow_id:borrowId,event_id:eventId});
   await loadLibData();
-  // re-open modal to refresh
-  const tileKey=Object.keys(window._rehTileRegistry).find(k=>window._rehTileRegistry[k].some(r=>r.id===borrowId));
   const ens=libEnsembles.find(e=>String(e.id)===String(_borrowTileEnsId));
-  if(tileKey&&ens) openBorrowTileModal(ens.name,tileKey,_borrowTileEnsId);
+  if(ens&&_borrowTileTileKey) openBorrowTileModal(ens.name,_borrowTileTileKey,_borrowTileEnsId);
   showToast('Linked ✓');
 }
 
@@ -2448,9 +2456,8 @@ async function unlinkBorrowFromEvents(rowIdx){
   if(!confirm('Remove all performance links for this piece?'))return;
   await db.from('library_borrow_performances').delete().eq('borrow_id',borrowId);
   await loadLibData();
-  const tileKey=Object.keys(window._rehTileRegistry).find(k=>window._rehTileRegistry[k].some(r=>r.id===borrowId));
   const ens=libEnsembles.find(e=>String(e.id)===String(_borrowTileEnsId));
-  if(tileKey&&ens) openBorrowTileModal(ens.name,tileKey,_borrowTileEnsId);
+  if(ens&&_borrowTileTileKey) openBorrowTileModal(ens.name,_borrowTileTileKey,_borrowTileEnsId);
   showToast('Unlinked ✓');
 }
 
@@ -2463,7 +2470,7 @@ async function saveBorrowDateModal(){
     const newDate=document.getElementById(`bdm-date-${i}`)?.value;
     if(newDate&&newDate!==row.date){
       await db.from('library_borrows')
-        .update({date:newDate,updated_at:new Date().toISOString(),updated_by:currentUser?.email||null})
+        .update({date:newDate})
         .eq('id',row.id);
     }
     // link to event if selected
@@ -2548,22 +2555,26 @@ function renderLibPieceHistory(pieceId){
   const borrows=libBorrows.filter(b=>b.piece_id===pieceId).sort((a,b)=>b.date.localeCompare(a.date));
   document.getElementById('lib-piece-history').innerHTML=borrows.length?borrows.map(b=>{
     const ens=libEnsembles.find(e=>e.id===b.ensemble_id);
-    const linkedEvents=libBorrowPerfs.filter(bp=>bp.borrow_id===b.id).map(bp=>libEvents.find(e=>e.id===bp.event_id)).filter(Boolean);
-    const eventTags=linkedEvents.map(e=>`<span style="background:#e8f0fb;color:#1B3A6B;border-radius:4px;padding:.1rem .35rem;font-size:.68rem;">${esc(e.name)}</span>`).join(' ');
+    const linkedEvents=libBorrowPerfs.filter(bp=>bp.borrow_id===b.id).map(bp=>libEvents.find(e=>e.id===bp.event_id)).filter(Boolean).sort((a,b)=>a.date.localeCompare(b.date));
+    const perfEntries=linkedEvents.map(e=>`
+      <div style="display:flex;align-items:baseline;gap:.4rem;padding:.2rem 0 .2rem .75rem;border-left:2px solid #e8f0fb;">
+        <span style="font-size:.68rem;font-weight:700;color:#1B3A6B;white-space:nowrap;">Performed</span>
+        <span style="font-size:.75rem;color:var(--grey-800);flex:1;">${esc(e.name)}</span>
+        <span style="font-size:.68rem;color:var(--grey-400);white-space:nowrap;">${e.date}</span>
+      </div>`).join('');
     return`<div class="hist-entry">
-      <div class="hist-field">Borrowed${linkedEvents.length?` → Performed`:''}</div>
+      <div class="hist-field">Borrowed${linkedEvents.length?` · ${linkedEvents.length} performance${linkedEvents.length>1?'s':''}`:''}</div>
       <div class="hist-val">${esc(ens?.name||'Unknown')}</div>
-      ${eventTags?`<div style="margin:.2rem 0;">${eventTags}</div>`:''}
-      <div class="hist-meta" style="display:flex;justify-content:space-between;align-items:center;">${b.date}
+      <div class="hist-meta" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:${perfEntries?'.4rem':'0'};">${b.date}
         <span style="display:flex;gap:.2rem;">
           <button class="btn btn-ghost btn-sm" style="padding:.1rem .4rem;font-size:.7rem;" onclick="openEditBorrow('${b.id}')">Edit</button>
-          <button class="btn btn-ghost btn-sm" style="padding:.1rem .4rem;font-size:.7rem;color:var(--danger);" onclick="deleteLibBorrowFromEdit('${b.id}')">✕</button>
+          <button class="btn btn-ghost btn-sm" style="padding:.1rem .4rem;font-size:.7rem;color:var(--danger);" onclick="deleteLibBorrowFromEdit('${b.id}')">\u2715</button>
         </span>
       </div>
+      ${perfEntries}
     </div>`;
-  }).join(''):'<div style="color:var(--grey-400);font-size:.82rem;">No history yet.</div>';
+  }).join(''):'<div style="color:var(--grey-400);font-size:.82rem;">No borrow history yet.</div>';
 }
-
 async function deleteLibBorrowFromEdit(id){
   if(!confirm('Delete this borrow record?'))return;
   await db.from('library_borrows').delete().eq('id',id);
@@ -2841,13 +2852,18 @@ function openLibDetail(pieceId){
   const sortedBorrows=[...borrows].sort((a,b)=>b.date.localeCompare(a.date));
   document.getElementById('lib-detail-history').innerHTML=sortedBorrows.length?sortedBorrows.map(b=>{
     const ens=libEnsembles.find(e=>e.id===b.ensemble_id);
-    const linkedEvents=libBorrowPerfs.filter(bp=>bp.borrow_id===b.id).map(bp=>libEvents.find(e=>e.id===bp.event_id)).filter(Boolean);
-    const eventTags=linkedEvents.map(e=>`<span style="background:#e8f0fb;color:#1B3A6B;border-radius:4px;padding:.1rem .35rem;font-size:.68rem;">${esc(e.name)}</span>`).join(' ');
+    const linkedEvents=libBorrowPerfs.filter(bp=>bp.borrow_id===b.id).map(bp=>libEvents.find(e=>e.id===bp.event_id)).filter(Boolean).sort((a,b)=>a.date.localeCompare(b.date));
+    const perfEntries=linkedEvents.map(e=>`
+      <div style="display:flex;align-items:baseline;gap:.4rem;padding:.2rem 0 .2rem .75rem;border-left:2px solid #e8f0fb;">
+        <span style="font-size:.68rem;font-weight:700;color:#1B3A6B;white-space:nowrap;">Performed</span>
+        <span style="font-size:.75rem;color:var(--grey-800);flex:1;">${esc(e.name)}</span>
+        <span style="font-size:.68rem;color:var(--grey-400);white-space:nowrap;">${e.date}</span>
+      </div>`).join('');
     return`<div class="hist-entry">
-      <div class="hist-field">Borrowed${linkedEvents.length?' → Performed':''}</div>
+      <div class="hist-field">Borrowed${linkedEvents.length?` · ${linkedEvents.length} performance${linkedEvents.length>1?'s':''}`:''}</div>
       <div class="hist-val">${esc(ens?.name||'Unknown')}</div>
-      ${eventTags?`<div style="margin:.2rem 0;">${eventTags}</div>`:''}
-      <div class="hist-meta">${b.date}</div>
+      <div class="hist-meta" style="margin-bottom:${perfEntries?'.4rem':'0'};">${b.date}</div>
+      ${perfEntries}
     </div>`;
   }).join(''):'<div style="color:var(--grey-400);font-size:.82rem;">No usage history.</div>';
   document.getElementById('lib-detail-modal').classList.add('open');
@@ -2875,7 +2891,7 @@ async function submitLibBorrow(){
   const date=document.getElementById('lib-borrow-date').value;
   if(!ensembleId){showToast('Select an ensemble');return;}
   if(!date){showToast('Date required');return;}
-  await db.from('library_borrows').insert({piece_id:libDetailPieceId,ensemble_id:ensembleId,date,user_email:currentUser?.email||null});
+  await db.from('library_borrows').insert({piece_id:libDetailPieceId,ensemble_id:ensembleId,date});
   closeModal('lib-borrow-modal');
   await loadLibData();
   if(libEditPieceId===libDetailPieceId)renderLibPieceHistory(libEditPieceId);
@@ -2901,7 +2917,7 @@ async function submitEditBorrow(id){
   const ensembleId=document.getElementById('edit-borrow-ensemble').value;
   const date=document.getElementById('edit-borrow-date').value;
   if(!ensembleId||!date){showToast('All fields required');return;}
-  await db.from('library_borrows').update({ensemble_id:ensembleId,date,updated_at:new Date().toISOString(),updated_by:currentUser?.email||null}).eq('id',id);
+  await db.from('library_borrows').update({ensemble_id:ensembleId,date}).eq('id',id);
   closeModal('lib-edit-borrow-modal');
   await loadLibData();
   if(libEditPieceId)renderLibPieceHistory(libEditPieceId);
@@ -3190,7 +3206,7 @@ async function submitBorrowAndLink(eventId,ensId,date){
   if(!date||date==='undefined'){showToast('No date — please try again');return;}
   // create the borrow
   const{data:newBorrow,error}=await db.from('library_borrows')
-    .insert({piece_id:_balSelectedPieceId,ensemble_id:ensId,date,user_email:currentUser?.email||null})
+    .insert({piece_id:_balSelectedPieceId,ensemble_id:ensId,date})
     .select().single();
   if(error){showToast('Error creating borrow: '+error.message);return;}
   // link to event
@@ -3396,7 +3412,7 @@ async function submitBulkBorrow(){
   if(!date){showToast('Date required');return;}
   const pieces=Object.values(bulkBorrowSelectedPieces);
   if(!pieces.length){showToast('Add at least one piece');return;}
-  const inserts=pieces.map(p=>({piece_id:p.id,ensemble_id:ensembleId,date,user_email:currentUser?.email||null}));
+  const inserts=pieces.map(p=>({piece_id:p.id,ensemble_id:ensembleId,date}));
   const{error}=await db.from('library_borrows').insert(inserts);
   if(error){showToast('Error: '+error.message);return;}
   closeModal('lib-bulk-borrow-modal');
