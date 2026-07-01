@@ -250,6 +250,16 @@
     .log-hist-tile-body.open{display:block;}
     .log-hist-piece{font-size:.82rem;color:var(--grey-700);padding:.2rem 0;border-bottom:1px solid var(--grey-100);}
     .log-hist-piece:last-child{border-bottom:none;}
+    .hist-chk-dropdown{position:relative;}
+    .hist-chk-btn{font-family:'Inter',sans-serif;font-size:.82rem;font-weight:600;color:var(--navy);background:white;border:1.5px solid var(--grey-200);border-radius:var(--radius);padding:.4rem .75rem;cursor:pointer;display:flex;align-items:center;gap:.4rem;white-space:nowrap;}
+    .hist-chk-btn:hover{border-color:var(--navy);}
+    .hist-chk-btn.hist-chk-active{border-color:var(--navy);background:#eef2f8;}
+    .hist-chk-badge{background:var(--navy);color:white;font-size:.65rem;font-weight:700;border-radius:10px;padding:.05rem .35rem;}
+    .hist-chk-panel{display:none;position:absolute;top:calc(100% + 4px);left:0;background:white;border:1.5px solid var(--grey-200);border-radius:var(--radius);box-shadow:var(--shadow);z-index:100;min-width:160px;padding:.4rem 0;}
+    .hist-chk-panel.open{display:block;}
+    .hist-chk-item{display:flex;align-items:center;gap:.5rem;padding:.35rem .75rem;font-size:.82rem;color:var(--grey-800);cursor:pointer;white-space:nowrap;}
+    .hist-chk-item:hover{background:var(--grey-50);}
+    .hist-chk-item input{accent-color:var(--navy);}
     .lib-hist-filters{display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;padding:.75rem 1.25rem;border-bottom:1px solid var(--grey-200);background:white;position:sticky;top:0;z-index:10;}
     .lib-hist-filter-group{display:flex;flex-direction:column;gap:.2rem;}
     .lib-hist-filter-label{font-size:.68rem;font-weight:700;color:var(--grey-400);text-transform:uppercase;letter-spacing:.05em;}
@@ -2204,38 +2214,23 @@ function renderLibHistory(){
   ])].sort((a,b)=>b-a);
   const allEventTypes=[...new Set(libPerformances.map(p=>p.event_type))].sort();
 
-  // read current filter values (or default to 'all')
-  const selYear=container._fYear||'all';
-  const selEvent=container._fEvent||'all';
-
   // --- build filter bar HTML ---
-  const yearOpts=`<option value="all">All years</option>`+allYears.map(y=>`<option value="${y}"${selYear==y?'selected':''}>${y}</option>`).join('');
-  const eventOpts=`<option value="all">All events</option>`+allEventTypes.map(t=>`<option value="${t}"${selEvent===t?'selected':''}>${esc(t)}</option>`).join('');
   // ensemble checkboxes — persist hidden set on container
   // --- determine ensemble columns (from both perfs and borrows, always all ensembles with data across ALL years not just filtered) ---
   const ensIdSet=new Set([...libPerformances.map(p=>p.ensemble_id),...libBorrows.map(b=>b.ensemble_id)]);
   const ensColumns=libEnsembles.filter(e=>ensIdSet.has(e.id) && !e.name.toLowerCase().startsWith('external'));
 
-  if(!container._hiddenEns) container._hiddenEns=new Set();
-  const ensCheckboxes=ensColumns.map(e=>`
-    <label style="display:flex;align-items:center;gap:.3rem;font-size:.8rem;color:var(--grey-700);cursor:pointer;white-space:nowrap;">
-      <input type="checkbox" ${container._hiddenEns.has(e.id)?'':'checked'}
-        onchange="libHistToggleEns('${e.id}',this.checked)" style="accent-color:var(--navy);"/>
-      ${esc(e.name)}
-    </label>`).join('');
+  // --- filter data using hidden sets ---
+  let perfs=libPerformances.filter(p=>{
+    const y=String(new Date(p.date).getFullYear());
+    return !container._hiddenYears.has(y) && !container._hiddenEvents.has(p.event_type);
+  });
+  let borrows=libBorrows.filter(b=>{
+    const y=String(new Date(b.date).getFullYear());
+    return !container._hiddenYears.has(y);
+  });
 
-  // apply ensemble visibility to columns
   const visibleEns=ensColumns.filter(e=>!container._hiddenEns.has(e.id));
-
-  // --- filter data ---
-  let perfs=libPerformances;
-  let borrows=libBorrows;
-  if(selYear!=='all'){
-    const y=parseInt(selYear);
-    perfs=perfs.filter(p=>new Date(p.date).getFullYear()===y);
-    borrows=borrows.filter(b=>new Date(b.date).getFullYear()===y);
-  }
-  if(selEvent!=='all') perfs=perfs.filter(p=>p.event_type===selEvent);
 
   // --- group years ---
   const years=[...new Set([
@@ -2356,19 +2351,52 @@ function renderLibHistory(){
     }).join('');
   }
 
+  // build checkbox dropdown filters
+  if(!container._hiddenYears) container._hiddenYears=new Set();
+  if(!container._hiddenEvents) container._hiddenEvents=new Set();
+  if(!container._hiddenEns) container._hiddenEns=new Set();
+
+  const yearItems=allYears.map(y=>`
+    <label class="hist-chk-item">
+      <input type="checkbox" ${container._hiddenYears.has(String(y))?'':'checked'} onchange="libHistToggleItem('years','${y}',this.checked)"/>
+      ${y}
+    </label>`).join('');
+
+  const eventItems=allEventTypes.map(t=>`
+    <label class="hist-chk-item">
+      <input type="checkbox" ${container._hiddenEvents.has(t)?'':'checked'} onchange="libHistToggleItem('events','${t}',this.checked)"/>
+      ${esc(t)}
+    </label>`).join('');
+
+  const ensItems=ensColumns.map(e=>`
+    <label class="hist-chk-item">
+      <input type="checkbox" ${container._hiddenEns.has(e.id)?'':'checked'} onchange="libHistToggleEns('${e.id}',this.checked)"/>
+      ${esc(e.name)}
+    </label>`).join('');
+
+  const hiddenYearCount=container._hiddenYears.size;
+  const hiddenEventCount=container._hiddenEvents.size;
+  const hiddenEnsCount=container._hiddenEns.size;
+
   container.innerHTML=`
     <div class="lib-hist-filters">
-      <div class="lib-hist-filter-group">
-        <div class="lib-hist-filter-label">Year</div>
-        <select onchange="libHistSetFilter('year',this.value)">${yearOpts}</select>
+      <div class="hist-chk-dropdown">
+        <button class="hist-chk-btn${hiddenYearCount?' hist-chk-active':''}" onclick="toggleHistDropdown('hdd-year')">
+          Year${hiddenYearCount?` <span class="hist-chk-badge">${allYears.length-hiddenYearCount}/${allYears.length}</span>`:''} ▾
+        </button>
+        <div class="hist-chk-panel" id="hdd-year">${yearItems||'<span style="color:var(--grey-400);font-size:.8rem;">No data yet</span>'}</div>
       </div>
-      <div class="lib-hist-filter-group">
-        <div class="lib-hist-filter-label">Event type</div>
-        <select onchange="libHistSetFilter('event',this.value)">${eventOpts}</select>
+      <div class="hist-chk-dropdown">
+        <button class="hist-chk-btn${hiddenEventCount?' hist-chk-active':''}" onclick="toggleHistDropdown('hdd-event')">
+          Event type${hiddenEventCount?` <span class="hist-chk-badge">${allEventTypes.length-hiddenEventCount}/${allEventTypes.length}</span>`:''} ▾
+        </button>
+        <div class="hist-chk-panel" id="hdd-event">${eventItems||'<span style="color:var(--grey-400);font-size:.8rem;">No data yet</span>'}</div>
       </div>
-      <div style="display:flex;flex-direction:column;gap:.2rem;">
-        <div class="lib-hist-filter-label">Ensembles</div>
-        <div style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:center;">${ensCheckboxes}</div>
+      <div class="hist-chk-dropdown">
+        <button class="hist-chk-btn${hiddenEnsCount?' hist-chk-active':''}" onclick="toggleHistDropdown('hdd-ens')">
+          Ensemble${hiddenEnsCount?` <span class="hist-chk-badge">${ensColumns.length-hiddenEnsCount}/${ensColumns.length}</span>`:''} ▾
+        </button>
+        <div class="hist-chk-panel" id="hdd-ens">${ensItems}</div>
       </div>
     </div>
     <div class="lib-hist-body">${bodyHTML}</div>
@@ -2426,10 +2454,31 @@ async function saveBorrowDateModal(){
 document.getElementById('lib-borrow-date-modal')?.addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal('lib-borrow-date-modal');});
 
 
-function libHistSetFilter(key,value){
+function toggleHistDropdown(id){
+  document.querySelectorAll('.hist-chk-panel').forEach(p=>{
+    if(p.id!==id) p.classList.remove('open');
+  });
+  document.getElementById(id)?.classList.toggle('open');
+}
+
+// close dropdowns when clicking outside
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.hist-chk-dropdown')){
+    document.querySelectorAll('.hist-chk-panel.open').forEach(p=>p.classList.remove('open'));
+  }
+});
+
+function libHistToggleItem(type,value,checked){
   const container=document.getElementById('lib-history');
-  if(key==='year') container._fYear=value;
-  if(key==='event') container._fEvent=value;
+  if(type==='years'){
+    if(!container._hiddenYears) container._hiddenYears=new Set();
+    if(checked) container._hiddenYears.delete(value);
+    else container._hiddenYears.add(value);
+  } else if(type==='events'){
+    if(!container._hiddenEvents) container._hiddenEvents=new Set();
+    if(checked) container._hiddenEvents.delete(value);
+    else container._hiddenEvents.add(value);
+  }
   renderLibHistory();
 }
 
