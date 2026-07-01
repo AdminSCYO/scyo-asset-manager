@@ -2143,8 +2143,8 @@ function renderLibHistory(){
     borrows=borrows.filter(b=>String(b.ensemble_id)===String(eid));
   }
 
-  // --- determine ensemble columns (only those present in filtered perfs) ---
-  const ensIdSet=new Set(perfs.map(p=>p.ensemble_id));
+  // --- determine ensemble columns (from both perfs and borrows) ---
+  const ensIdSet=new Set([...perfs.map(p=>p.ensemble_id),...borrows.map(b=>b.ensemble_id)]);
   const ensColumns=libEnsembles.filter(e=>ensIdSet.has(e.id));
 
   // --- group years ---
@@ -2203,22 +2203,45 @@ function renderLibHistory(){
         </div>`;
       }
 
-      // rehearsed but not performed (borrows with no matching performance that year, ignoring event-type filter)
-      // use unfiltered-by-event perfs for this year so we don't show pieces that *were* performed under another event type
-      const allYearPerfIds=new Set(
-        (selEns!=='all'
-          ? libPerformances.filter(p=>new Date(p.date).getFullYear()===year && String(p.ensemble_id)===String(selEns))
-          : libPerformances.filter(p=>new Date(p.date).getFullYear()===year)
-        ).map(p=>p.piece_id)
-      );
-      const rehearsedIds=[...new Set(yearBorrows.filter(b=>!allYearPerfIds.has(b.piece_id)).map(b=>b.piece_id))];
-      const rehearsedBlock=rehearsedIds.length?`
+      // rehearsed but not performed — split by ensemble, using same columns
+      // use all perfs for this year (ignore event-type filter) to correctly exclude performed pieces
+      const allYearPerfs=libPerformances.filter(p=>new Date(p.date).getFullYear()===year);
+      // build a set of piece+ensemble combos that were performed
+      const performedSet=new Set(allYearPerfs.map(p=>`${p.piece_id}|${p.ensemble_id}`));
+
+      // for each ensemble column, find borrows that weren't performed
+      const rehearsedByEns={};
+      ensColumns.forEach(e=>{
+        const unperformed=yearBorrows
+          .filter(b=>String(b.ensemble_id)===String(e.id) && !performedSet.has(`${b.piece_id}|${b.ensemble_id}`))
+          .map(b=>libPieces.find(pc=>pc.id===b.piece_id)?.title||'Unknown');
+        // deduplicate
+        rehearsedByEns[e.id]=[...new Set(unperformed)];
+      });
+
+      const hasAnyRehearsed=ensColumns.some(e=>rehearsedByEns[e.id].length>0);
+      const rehearsedBlock=hasAnyRehearsed?`
         <div class="lib-rehearsed-block">
           <div class="lib-rehearsed-title">Rehearsed but not performed</div>
-          ${rehearsedIds.map(id=>{
-            const pc=libPieces.find(pc=>pc.id===id);
-            return`<div class="lib-rehearsed-piece">${esc(pc?.title||'Unknown')}</div>`;
-          }).join('')}
+          <div style="overflow-x:auto;">
+            <table class="lib-hist-grid">
+              <thead><tr>
+                <th class="col-event"></th>
+                ${ensColumns.map(e=>`<th>${esc(e.name)}</th>`).join('')}
+              </tr></thead>
+              <tbody><tr>
+                <td class="cell-event" style="color:var(--grey-400);font-size:.72rem;font-style:italic;">Not performed</td>
+                ${ensColumns.map(e=>{
+                  const titles=rehearsedByEns[e.id];
+                  return`<td><div class="lib-hist-cell" style="border-style:dashed;">${
+                    titles.length
+                      ? titles.map(t=>`<div class="lib-rehearsed-piece">${esc(t)}</div>`).join('')
+                      : `<span class="lib-hist-empty">—</span>`
+                  }</div></td>`;
+                }).join('')}
+              </tr></tbody>
+            </table>
+          </div>
         </div>`:'';
 
       return`<div class="lib-year-block">
