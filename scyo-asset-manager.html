@@ -629,7 +629,7 @@
       <span class="modal-title" id="lib-events-modal-title">Manage Events</span>
       <button class="btn-close" onclick="closeModal('lib-events-modal')">✕</button>
     </div>
-    <div id="lib-events-modal-body" style="overflow-y:auto;flex:1;padding:1.25rem;"></div>
+    <div id="lib-events-modal-body" style="overflow-y:auto;flex:1;padding:1.25rem;min-height:0;"></div>
   </div>
 </div>
 
@@ -2989,7 +2989,7 @@ function renderBorrowAndLinkForm(eventId){
         <input type="text" id="bal-piece-input" placeholder="Search for a piece…" autocomplete="off"
           oninput="filterBalPieces()"
           onfocus="filterBalPieces()"/>
-        <div class="bulk-piece-dropdown" id="bal-piece-dd"></div>
+        <div class="bulk-piece-dropdown" id="bal-piece-dd" style="max-height:180px;overflow-y:auto;"></div>
       </div>
       <div id="bal-selected" style="margin-top:.35rem;font-size:.82rem;color:var(--navy);font-weight:600;"></div>
     </div>
