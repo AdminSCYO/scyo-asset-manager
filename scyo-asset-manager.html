@@ -266,23 +266,25 @@
     .lib-hist-filter-group select{font-family:'Inter',sans-serif;font-size:.8rem;color:var(--grey-800);border:1.5px solid var(--grey-200);border-radius:6px;padding:.3rem .6rem;background:white;cursor:pointer;min-width:130px;}
     .lib-hist-filter-group select:focus{outline:none;border-color:var(--navy);}
     .lib-hist-scroll-outer{flex:1;overflow:auto;min-height:0;}
-    /* tile-based performance history layout */
+    /* brick-based performance history layout */
     .lh-inner{width:auto;}
     .lh-ens-header{display:grid;position:sticky;top:0;z-index:10;background:white;border-bottom:2px solid var(--grey-200);box-shadow:0 2px 0 var(--grey-200);}
     .lh-ens-col{padding:.55rem .75rem;font-size:.78rem;font-weight:700;color:var(--navy);white-space:nowrap;}
     .lh-body{padding:.5rem .5rem 1.5rem;}
     .lib-hist-year-divider{padding:1.5rem .75rem .4rem;font-size:1rem;font-weight:800;color:var(--navy);border-bottom:2px solid var(--navy);margin-bottom:.5rem;}
-    .lh-cols-row{display:grid;gap:.5rem;align-items:start;margin-bottom:.5rem;}
-    .lh-col{display:flex;flex-direction:column;gap:.5rem;min-width:0;}
-    .lh-tile{border:1.5px solid var(--grey-200);border-radius:6px;overflow:hidden;cursor:pointer;transition:border-color .12s;}
-    .lh-tile-ev:hover{border-color:#1B3A6B;}
-    .lh-tile-np:hover{border-color:#6b7280;}
-    .lh-tile-hd{background:#1B3A6B;color:white;padding:.3rem .65rem;font-size:.72rem;font-weight:700;display:flex;align-items:center;gap:.4rem;min-width:0;}
+    .lh-event-brick{border:1.5px solid var(--grey-200);border-radius:6px;overflow:hidden;margin-bottom:.4rem;}
+    .lh-np-brick{border:1.5px dashed var(--grey-300);border-radius:6px;overflow:hidden;margin-bottom:.4rem;}
+    .lh-brick-header{background:#1B3A6B;color:white;padding:.35rem .75rem;font-size:.75rem;font-weight:700;display:flex;align-items:center;gap:.5rem;cursor:pointer;min-width:0;}
+    .lh-brick-header:hover{background:#24508a;}
+    .lh-np-brick-header{background:#6b7280;color:white;padding:.35rem .75rem;font-size:.75rem;font-weight:700;}
     .lh-tile-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;}
     .lh-tile-date{flex-shrink:0;opacity:.75;white-space:nowrap;}
-    .lh-tile-hd-np{background:#6b7280;color:white;padding:.3rem .65rem;font-size:.72rem;font-weight:700;}
-    .lh-tile-body{padding:.35rem .65rem;}
-    .lh-tile-body-np{background:#fafbfc;}
+    .lh-brick-cols{display:grid;}
+    .lh-brick-col{padding:.4rem .65rem;border-right:1px solid var(--grey-100);vertical-align:top;cursor:pointer;min-width:0;}
+    .lh-brick-col:last-child{border-right:none;}
+    .lh-brick-col:hover{background:#f0f4fb;}
+    .lh-brick-col-np{background:#fafbfc;}
+    .lh-brick-col-np:hover{background:#f0f2f5;}
     /* solo-hint: when all ensembles selected, checkboxes look unchecked to hint click=solo */
     #hdd-ens[data-all-selected] .hist-chk-item input[type="checkbox"]:checked{appearance:none;-webkit-appearance:none;width:13px;height:13px;border:1.5px solid var(--grey-300);border-radius:3px;background:white;flex-shrink:0;}
     #hdd-ens[data-all-selected] .hist-chk-item:hover input[type="checkbox"]{appearance:auto;-webkit-appearance:auto;accent-color:var(--navy);}
@@ -2228,29 +2230,38 @@ function renderLibHistory(){
 
       const yearBorrows=libBorrows.filter(b=>new Date(b.date).getFullYear()===year);
 
-      const colsHTML=visibleEns.map(e=>{
-        let tiles='';
+      bodyHTML+=`<div class="lib-hist-year-divider">${year}</div>`;
 
-        // one tile per event that has pieces for this ensemble
-        yearEvents.forEach(ev=>{
-          const linkedBorrowIds=new Set(libBorrowPerfs.filter(bp=>bp.event_id===ev.id).map(bp=>bp.borrow_id));
+      // Event bricks — each event is one bordered tile spanning all ensemble columns
+      yearEvents.forEach(ev=>{
+        const linkedBorrowIds=new Set(libBorrowPerfs.filter(bp=>bp.event_id===ev.id).map(bp=>bp.borrow_id));
+        const anyHasPieces=visibleEns.some(e=>libBorrows.some(b=>String(b.ensemble_id)===String(e.id)&&linkedBorrowIds.has(b.id)));
+        if(!anyHasPieces)return;
+        const evDate=new Date(ev.date+'T00:00:00').toLocaleDateString('en-AU',{month:'short',day:'numeric'});
+        const colsHTML=visibleEns.map(e=>{
           const pieces=libBorrows
             .filter(b=>String(b.ensemble_id)===String(e.id)&&linkedBorrowIds.has(b.id))
             .map(b=>libPieces.find(p=>p.id===b.piece_id))
             .filter(Boolean)
             .sort((a,b)=>a.title.localeCompare(b.title));
-          if(!pieces.length)return;
-          const evDate=new Date(ev.date+'T00:00:00').toLocaleDateString('en-AU',{month:'short',day:'numeric'});
-          const piecesHTML=pieces.map(p=>`<div class="lib-hist-cell-piece"><span class="lib-hist-piece-title">${esc(p.title)}</span>${p.level!=null?`<span class="lib-hist-piece-level">[${p.level===99?'Prof':p.level}]</span>`:''}</div>`).join('');
-          tiles+=`<div class="lh-tile lh-tile-ev" onclick="openManageEventsModal();renderLinkPiecesView('${ev.id}');showRightPanel('${ev.id}',${year},'${e.id}')">
-            <div class="lh-tile-hd"><span class="lh-tile-name">${esc(ev.name)}</span><span class="lh-tile-date">${evDate}</span></div>
-            <div class="lh-tile-body">${piecesHTML}</div>
-          </div>`;
-        });
+          const body=pieces.length
+            ?pieces.map(p=>`<div class="lib-hist-cell-piece"><span class="lib-hist-piece-title">${esc(p.title)}</span>${p.level!=null?`<span class="lib-hist-piece-level">[${p.level===99?'Prof':p.level}]</span>`:''}</div>`).join('')
+            :`<span class="lib-hist-empty">—</span>`;
+          return`<div class="lh-brick-col" onclick="openManageEventsModal();renderLinkPiecesView('${ev.id}');showRightPanel('${ev.id}',${year},'${e.id}')">${body}</div>`;
+        }).join('');
+        bodyHTML+=`<div class="lh-event-brick">
+          <div class="lh-brick-header" onclick="openManageEventsModal();renderLinkPiecesView('${ev.id}')">
+            <span class="lh-tile-name">${esc(ev.name)}</span><span class="lh-tile-date">${evDate}</span>
+          </div>
+          <div class="lh-brick-cols" style="grid-template-columns:repeat(${n},1fr);">${colsHTML}</div>
+        </div>`;
+      });
 
-        // rehearsed but not performed tile
+      // Rehearsed but Not Performed brick
+      const rehearsedByEns={};
+      visibleEns.forEach(e=>{
         const seen=new Set();
-        const rehearsed=yearBorrows
+        rehearsedByEns[e.id]=yearBorrows
           .filter(b=>String(b.ensemble_id)===String(e.id)&&!performedBorrowIds.has(b.id))
           .filter(b=>!seen.has(b.piece_id)&&seen.add(b.piece_id))
           .map(b=>({borrow:b,piece:libPieces.find(p=>p.id===b.piece_id)}))
@@ -2261,24 +2272,24 @@ function renderLibHistory(){
             if(la!==lb)return la-lb;
             return a.piece.title.localeCompare(b.piece.title);
           });
-        if(rehearsed.length){
+      });
+      const hasAnyRehearsed=visibleEns.some(e=>rehearsedByEns[e.id]?.length>0);
+      if(hasAnyRehearsed){
+        const npColsHTML=visibleEns.map(e=>{
+          const rows=rehearsedByEns[e.id];
+          if(!rows||!rows.length)return`<div class="lh-brick-col lh-brick-col-np"><span class="lib-hist-empty">—</span></div>`;
           const tileKey=`${year}_${e.id}`;
-          window._rehTileRegistry[tileKey]=rehearsed.map(({borrow,piece})=>({id:borrow.id,date:borrow.date,title:piece.title,level:piece.level}));
-          const rHTML=rehearsed.map(({piece})=>`<div class="lib-rehearsed-piece"><span class="lib-rehearsed-piece-title">${esc(piece.title)}</span>${piece.level!=null?`<span class="lib-rehearsed-piece-level">[${piece.level===99?'Prof':piece.level}]</span>`:''}</div>`).join('');
-          tiles+=`<div class="lh-tile lh-tile-np" onclick="openBorrowTileModal('${esc(e.name)}','${tileKey}','${e.id}')">
-            <div class="lh-tile-hd-np">Rehearsed but Not Performed</div>
-            <div class="lh-tile-body lh-tile-body-np">${rHTML}</div>
-          </div>`;
-        }
-
-        return`<div class="lh-col">${tiles||''}</div>`;
-      }).join('');
-
-      bodyHTML+=`<div class="lib-hist-year-divider">${year}</div>
-        <div class="lh-cols-row" style="grid-template-columns:repeat(${n},1fr);">${colsHTML}</div>`;
+          window._rehTileRegistry[tileKey]=rows.map(({borrow,piece})=>({id:borrow.id,date:borrow.date,title:piece.title,level:piece.level}));
+          const rHTML=rows.map(({piece})=>`<div class="lib-rehearsed-piece"><span class="lib-rehearsed-piece-title">${esc(piece.title)}</span>${piece.level!=null?`<span class="lib-rehearsed-piece-level">[${piece.level===99?'Prof':piece.level}]</span>`:''}</div>`).join('');
+          return`<div class="lh-brick-col lh-brick-col-np" onclick="openBorrowTileModal('${esc(e.name)}','${tileKey}','${e.id}')">${rHTML}</div>`;
+        }).join('');
+        bodyHTML+=`<div class="lh-np-brick">
+          <div class="lh-np-brick-header">Rehearsed but Not Performed</div>
+          <div class="lh-brick-cols" style="grid-template-columns:repeat(${n},1fr);">${npColsHTML}</div>
+        </div>`;
+      }
     });
   }
-
   // build filter UI
   const yearItems=allYears.map(y=>`<label class="hist-chk-item"><input type="checkbox" ${container._hiddenYears.has(String(y))?'':'checked'} onchange="libHistToggleItem('years','${y}',this.checked)"/> ${y}</label>`).join('');
   const eventItems=libEvents.map(e=>`<label class="hist-chk-item"><input type="checkbox" ${container._hiddenEventIds.has(e.id)?'':'checked'} onchange="libHistToggleItem('eventIds','${e.id}',this.checked)"/> ${esc(e.name)}</label>`).join('');
