@@ -270,8 +270,8 @@
     .lib-hist-pivot{border-collapse:separate;border-spacing:0;width:100%;table-layout:fixed;}
     .lib-hist-pivot thead th{position:sticky;top:0;z-index:10;background:white;border-bottom:2px solid var(--grey-200);padding:.55rem .75rem .6rem;font-size:.78rem;font-weight:700;color:var(--navy);text-align:left;white-space:nowrap;box-shadow:0 2px 0 var(--grey-200);}
     .lib-hist-yr-row td{padding:1.5rem .75rem .35rem;font-size:1rem;font-weight:800;color:var(--navy);border-bottom:2px solid var(--navy);white-space:nowrap;}
-    .lib-hist-ev-row td{background:#1B3A6B;color:white;font-size:.75rem;font-weight:700;padding:.4rem .75rem;cursor:pointer;letter-spacing:.02em;}
-    .lib-hist-ev-row:hover td{background:#24508a;}
+    .lib-hist-ev-row td{background:#1B3A6B;color:white;font-size:.75rem;font-weight:700;padding:.4rem .75rem;cursor:pointer;letter-spacing:.02em;border-radius:4px;}
+    .lib-hist-ev-row:hover td[colspan]{background:#24508a;}
     .lib-hist-np-row td{background:#6b7280;color:white;font-size:.75rem;font-weight:700;padding:.4rem .75rem;letter-spacing:.02em;}
     .lib-hist-pc-row td{vertical-align:top;padding:.45rem .75rem;border-bottom:1px solid var(--grey-100);cursor:pointer;}
     .lib-hist-pc-row td:hover{background:#f0f4fb;}
@@ -2223,8 +2223,24 @@ function renderLibHistory(){
       yearEvents.forEach(ev=>{
         const linkedBorrowIds=new Set(libBorrowPerfs.filter(bp=>bp.event_id===ev.id).map(bp=>bp.borrow_id));
         const evDate=new Date(ev.date+'T00:00:00').toLocaleDateString('en-AU',{month:'short',day:'numeric'});
-        // event header row (clickable — opens manage events)
-        tableRows+=`<tr class="lib-hist-ev-row" onclick="openManageEventsModal();renderLinkPiecesView('${ev.id}')"><td colspan="${colCount}">${esc(ev.name)} · ${evDate}</td></tr>`;
+
+        // find which ensemble indices have pieces for this event
+        const ensHasPieces=visibleEns.map(e=>libBorrows.some(b=>String(b.ensemble_id)===String(e.id)&&linkedBorrowIds.has(b.id)));
+        const firstIdx=ensHasPieces.indexOf(true);
+        const lastIdx=ensHasPieces.lastIndexOf(true);
+
+        // event header: dark label spans only first→last relevant column; transparent padding cells either side
+        let evCells='';
+        if(firstIdx===-1){
+          // no pieces linked yet — span all columns but with reduced opacity
+          evCells=`<td colspan="${colCount}" onclick="openManageEventsModal();renderLinkPiecesView('${ev.id}')" style="opacity:.6;">${esc(ev.name)} · ${evDate}</td>`;
+        } else {
+          if(firstIdx>0) evCells+=`<td colspan="${firstIdx}" style="background:transparent;"></td>`;
+          evCells+=`<td colspan="${lastIdx-firstIdx+1}" onclick="openManageEventsModal();renderLinkPiecesView('${ev.id}')">${esc(ev.name)} · ${evDate}</td>`;
+          if(lastIdx<visibleEns.length-1) evCells+=`<td colspan="${visibleEns.length-lastIdx-1}" style="background:transparent;"></td>`;
+        }
+        tableRows+=`<tr class="lib-hist-ev-row">${evCells}</tr>`;
+
         // pieces row
         const pieceCells=visibleEns.map(e=>{
           const pieces=libBorrows
@@ -2330,7 +2346,7 @@ function openBorrowTileModal(ensName, tileKey, ensId){
   _borrowTileEnsId=ensId;
   document.getElementById('lib-borrow-date-modal-title').textContent=`${ensName} — Rehearsed pieces`;
 
-  const eventOpts=libEvents.map(e=>`<option value="${e.id}">${esc(e.name)} (${e.date})</option>`).join('');
+  const eventOpts=[...libEvents].sort((a,b)=>a.date.localeCompare(b.date)).map(e=>`<option value="${e.id}">${esc(e.name)} (${e.date})</option>`).join('');
 
   document.getElementById('lib-borrow-date-body').innerHTML=`
     <div style="font-size:.8rem;color:var(--grey-500);margin-bottom:.85rem;">Edit borrow dates and link pieces to a performance event.</div>
@@ -2539,9 +2555,9 @@ function openEditLibPiece(pieceId){
 function renderLibPieceForm(p=null){
   const isEdit=!!p;
   document.getElementById('lib-piece-form').innerHTML=`
-    <div class="fg"><label>Title *</label><input type="text" id="lib-title" value="${esc(p?.title||'')}" placeholder="Title" ${isEdit?'onblur="autoSaveLibPiece()"':''}/>
+    <div class="fg" style="position:relative;"><label>Title *</label><input type="text" id="lib-title" value="${esc(p?.title||'')}" placeholder="Title" ${isEdit?'onblur="autoSaveLibPiece()"':'oninput="libTitleSuggest()" onfocus="libTitleSuggest()" onblur="setTimeout(()=>{const d=document.getElementById(\'lib-title-dd\');if(d)d.remove();},200)"'}/>
     </div>
-    <div class="fg"><label>Composer</label><input type="text" id="lib-composer" value="${esc(p?.composer||'')}" placeholder="Composer / Arranger" ${isEdit?'onblur="autoSaveLibPiece()"':''}/>
+    <div class="fg" style="position:relative;"><label>Composer</label><input type="text" id="lib-composer" value="${esc(p?.composer||'')}" placeholder="Composer / Arranger" ${isEdit?'onblur="autoSaveLibPiece()"':'oninput="libComposerSuggest()" onfocus="libComposerSuggest()" onblur="setTimeout(()=>{const d=document.getElementById(\'lib-composer-dd\');if(d)d.remove();},200)"'}/>
     </div>
     <div style="margin-bottom:.4rem;">
     <button class="lib-research-toggle" id="lib-res-toggle" onclick="toggleLibResearch()" type="button">🔍 Research this piece <span class="res-chevron">▼</span></button>
@@ -2585,6 +2601,73 @@ function renderLibPieceForm(p=null){
     </div>`:'<button class="btn btn-primary" style="width:100%;justify-content:center;padding:.75rem;" onclick="submitLibPiece()">Add Piece</button>'}
   `;
 }
+
+function _libFuzzy(query,target){
+  if(!query)return true;
+  const q=query.toLowerCase();
+  const t=target.toLowerCase();
+  return q.split(/\s+/).filter(Boolean).every(w=>t.includes(w));
+}
+
+function _libSuggestDropdown(anchorId,ddId,items,onSelect){
+  const existing=document.getElementById(ddId);
+  if(existing)existing.remove();
+  if(!items.length)return;
+  const anchor=document.getElementById(anchorId);
+  if(!anchor)return;
+  const rect=anchor.getBoundingClientRect();
+  const dd=document.createElement('div');
+  dd.id=ddId;
+  dd.style.cssText=`position:fixed;z-index:99999;background:white;border:1.5px solid var(--grey-200);border-radius:var(--radius);box-shadow:0 4px 16px rgba(0,0,0,.13);min-width:${rect.width}px;max-width:520px;max-height:260px;overflow-y:auto;top:${rect.bottom+2}px;left:${rect.left}px;`;
+  items.forEach(item=>{
+    const row=document.createElement('div');
+    row.style.cssText='padding:.4rem .75rem;font-size:.82rem;cursor:pointer;border-bottom:1px solid var(--grey-100);display:flex;align-items:baseline;gap:.5rem;';
+    row.innerHTML=item.html;
+    row.onmousedown=e=>{e.preventDefault();onSelect(item);dd.remove();};
+    row.onmouseenter=()=>row.style.background='var(--grey-50)';
+    row.onmouseleave=()=>row.style.background='';
+    dd.appendChild(row);
+  });
+  document.body.appendChild(dd);
+}
+
+function libTitleSuggest(){
+  const q=(document.getElementById('lib-title')?.value||'').trim();
+  const matches=libPieces
+    .filter(p=>_libFuzzy(q,p.title))
+    .sort((a,b)=>a.title.localeCompare(b.title))
+    .slice(0,12);
+  _libSuggestDropdown('lib-title','lib-title-dd',
+    matches.map(p=>({
+      id:p.id,
+      html:`<span style="flex:1;overflow:hidden;text-overflow:ellipsis;">${p.title.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span><span style="color:var(--grey-400);font-style:italic;font-size:.72rem;flex-shrink:0;">${(p.category||'').replace(/&/g,'&amp;')}</span>`
+    })),
+    item=>{
+      closeModal('lib-piece-modal');
+      openEditLibPiece(item.id);
+    }
+  );
+}
+
+function libComposerSuggest(){
+  const q=(document.getElementById('lib-composer')?.value||'').trim();
+  if(!q){const d=document.getElementById('lib-composer-dd');if(d)d.remove();return;}
+  const seen=new Set();
+  const matches=libPieces
+    .map(p=>p.composer).filter(Boolean)
+    .filter(c=>{if(seen.has(c))return false;seen.add(c);return true;})
+    .filter(c=>_libFuzzy(q,c))
+    .sort()
+    .slice(0,8);
+  _libSuggestDropdown('lib-composer','lib-composer-dd',
+    matches.map(c=>({val:c,html:`<span>${c.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>`})),
+    item=>{
+      const inp=document.getElementById('lib-composer');
+      if(inp){inp.value=item.val;const d=document.getElementById('lib-composer-dd');if(d)d.remove();}
+    }
+  );
+}
+
 
 function toggleLibResearch(){
   const toggle=document.getElementById('lib-res-toggle');
