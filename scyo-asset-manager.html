@@ -267,16 +267,19 @@
     .lib-hist-filter-group select:focus{outline:none;border-color:var(--navy);}
     .lib-hist-scroll-outer{flex:1;overflow:auto;min-height:0;}
     /* pivot table */
-    .lib-hist-pivot{border-collapse:separate;border-spacing:0;width:100%;table-layout:fixed;}
-    .lib-hist-pivot thead th{position:sticky;top:0;z-index:10;background:white;border-bottom:2px solid var(--grey-200);padding:.55rem .75rem .6rem;font-size:.78rem;font-weight:700;color:var(--navy);text-align:left;white-space:nowrap;box-shadow:0 2px 0 var(--grey-200);}
+    .lib-hist-pivot{border-collapse:separate;border-spacing:0;width:auto;max-width:100%;table-layout:auto;}
+    .lib-hist-pivot thead th{position:sticky;top:0;z-index:10;background:white;border-bottom:2px solid var(--grey-200);padding:.55rem .75rem .6rem;font-size:.78rem;font-weight:700;color:var(--navy);text-align:left;white-space:nowrap;min-width:130px;box-shadow:0 2px 0 var(--grey-200);}
     .lib-hist-yr-row td{padding:1.5rem .75rem .35rem;font-size:1rem;font-weight:800;color:var(--navy);border-bottom:2px solid var(--navy);white-space:nowrap;}
     .lib-hist-ev-row td{background:#1B3A6B;color:white;font-size:.75rem;font-weight:700;padding:.4rem .75rem;cursor:pointer;letter-spacing:.02em;border-radius:4px;}
     .lib-hist-ev-row:hover td[colspan]{background:#24508a;}
     .lib-hist-np-row td{background:#6b7280;color:white;font-size:.75rem;font-weight:700;padding:.4rem .75rem;letter-spacing:.02em;}
-    .lib-hist-pc-row td{vertical-align:top;padding:.45rem .75rem;border-bottom:1px solid var(--grey-100);cursor:pointer;}
+    .lib-hist-pc-row td{vertical-align:top;padding:.45rem .75rem;border-bottom:1px solid var(--grey-100);cursor:pointer;min-width:130px;}
     .lib-hist-pc-row td:hover{background:#f0f4fb;}
-    .lib-hist-np-pc-row td{vertical-align:top;padding:.45rem .75rem;border-bottom:1px solid var(--grey-100);background:#fafbfc;cursor:pointer;}
+    .lib-hist-np-pc-row td{vertical-align:top;padding:.45rem .75rem;border-bottom:1px solid var(--grey-100);min-width:130px;background:#fafbfc;cursor:pointer;}
     .lib-hist-np-pc-row td:hover{background:#f0f2f5;}
+    /* solo-hint: when all ensembles selected, checkboxes look unchecked to hint click=solo */
+    #hdd-ens[data-all-selected] .hist-chk-item input[type="checkbox"]:checked{appearance:none;-webkit-appearance:none;width:13px;height:13px;border:1.5px solid var(--grey-300);border-radius:3px;background:white;flex-shrink:0;}
+    #hdd-ens[data-all-selected] .hist-chk-item:hover input[type="checkbox"]{appearance:auto;-webkit-appearance:auto;accent-color:var(--navy);}
     .lib-hist-cell-piece{font-size:.78rem;color:var(--grey-800);padding:.15rem 0;border-bottom:1px solid var(--grey-100);display:flex;align-items:baseline;gap:.25rem;min-width:0;}
     .lib-hist-cell-piece:last-child{border-bottom:none;}
     .lib-hist-piece-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;}
@@ -2246,7 +2249,8 @@ function renderLibHistory(){
           const pieces=libBorrows
             .filter(b=>String(b.ensemble_id)===String(e.id)&&linkedBorrowIds.has(b.id))
             .map(b=>libPieces.find(p=>p.id===b.piece_id))
-            .filter(Boolean);
+            .filter(Boolean)
+            .sort((a,b)=>a.title.localeCompare(b.title));
           const body=pieces.length
             ?pieces.map(p=>`<div class="lib-hist-cell-piece"><span class="lib-hist-piece-title">${esc(p.title)}</span>${p.level!=null?`<span class="lib-hist-piece-level">[${p.level===99?'Prof':p.level}]</span>`:''}</div>`).join('')
             :`<span class="lib-hist-empty">—</span>`;
@@ -2276,7 +2280,7 @@ function renderLibHistory(){
 
       const hasAnyRehearsed=visibleEns.some(e=>rehearsedByEns[e.id]?.length>0);
       if(hasAnyRehearsed){
-        tableRows+=`<tr class="lib-hist-np-row"><td colspan="${colCount}">Not performed</td></tr>`;
+        tableRows+=`<tr class="lib-hist-np-row"><td colspan="${colCount}">Rehearsed but Not Performed</td></tr>`;
         const npCells=visibleEns.map(e=>{
           const rows=rehearsedByEns[e.id];
           if(!rows||!rows.length)return`<td class="lib-hist-np-pc-row-empty"><span class="lib-hist-empty">—</span></td>`;
@@ -2294,7 +2298,9 @@ function renderLibHistory(){
   // build filter UI
   const yearItems=allYears.map(y=>`<label class="hist-chk-item"><input type="checkbox" ${container._hiddenYears.has(String(y))?'':'checked'} onchange="libHistToggleItem('years','${y}',this.checked)"/> ${y}</label>`).join('');
   const eventItems=libEvents.map(e=>`<label class="hist-chk-item"><input type="checkbox" ${container._hiddenEventIds.has(e.id)?'':'checked'} onchange="libHistToggleItem('eventIds','${e.id}',this.checked)"/> ${esc(e.name)}</label>`).join('');
-  const ensItems=ensColumns.map(e=>`<label class="hist-chk-item"><input type="checkbox" ${container._hiddenEns.has(e.id)?'':'checked'} onchange="libHistToggleEns('${e.id}',this.checked)"/> ${esc(e.name)}</label>`).join('');
+
+  const allSelected=container._hiddenEns.size===0;
+  const ensItems=ensColumns.map(e=>`<label class="hist-chk-item"><input type="checkbox" ${container._hiddenEns.has(e.id)?'':'checked'} onchange="libHistEnsClick('${e.id}')"/> ${esc(e.name)}</label>`).join('');
 
   const hiddenYearCount=container._hiddenYears.size;
   const hiddenEventCount=container._hiddenEventIds.size;
@@ -2316,7 +2322,7 @@ function renderLibHistory(){
       </div>
     </div>
     <div class="lib-hist-scroll-outer">
-      <table class="lib-hist-pivot" style="min-width:${Math.max(visibleEns.length,1)*140}px;">
+      <table class="lib-hist-pivot" style="min-width:${Math.max(visibleEns.length,1)*130}px;">
         <thead><tr>${ensHeaderCells||`<th style="color:var(--grey-400);font-weight:400;">No ensembles visible</th>`}</tr></thead>
         <tbody>${tableRows}</tbody>
       </table>
@@ -2326,7 +2332,10 @@ function renderLibHistory(){
   const panelYear=document.createElement('div');panelYear.className='hist-chk-panel';panelYear.id='hdd-year';panelYear.innerHTML=yearItems||'<span style="color:var(--grey-400);font-size:.8rem;padding:.5rem .75rem;display:block;">No data yet</span>';document.body.appendChild(panelYear);
   const panelEvent=document.createElement('div');panelEvent.className='hist-chk-panel';panelEvent.id='hdd-event';panelEvent.innerHTML=eventItems||'<span style="color:var(--grey-400);font-size:.8rem;padding:.5rem .75rem;display:block;">No events yet</span>';document.body.appendChild(panelEvent);
   const panelEns=document.createElement('div');panelEns.className='hist-chk-panel';panelEns.id='hdd-ens';
-  panelEns.innerHTML=ensItems+`<div style="border-top:1px solid var(--grey-100);margin-top:.3rem;padding-top:.3rem;"><button onclick="openManageEnsembles();document.querySelectorAll('.hist-chk-panel').forEach(p=>p.classList.remove('open'));" style="font-family:'Inter',sans-serif;font-size:.78rem;color:var(--grey-500);background:none;border:none;cursor:pointer;padding:.35rem .75rem;width:100%;text-align:left;">⚙ Manage ensembles</button></div>`;
+  if(allSelected) panelEns.setAttribute('data-all-selected','');
+  const selectAllRow=!allSelected?`<div style="padding:.3rem .75rem .4rem;border-bottom:1px solid var(--grey-100);"><button onclick="libHistEnsSelectAll()" style="font-family:'Inter',sans-serif;font-size:.78rem;font-weight:700;color:var(--navy);background:none;border:none;cursor:pointer;padding:0;">✓ Select all</button></div>`:'';
+  const hintRow=allSelected?`<div style="font-size:.68rem;color:var(--grey-400);padding:.3rem .75rem .1rem;font-style:italic;">Click to view only</div>`:'';
+  panelEns.innerHTML=hintRow+ensItems+`<div style="border-top:1px solid var(--grey-100);margin-top:.3rem;padding-top:.3rem;">${selectAllRow}<button onclick="openManageEnsembles();document.querySelectorAll('.hist-chk-panel').forEach(p=>p.classList.remove('open'));" style="font-family:'Inter',sans-serif;font-size:.78rem;color:var(--grey-500);background:none;border:none;cursor:pointer;padding:.35rem .75rem;width:100%;text-align:left;">⚙ Manage ensembles</button></div>`;
   document.body.appendChild(panelEns);
 }
 
@@ -2495,12 +2504,28 @@ function libHistToggleItem(type,value,checked){
   renderLibHistory();
 }
 
-function libHistToggleEns(ensId,checked){
+function libHistEnsClick(ensId){
   const container=document.getElementById('lib-history');
   if(!container._hiddenEns) container._hiddenEns=new Set();
-  if(checked) container._hiddenEns.delete(ensId);
-  else container._hiddenEns.add(ensId);
+  if(container._hiddenEns.size===0){
+    // all visible → solo: hide everything except this one
+    const ensIdSet=new Set(libBorrows.map(b=>b.ensemble_id));
+    libEnsembles.filter(e=>ensIdSet.has(e.id)&&!e.name.toLowerCase().startsWith('external'))
+      .forEach(e=>{if(String(e.id)!==String(ensId)) container._hiddenEns.add(e.id);});
+  } else {
+    // partial → normal toggle
+    if(container._hiddenEns.has(ensId)) container._hiddenEns.delete(ensId);
+    else container._hiddenEns.add(ensId);
+  }
   renderLibHistory();
+  setTimeout(()=>toggleHistDropdown('hdd-ens'),0);
+}
+
+function libHistEnsSelectAll(){
+  const container=document.getElementById('lib-history');
+  if(container._hiddenEns) container._hiddenEns.clear();
+  renderLibHistory();
+  setTimeout(()=>toggleHistDropdown('hdd-ens'),0);
 }
 
 
