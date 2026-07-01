@@ -2054,10 +2054,7 @@ function renderLibCatalogue(){
 
   filtered=[...filtered].sort((a,b)=>{
     if(libShuffled){
-      // stable shuffle stored on each piece temporarily
-      if(a.__shuffleKey===undefined)a.__shuffleKey=Math.random();
-      if(b.__shuffleKey===undefined)b.__shuffleKey=Math.random();
-      return a.__shuffleKey-b.__shuffleKey;
+      return(a.__shuffleKey||0)-(b.__shuffleKey||0);
     }
     let av,bv;
     if(libSortCol==='title'){av=a.title.toLowerCase();bv=b.title.toLowerCase();}
@@ -2384,7 +2381,7 @@ function libResearch(type){
   const qEnc=encodeURIComponent(raw);
   const urls={
     img:`https://www.google.com/search?q=${qEnc}&tbm=isch`,
-    grade:`https://www.google.com/search?q=${qEnc}+grade+level+sheet+music`,
+    grade:`https://www.google.com/search?q=${qEnc}+%22level%22`,
     yt:`https://www.youtube.com/results?search_query=${qPlus}+sheet+music`,
     jwp:`https://www.jwpepper.com/s?q=${qPlus}&fuzzy=0&operator=and&facets=fuzzy%2Coperator&sort=score_desc&page=0`,
     hl:`https://www.halleonard.com/search/search.action?keywords=${qPlus}`,
