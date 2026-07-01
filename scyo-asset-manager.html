@@ -2403,6 +2403,7 @@ async function deleteBorrowFromTile(borrowId){
 
 async function linkBorrowToEvent(rowIdx){
   const borrowId=_borrowDateModalRows[rowIdx]?.id;
+  const eventId=document.getElementById(`bdm-event-${rowIdx}`)?.value;
   if(!borrowId||!eventId){showToast('Select an event first');return;}
   // check not already linked
   const already=libBorrowPerfs.some(bp=>bp.borrow_id===borrowId&&bp.event_id===eventId);
