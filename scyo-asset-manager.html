@@ -255,7 +255,7 @@
     .hist-chk-btn:hover{border-color:var(--navy);}
     .hist-chk-btn.hist-chk-active{border-color:var(--navy);background:#eef2f8;}
     .hist-chk-badge{background:var(--navy);color:white;font-size:.65rem;font-weight:700;border-radius:10px;padding:.05rem .35rem;}
-    .hist-chk-panel{display:none;position:fixed;background:white;border:1.5px solid var(--grey-200);border-radius:var(--radius);box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:99999;min-width:180px;padding:.4rem 0;max-height:320px;overflow-y:auto;}
+    .hist-chk-panel{display:none;position:absolute;background:white;border:1.5px solid var(--grey-200);border-radius:var(--radius);box-shadow:0 4px 16px rgba(0,0,0,.15);z-index:99999;min-width:180px;padding:.4rem 0;max-height:320px;overflow-y:auto;}
     .hist-chk-panel.open{display:block;}
     .hist-chk-item{display:flex;align-items:center;gap:.5rem;padding:.35rem .75rem;font-size:.82rem;color:var(--grey-800);cursor:pointer;white-space:nowrap;}
     .hist-chk-item:hover{background:var(--grey-50);}
@@ -2382,26 +2382,29 @@ function renderLibHistory(){
   container.innerHTML=`
     <div class="lib-hist-filters">
       <div class="hist-chk-dropdown">
-        <button class="hist-chk-btn${hiddenYearCount?' hist-chk-active':''}" onclick="toggleHistDropdown('hdd-year')">
+        <button id="hdd-year-btn" class="hist-chk-btn${hiddenYearCount?' hist-chk-active':''}" onclick="toggleHistDropdown('hdd-year')">
           Year${hiddenYearCount?` <span class="hist-chk-badge">${allYears.length-hiddenYearCount}/${allYears.length}</span>`:''} ▾
         </button>
-        <div class="hist-chk-panel" id="hdd-year">${yearItems||'<span style="color:var(--grey-400);font-size:.8rem;">No data yet</span>'}</div>
       </div>
       <div class="hist-chk-dropdown">
-        <button class="hist-chk-btn${hiddenEventCount?' hist-chk-active':''}" onclick="toggleHistDropdown('hdd-event')">
+        <button id="hdd-event-btn" class="hist-chk-btn${hiddenEventCount?' hist-chk-active':''}" onclick="toggleHistDropdown('hdd-event')">
           Event type${hiddenEventCount?` <span class="hist-chk-badge">${allEventTypes.length-hiddenEventCount}/${allEventTypes.length}</span>`:''} ▾
         </button>
-        <div class="hist-chk-panel" id="hdd-event">${eventItems||'<span style="color:var(--grey-400);font-size:.8rem;">No data yet</span>'}</div>
       </div>
       <div class="hist-chk-dropdown">
-        <button class="hist-chk-btn${hiddenEnsCount?' hist-chk-active':''}" onclick="toggleHistDropdown('hdd-ens')">
+        <button id="hdd-ens-btn" class="hist-chk-btn${hiddenEnsCount?' hist-chk-active':''}" onclick="toggleHistDropdown('hdd-ens')">
           Ensemble${hiddenEnsCount?` <span class="hist-chk-badge">${ensColumns.length-hiddenEnsCount}/${ensColumns.length}</span>`:''} ▾
         </button>
-        <div class="hist-chk-panel" id="hdd-ens">${ensItems}</div>
       </div>
     </div>
     <div class="lib-hist-body">${bodyHTML}</div>
   `;
+
+  // inject panels into body so they escape stacking contexts
+  ['hdd-year','hdd-event','hdd-ens'].forEach(id=>{ const el=document.getElementById(id); if(el) el.remove(); });
+  const panelYear=document.createElement('div'); panelYear.className='hist-chk-panel'; panelYear.id='hdd-year'; panelYear.innerHTML=yearItems||'<span style="color:var(--grey-400);font-size:.8rem;padding:.5rem .75rem;display:block;">No data yet</span>'; document.body.appendChild(panelYear);
+  const panelEvent=document.createElement('div'); panelEvent.className='hist-chk-panel'; panelEvent.id='hdd-event'; panelEvent.innerHTML=eventItems||'<span style="color:var(--grey-400);font-size:.8rem;padding:.5rem .75rem;display:block;">No data yet</span>'; document.body.appendChild(panelEvent);
+  const panelEns=document.createElement('div'); panelEns.className='hist-chk-panel'; panelEns.id='hdd-ens'; panelEns.innerHTML=ensItems; document.body.appendChild(panelEns);
 }
 
 let _borrowDateModalRows=[];
@@ -2456,17 +2459,16 @@ document.getElementById('lib-borrow-date-modal')?.addEventListener('click',e=>{i
 
 
 function toggleHistDropdown(id){
+  // close all
+  document.querySelectorAll('.hist-chk-panel').forEach(p=>p.classList.remove('open'));
   const panel=document.getElementById(id);
   if(!panel)return;
-  const isOpen=panel.classList.contains('open');
-  document.querySelectorAll('.hist-chk-panel').forEach(p=>p.classList.remove('open'));
-  if(!isOpen){
-    const btn=panel.previousElementSibling;
-    const rect=btn.getBoundingClientRect();
-    panel.style.top=(rect.bottom+4)+'px';
-    panel.style.left=rect.left+'px';
-    panel.classList.add('open');
-  }
+  const btn=document.getElementById(id+'-btn');
+  if(!btn)return;
+  const rect=btn.getBoundingClientRect();
+  panel.style.top=(rect.bottom+window.scrollY+4)+'px';
+  panel.style.left=(rect.left+window.scrollX)+'px';
+  panel.classList.add('open');
 }
 
 // close dropdowns when clicking outside
