@@ -273,7 +273,8 @@
     .lib-hist-ev-row td{background:#1B3A6B;color:white;font-size:.75rem;font-weight:700;padding:.4rem .75rem;cursor:pointer;letter-spacing:.02em;}
     .lib-hist-ev-row:hover td{background:#24508a;}
     .lib-hist-np-row td{background:#6b7280;color:white;font-size:.75rem;font-weight:700;padding:.4rem .75rem;letter-spacing:.02em;}
-    .lib-hist-pc-row td{vertical-align:top;padding:.45rem .75rem;border-bottom:1px solid var(--grey-100);}
+    .lib-hist-pc-row td{vertical-align:top;padding:.45rem .75rem;border-bottom:1px solid var(--grey-100);cursor:pointer;}
+    .lib-hist-pc-row td:hover{background:#f0f4fb;}
     .lib-hist-np-pc-row td{vertical-align:top;padding:.45rem .75rem;border-bottom:1px solid var(--grey-100);background:#fafbfc;cursor:pointer;}
     .lib-hist-np-pc-row td:hover{background:#f0f2f5;}
     .lib-hist-cell-piece{font-size:.78rem;color:var(--grey-800);padding:.15rem 0;border-bottom:1px solid var(--grey-100);display:flex;align-items:baseline;gap:.25rem;min-width:0;}
@@ -2233,7 +2234,7 @@ function renderLibHistory(){
           const body=pieces.length
             ?pieces.map(p=>`<div class="lib-hist-cell-piece"><span class="lib-hist-piece-title">${esc(p.title)}</span>${p.level!=null?`<span class="lib-hist-piece-level">[${p.level===99?'Prof':p.level}]</span>`:''}</div>`).join('')
             :`<span class="lib-hist-empty">—</span>`;
-          return`<td>${body}</td>`;
+          return`<td onclick="openManageEventsModal();renderLinkPiecesView('${ev.id}');showRightPanel('${ev.id}',${eventYear},'${e.id}')">${body}</td>`;
         }).join('');
         tableRows+=`<tr class="lib-hist-pc-row">${pieceCells}</tr>`;
       });
@@ -2359,7 +2360,6 @@ function openBorrowTileModal(ensName, tileKey, ensId){
                   <option value="">Link to event…</option>
                   ${eventOpts}
                 </select>
-                <button class="btn btn-ghost btn-sm" style="padding:.2rem .5rem;font-size:.72rem;" onclick="linkBorrowToEvent(${i})">Link</button>
                 ${linkedEventIds.length?`<button class="btn btn-ghost btn-sm" style="padding:.2rem .5rem;font-size:.72rem;color:var(--danger);" onclick="unlinkBorrowFromEvents(${i})">Unlink</button>`:''}
               </div>
             </td>
@@ -2418,17 +2418,28 @@ async function saveBorrowDateModal(){
   const btn=document.querySelector('#lib-borrow-date-modal .btn-primary');
   if(btn){btn.textContent='Saving…';btn.disabled=true;}
   for(let i=0;i<_borrowDateModalRows.length;i++){
+    const row=_borrowDateModalRows[i];
+    // save updated borrow date
     const newDate=document.getElementById(`bdm-date-${i}`)?.value;
-    if(newDate&&newDate!==_borrowDateModalRows[i].date){
+    if(newDate&&newDate!==row.date){
       await db.from('library_borrows')
         .update({date:newDate,updated_at:new Date().toISOString(),updated_by:currentUser?.email||null})
-        .eq('id',_borrowDateModalRows[i].id);
+        .eq('id',row.id);
+    }
+    // link to event if selected
+    const eventId=document.getElementById(`bdm-event-${i}`)?.value;
+    if(eventId){
+      const already=libBorrowPerfs.some(bp=>bp.borrow_id===row.id&&bp.event_id===eventId);
+      if(!already){
+        await db.from('library_borrow_performances').insert({borrow_id:row.id,event_id:eventId});
+      }
     }
   }
   if(btn){btn.textContent='Save changes';btn.disabled=false;}
   closeModal('lib-borrow-date-modal');
   await loadLibData();
-  showToast('Dates updated ✓');
+  renderLibHistory();
+  showToast('Saved ✓');
 }
 
 document.getElementById('lib-borrow-date-modal')?.addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal('lib-borrow-date-modal');});
@@ -2879,7 +2890,7 @@ function renderLinkPiecesView(eventId){
       return`<div style="margin-bottom:.85rem;border:1.5px solid var(--grey-200);border-radius:var(--radius);overflow:hidden;">
         <div style="background:#1B3A6B;color:white;padding:.4rem .75rem;display:flex;align-items:center;justify-content:space-between;">
           <span style="font-size:.78rem;font-weight:700;letter-spacing:.04em;">${esc(ensName)}</span>
-          <button onclick="showRightPanel('${eventId}',${eventYear},'${ensId}');renderBorrowAndLinkForm('${eventId}','${ensId}')" style="background:rgba(255,255,255,.15);border:none;color:white;font-size:.7rem;font-weight:600;padding:.15rem .5rem;border-radius:3px;cursor:pointer;">+ Add piece</button>
+          <button onclick="showRightPanel('${eventId}',${eventYear},'${ensId}')" style="background:rgba(255,255,255,.15);border:none;color:white;font-size:.7rem;font-weight:600;padding:.15rem .5rem;border-radius:3px;cursor:pointer;">+ Add piece</button>
         </div>
         <div style="padding:.35rem .65rem;">
           ${pieces.map(({borrow,piece})=>`
@@ -3090,7 +3101,7 @@ function refreshLinkedPiecesLeft(eventId){
       return`<div style="margin-bottom:.85rem;border:1.5px solid var(--grey-200);border-radius:var(--radius);overflow:hidden;">
         <div style="background:#1B3A6B;color:white;padding:.4rem .75rem;display:flex;align-items:center;justify-content:space-between;">
           <span style="font-size:.78rem;font-weight:700;letter-spacing:.04em;">${esc(ensName)}</span>
-          <button onclick="showRightPanel('${eventId}',${eventYear},'${ensId}');renderBorrowAndLinkForm('${eventId}','${ensId}')" style="background:rgba(255,255,255,.15);border:none;color:white;font-size:.7rem;font-weight:600;padding:.15rem .5rem;border-radius:3px;cursor:pointer;">+ Add piece</button>
+          <button onclick="showRightPanel('${eventId}',${eventYear},'${ensId}')" style="background:rgba(255,255,255,.15);border:none;color:white;font-size:.7rem;font-weight:600;padding:.15rem .5rem;border-radius:3px;cursor:pointer;">+ Add piece</button>
         </div>
         <div style="padding:.35rem .65rem;">
           ${pieces.map(({borrow,piece})=>`
