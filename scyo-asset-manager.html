@@ -2545,8 +2545,28 @@ async function submitLibBorrow(){
 function openLibPerfModal(pieceId){
   libDetailPieceId=pieceId;
   const p=libPieces.find(pc=>pc.id===pieceId);
+  // find existing borrows for this piece
+  const borrows=libBorrows.filter(b=>b.piece_id===pieceId);
+  const borrowOpts=borrows.length
+    ? borrows.map(b=>{
+        const ens=libEnsembles.find(e=>e.id===b.ensemble_id);
+        return`<option value="${b.id}" data-ensemble="${b.ensemble_id}">${esc(ens?.name||'Unknown')} — borrowed ${b.date}</option>`;
+      }).join('')
+    : '';
+  const borrowSection=borrows.length
+    ? `<div class="fg">
+        <label>Link to borrow</label>
+        <select id="lib-perf-borrow-id" onchange="libPerfBorrowChanged()">
+          <option value="">No existing borrow — create one</option>
+          ${borrowOpts}
+        </select>
+        <div style="font-size:.72rem;color:var(--grey-400);margin-top:.25rem;">Linking a borrow marks this piece as performed from that rehearsal period.</div>
+      </div>`
+    : `<div style="font-size:.78rem;color:var(--grey-400);padding:.4rem .6rem;background:var(--grey-50);border-radius:var(--radius);margin-bottom:.25rem;">No existing borrow found — a borrow will be created automatically.</div>`;
+
   document.getElementById('lib-perf-form').innerHTML=`
     <div style="font-size:.85rem;font-weight:600;color:var(--navy);margin-bottom:.75rem;">${esc(p?.title||'')}</div>
+    ${borrowSection}
     <div class="fg"><label>Ensemble *</label>
       <div style="display:flex;gap:.5rem;">
         <select id="lib-perf-ensemble" style="flex:1;"><option value="">Select ensemble…</option>${libEnsembles.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('')}</select>
@@ -2558,7 +2578,22 @@ function openLibPerfModal(pieceId){
     <div class="fg" id="lib-workshop-name-wrap" style="display:none;"><label>Workshop Name *</label><input type="text" id="lib-workshop-name" placeholder="e.g. String Workshop"/></div>
     <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="submitLibPerformance()">Log Performance</button>
   `;
+  // if borrows exist, pre-select the first one and pre-fill ensemble
+  if(borrows.length) libPerfBorrowChanged();
   document.getElementById('lib-perf-modal').classList.add('open');
+}
+
+function libPerfBorrowChanged(){
+  const sel=document.getElementById('lib-perf-borrow-id');
+  if(!sel)return;
+  const ensId=sel.selectedOptions[0]?.dataset?.ensemble;
+  const ensSelect=document.getElementById('lib-perf-ensemble');
+  if(ensId&&ensSelect){
+    ensSelect.value=ensId;
+    ensSelect.closest('.fg').style.display=sel.value?'none':'block';
+  } else {
+    if(ensSelect)ensSelect.closest('.fg').style.display='block';
+  }
 }
 
 function toggleWorkshopName(){
@@ -2568,15 +2603,42 @@ function toggleWorkshopName(){
 }
 
 async function submitLibPerformance(){
-  const ensembleId=document.getElementById('lib-perf-ensemble').value;
   const date=document.getElementById('lib-perf-date').value;
   const eventType=document.getElementById('lib-perf-event-type').value;
   const workshopName=document.getElementById('lib-workshop-name')?.value.trim()||null;
-  if(!ensembleId){showToast('Select an ensemble');return;}
   if(!date){showToast('Date required');return;}
   if(!eventType){showToast('Event type required');return;}
   if(eventType==='Workshop'&&!workshopName){showToast('Workshop name required');return;}
-  await db.from('library_performances').insert({piece_id:libDetailPieceId,ensemble_id:ensembleId,date,event_type:eventType,workshop_name:workshopName});
+
+  // resolve borrow linkage
+  const borrowSel=document.getElementById('lib-perf-borrow-id');
+  let borrowId=borrowSel?.value||null;
+  let ensembleId;
+
+  if(borrowId){
+    // linked to existing borrow — use that borrow's ensemble
+    const borrow=libBorrows.find(b=>b.id===borrowId);
+    ensembleId=borrow?.ensemble_id;
+  } else {
+    // no borrow selected — use ensemble dropdown
+    ensembleId=document.getElementById('lib-perf-ensemble')?.value;
+    if(!ensembleId){showToast('Select an ensemble');return;}
+    // create the borrow automatically
+    const{data:newBorrow,error:borrowErr}=await db.from('library_borrows')
+      .insert({piece_id:libDetailPieceId,ensemble_id:ensembleId,date})
+      .select().single();
+    if(borrowErr){showToast('Error creating borrow: '+borrowErr.message);return;}
+    borrowId=newBorrow?.id||null;
+  }
+
+  await db.from('library_performances').insert({
+    piece_id:libDetailPieceId,
+    ensemble_id:ensembleId,
+    date,
+    event_type:eventType,
+    workshop_name:workshopName,
+    borrow_id:borrowId
+  });
   closeModal('lib-perf-modal');
   await loadLibData();
   if(libEditPieceId===libDetailPieceId)renderLibPieceHistory(libEditPieceId);
