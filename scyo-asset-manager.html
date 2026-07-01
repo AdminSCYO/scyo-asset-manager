@@ -267,7 +267,7 @@
     .lib-hist-filter-group select:focus{outline:none;border-color:var(--navy);}
     .lib-hist-scroll-outer{flex:1;overflow:auto;min-height:0;}
     /* pivot table */
-    .lib-hist-pivot{border-collapse:separate;border-spacing:0;width:100%;table-layout:fixed;}
+    .lib-hist-pivot{border-collapse:separate;border-spacing:0;table-layout:auto;}
     .lib-hist-pivot thead th{position:sticky;top:0;z-index:10;background:white;border-bottom:2px solid var(--grey-200);padding:.55rem .75rem .6rem;font-size:.78rem;font-weight:700;color:var(--navy);text-align:left;white-space:nowrap;box-shadow:0 2px 0 var(--grey-200);}
     .lib-hist-yr-row td{padding:1.5rem .75rem .35rem;font-size:1rem;font-weight:800;color:var(--navy);border-bottom:2px solid var(--navy);}
     .lib-hist-ev-row td{background:#1B3A6B;color:white;font-size:.75rem;font-weight:700;padding:.4rem .75rem;cursor:pointer;letter-spacing:.02em;border-radius:4px;}
@@ -2323,12 +2323,10 @@ function renderLibHistory(){
       </div>
     </div>
     <div class="lib-hist-scroll-outer">
-      <div style="width:fit-content;max-width:100%;min-width:${Math.max(visibleEns.length,1)*130}px;">
-        <table class="lib-hist-pivot" style="width:100%;min-width:${Math.max(visibleEns.length,1)*130}px;">
-          <thead><tr>${ensHeaderCells||`<th style="color:var(--grey-400);font-weight:400;">No ensembles visible</th>`}</tr></thead>
-          <tbody>${tableRows}</tbody>
-        </table>
-      </div>
+      <table class="lib-hist-pivot" style="min-width:${Math.max(visibleEns.length,1)*130}px;">
+        <thead><tr>${ensHeaderCells||`<th style="color:var(--grey-400);font-weight:400;">No ensembles visible</th>`}</tr></thead>
+        <tbody>${tableRows}</tbody>
+      </table>
     </div>
   `;
   ['hdd-year','hdd-event','hdd-ens'].forEach(id=>{const el=document.getElementById(id);if(el)el.remove();});
@@ -2340,6 +2338,20 @@ function renderLibHistory(){
   const hintRow=allSelected?`<div style="font-size:.68rem;color:var(--grey-400);padding:.3rem .75rem .1rem;font-style:italic;">Click to view only</div>`:'';
   panelEns.innerHTML=hintRow+ensItems+`<div style="border-top:1px solid var(--grey-100);margin-top:.3rem;padding-top:.3rem;">${selectAllRow}<button onclick="openManageEnsembles();document.querySelectorAll('.hist-chk-panel').forEach(p=>p.classList.remove('open'));" style="font-family:'Inter',sans-serif;font-size:.78rem;color:var(--grey-500);background:none;border:none;cursor:pointer;padding:.35rem .75rem;width:100%;text-align:left;">⚙ Manage ensembles</button></div>`;
   document.body.appendChild(panelEns);
+
+  // Two-pass sizing: if natural content width < container, keep auto (content-fit columns);
+  // if wider, switch to fixed+100% so columns divide the space equally and scroll kicks in.
+  requestAnimationFrame(()=>{
+    const outer=container.querySelector('.lib-hist-scroll-outer');
+    const tbl=container.querySelector('.lib-hist-pivot');
+    if(!outer||!tbl)return;
+    const naturalW=tbl.scrollWidth;
+    const availW=outer.clientWidth;
+    if(naturalW>=availW){
+      tbl.style.tableLayout='fixed';
+      tbl.style.width='100%';
+    }
+  });
 }
 
   // --- build filter bar HTML ---
