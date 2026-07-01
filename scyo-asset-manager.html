@@ -601,7 +601,7 @@
     </div>
     <div class="modal-body">
       <div class="modal-fields" style="overflow-y:auto;" id="lib-piece-form"></div>
-      <div id="lib-piece-history-panel" style="width:280px;padding:1.25rem;overflow-y:auto;background:var(--grey-50);border-left:1px solid var(--grey-100);display:none;">
+      <div id="lib-piece-history-panel" style="width:360px;padding:1.25rem;overflow-y:auto;background:var(--grey-50);border-left:1px solid var(--grey-100);display:none;">
         <div class="hist-title">History</div>
         <div id="lib-piece-history"></div>
       </div>
@@ -2137,9 +2137,9 @@ function renderLibCatalogue(){
   const show=id=>!libHiddenCols.has(id);
 
   const rows=filtered.map(p=>{
-    const borrows=libBorrows.filter(br=>br.piece_id===p.id).length;
-    const performedBorrowIds=new Set(libBorrowPerfs.map(bp=>bp.borrow_id));
-    const perfs=libBorrows.filter(br=>br.piece_id===p.id&&performedBorrowIds.has(br.id)).length;
+    const pieceBorrowIds=new Set(libBorrows.filter(br=>br.piece_id===p.id).map(br=>br.id));
+    const borrows=pieceBorrowIds.size;
+    const perfs=libBorrowPerfs.filter(bp=>pieceBorrowIds.has(bp.borrow_id)).length;
     const playBtn=p.external_link?`<a class="lib-play-btn" href="${esc(p.external_link)}" target="_blank" onclick="event.stopPropagation()">▶ Play</a>`:'';
     return`<tr class="lib-piece-row" onclick="openEditLibPiece('${p.id}')">
       <td class="lib-title-cell"><div class="lib-piece-title">${esc(p.title)}${!p.owned?'<span class="lib-not-owned">Not owned</span>':''}${playBtn}</div></td>
@@ -2833,8 +2833,8 @@ function openLibDetail(pieceId){
   if(!p)return;
   document.getElementById('lib-detail-title').textContent=p.title;
   const borrows=libBorrows.filter(b=>b.piece_id===pieceId);
-  const performedBorrowIds=new Set(libBorrowPerfs.map(bp=>bp.borrow_id));
-  const perfCount=borrows.filter(b=>performedBorrowIds.has(b.id)).length;
+  const borrowIds=new Set(borrows.map(b=>b.id));
+  const perfCount=libBorrowPerfs.filter(bp=>borrowIds.has(bp.borrow_id)).length;
   document.getElementById('lib-detail-fields').innerHTML=`
     <div class="field-row"><div class="field-label">Title</div><div class="field-val">${p.external_link?`<a href="${esc(p.external_link)}" target="_blank" style="color:var(--navy);">${esc(p.title)}</a>`:esc(p.title)}</div></div>
     <div class="field-row"><div class="field-label">Composer</div><div class="field-val">${esc(p.composer||'—')}</div></div>
