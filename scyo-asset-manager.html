@@ -2207,12 +2207,21 @@ function renderLibHistory(){
   // read current filter values (or default to 'all')
   const selYear=container._fYear||'all';
   const selEvent=container._fEvent||'all';
-  const selEns=container._fEns||'all';
 
   // --- build filter bar HTML ---
   const yearOpts=`<option value="all">All years</option>`+allYears.map(y=>`<option value="${y}"${selYear==y?'selected':''}>${y}</option>`).join('');
   const eventOpts=`<option value="all">All events</option>`+allEventTypes.map(t=>`<option value="${t}"${selEvent===t?'selected':''}>${esc(t)}</option>`).join('');
-  const ensOpts=`<option value="all">All ensembles</option>`+libEnsembles.filter(e=>!e.name.toLowerCase().startsWith('external')).map(e=>`<option value="${e.id}"${selEns==e.id?'selected':''}>${esc(e.name)}</option>`).join('');
+  // ensemble checkboxes — persist hidden set on container
+  if(!container._hiddenEns) container._hiddenEns=new Set();
+  const ensCheckboxes=ensColumns.map(e=>`
+    <label style="display:flex;align-items:center;gap:.3rem;font-size:.8rem;color:var(--grey-700);cursor:pointer;white-space:nowrap;">
+      <input type="checkbox" ${container._hiddenEns.has(e.id)?'':'checked'}
+        onchange="libHistToggleEns('${e.id}',this.checked)" style="accent-color:var(--navy);"/>
+      ${esc(e.name)}
+    </label>`).join('');
+
+  // apply ensemble visibility to columns
+  const visibleEns=ensColumns.filter(e=>!container._hiddenEns.has(e.id));
 
   // --- filter data ---
   let perfs=libPerformances;
@@ -2223,11 +2232,6 @@ function renderLibHistory(){
     borrows=borrows.filter(b=>new Date(b.date).getFullYear()===y);
   }
   if(selEvent!=='all') perfs=perfs.filter(p=>p.event_type===selEvent);
-  if(selEns!=='all'){
-    const eid=selEns;
-    perfs=perfs.filter(p=>String(p.ensemble_id)===String(eid));
-    borrows=borrows.filter(b=>String(b.ensemble_id)===String(eid));
-  }
 
   // --- determine ensemble columns (from both perfs and borrows, always all ensembles with data across ALL years not just filtered) ---
   const ensIdSet=new Set([...libPerformances.map(p=>p.ensemble_id),...libBorrows.map(b=>b.ensemble_id)]);
@@ -2266,13 +2270,13 @@ function renderLibHistory(){
       // grid: only render if there are performances
       let gridHTML='';
       if(events.length && ensColumns.length){
-        const headerCells=ensColumns.map(e=>`<th>${esc(e.name)}</th>`).join('');
+        const headerCells=visibleEns.map(e=>`<th>${esc(e.name)}</th>`).join('');
         const rows=events.map(ev=>{
-          const eventLabel=ev.event_type==='Workshop'
-            ?`Workshop${ev.workshop_name?` — ${ev.workshop_name}`:''}`
+          const eventLabel=(ev.event_type==='Workshop'||ev.event_type==='Concert')
+            ?`${ev.event_type}${ev.workshop_name?` — ${ev.workshop_name}`:''}`
             :ev.event_type;
           const dateStr=new Date(ev.date+'T00:00:00').toLocaleDateString('en-AU',{month:'short',day:'numeric'});
-          const cells=ensColumns.map(e=>{
+          const cells=visibleEns.map(e=>{
             const pieces=ev.cells[e.id]||[];
             const inner=pieces.length
               ?pieces.map(p=>`<div class="lib-hist-cell-piece">${esc(p?.title||'Unknown')}${p?.level!=null?`<span style="color:var(--grey-400);font-style:italic;font-size:.7rem;"> [${p.level===99?'Prof':p.level}]</span>`:''}</div>`).join('')
@@ -2316,7 +2320,7 @@ function renderLibHistory(){
         rehearsedByEns[e.id]=borrows;
       });
 
-      const hasAnyRehearsed=ensColumns.some(e=>rehearsedByEns[e.id].length>0);
+      const hasAnyRehearsed=visibleEns.some(e=>rehearsedByEns[e.id]?.length>0);
       const rehearsedBlock=hasAnyRehearsed?`
         <div class="lib-rehearsed-block">
           <div class="lib-rehearsed-title">Rehearsed but not performed</div>
@@ -2324,11 +2328,11 @@ function renderLibHistory(){
             <table class="lib-hist-grid">
               <thead><tr>
                 <th class="col-event"></th>
-                ${ensColumns.map(e=>`<th>${esc(e.name)}</th>`).join('')}
+                ${visibleEns.map(e=>`<th>${esc(e.name)}</th>`).join('')}
               </tr></thead>
               <tbody><tr>
                 <td class="cell-event" style="color:var(--grey-400);font-size:.72rem;font-style:italic;">Not performed</td>
-                ${ensColumns.map(e=>{
+                ${visibleEns.map(e=>{
                   const rows=rehearsedByEns[e.id];
                   if(!rows.length)return`<td><div class="lib-hist-cell" style="border-style:dashed;"><span class="lib-hist-empty">—</span></div></td>`;
                   const tileKey=`${year}_${e.id}`;
@@ -2355,16 +2359,16 @@ function renderLibHistory(){
   container.innerHTML=`
     <div class="lib-hist-filters">
       <div class="lib-hist-filter-group">
-        <div class="lib-hist-filter-label">Filter</div>
+        <div class="lib-hist-filter-label">Year</div>
         <select onchange="libHistSetFilter('year',this.value)">${yearOpts}</select>
       </div>
       <div class="lib-hist-filter-group">
-        <div class="lib-hist-filter-label">Filter</div>
+        <div class="lib-hist-filter-label">Event type</div>
         <select onchange="libHistSetFilter('event',this.value)">${eventOpts}</select>
       </div>
-      <div class="lib-hist-filter-group">
-        <div class="lib-hist-filter-label">Filter</div>
-        <select onchange="libHistSetFilter('ens',this.value)">${ensOpts}</select>
+      <div style="display:flex;flex-direction:column;gap:.2rem;">
+        <div class="lib-hist-filter-label">Ensembles</div>
+        <div style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:center;">${ensCheckboxes}</div>
       </div>
     </div>
     <div class="lib-hist-body">${bodyHTML}</div>
@@ -2424,10 +2428,19 @@ document.getElementById('lib-borrow-date-modal')?.addEventListener('click',e=>{i
 
 function libHistSetFilter(key,value){
   const container=document.getElementById('lib-history');
+  if(key==='year') container._fYear=value;
   if(key==='event') container._fEvent=value;
-  if(key==='ens') container._fEns=value;
   renderLibHistory();
 }
+
+function libHistToggleEns(ensId,checked){
+  const container=document.getElementById('lib-history');
+  if(!container._hiddenEns) container._hiddenEns=new Set();
+  if(checked) container._hiddenEns.delete(ensId);
+  else container._hiddenEns.add(ensId);
+  renderLibHistory();
+}
+
 
 function renderLibPieceHistory(pieceId){
   const borrows=libBorrows.filter(b=>b.piece_id===pieceId);
@@ -2438,7 +2451,7 @@ function renderLibPieceHistory(pieceId){
   ].sort((a,b)=>b.date.localeCompare(a.date));
   document.getElementById('lib-piece-history').innerHTML=allEvents.length?allEvents.map(ev=>{
     const ens=libEnsembles.find(e=>e.id===ev.ensemble_id);
-    const label=ev.type==='borrow'?'Borrowed':`Performed — ${ev.event_type==='Workshop'?`Workshop: ${ev.workshop_name||''}`:ev.event_type}`;
+    const label=ev.type==='borrow'?'Borrowed':`Performed — ${(ev.event_type==='Workshop'||ev.event_type==='Concert')?`${ev.event_type}: ${ev.workshop_name||''}`:ev.event_type}`;
     const editBtn=ev.type==='borrow'
       ?`<button class="btn btn-ghost btn-sm" style="padding:.1rem .4rem;font-size:.7rem;" onclick="openEditBorrow('${ev.id}')">Edit</button>`
       :`<button class="btn btn-ghost btn-sm" style="padding:.1rem .4rem;font-size:.7rem;" onclick="openEditPerf('${ev.id}')">Edit</button>`;
@@ -2670,7 +2683,7 @@ function openLibDetail(pieceId){
   ].sort((a,b)=>b.date.localeCompare(a.date));
   document.getElementById('lib-detail-history').innerHTML=allEvents.length?allEvents.map(ev=>{
     const ens=libEnsembles.find(e=>e.id===ev.ensemble_id);
-    const label=ev.type==='borrow'?'Borrowed':`Performed — ${ev.event_type==='Workshop'?`Workshop: ${ev.workshop_name||''}`:ev.event_type}`;
+    const label=ev.type==='borrow'?'Borrowed':`Performed — ${(ev.event_type==='Workshop'||ev.event_type==='Concert')?`${ev.event_type}: ${ev.workshop_name||''}`:ev.event_type}`;
     const editBtn=ev.type==='borrow'
       ?`<button class="btn btn-ghost btn-sm" style="padding:.1rem .4rem;font-size:.7rem;" onclick="openEditBorrow('${ev.id}')">Edit</button>`
       :`<button class="btn btn-ghost btn-sm" style="padding:.1rem .4rem;font-size:.7rem;" onclick="openEditPerf('${ev.id}')">Edit</button>`;
@@ -2747,8 +2760,8 @@ function openLibPerfModal(pieceId){
       </div>
     </div>
     <div class="fg"><label>Date *</label><input type="date" id="lib-perf-date" value="${new Date().toISOString().slice(0,10)}"/></div>
-    <div class="fg"><label>Event Type *</label><select id="lib-perf-event-type" onchange="toggleWorkshopName()"><option value="">Select…</option><option>Camp</option><option>Concert</option><option>Gala</option><option>Workshop</option></select></div>
-    <div class="fg" id="lib-workshop-name-wrap" style="display:none;"><label>Workshop Name *</label><input type="text" id="lib-workshop-name" placeholder="e.g. String Workshop"/></div>
+    <div class="fg"><label>Event Type *</label><select id="lib-perf-event-type" onchange="toggleWorkshopName()"><option value="">Select…</option><option>Camp</option><option>Concert</option><option>Workshop</option></select></div>
+    <div class="fg" id="lib-workshop-name-wrap" style="display:none;"><label>Concert / Workshop Name *</label><input type="text" id="lib-workshop-name" placeholder="e.g. Winter Concert"/></div>
     <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="submitLibPerformance()">Log Performance</button>
   `;
   // if borrows exist, pre-select the first one and pre-fill ensemble
@@ -2772,7 +2785,7 @@ function libPerfBorrowChanged(){
 function toggleWorkshopName(){
   const type=document.getElementById('lib-perf-event-type')?.value;
   const wrap=document.getElementById('lib-workshop-name-wrap');
-  if(wrap)wrap.style.display=type==='Workshop'?'block':'none';
+  if(wrap)wrap.style.display=(type==='Workshop'||type==='Concert')?'block':'none';
 }
 
 async function submitLibPerformance(){
@@ -2781,7 +2794,7 @@ async function submitLibPerformance(){
   const workshopName=document.getElementById('lib-workshop-name')?.value.trim()||null;
   if(!date){showToast('Date required');return;}
   if(!eventType){showToast('Event type required');return;}
-  if(eventType==='Workshop'&&!workshopName){showToast('Workshop name required');return;}
+  if((eventType==='Workshop'||eventType==='Concert')&&!workshopName){showToast(`${eventType} name required`);return;}
 
   // resolve borrow linkage
   const borrowSel=document.getElementById('lib-perf-borrow-id');
@@ -2897,12 +2910,12 @@ function openEditPerf(perfId){
   const pf=libPerformances.find(x=>x.id===perfId);
   if(!pf)return;
   const opts=libEnsembles.map(e=>`<option value="${e.id}" ${e.id===pf.ensemble_id?'selected':''}>${esc(e.name)}</option>`).join('');
-  const etOpts=['Camp','Concert','Gala','Workshop'].map(t=>`<option ${pf.event_type===t?'selected':''}>${t}</option>`).join('');
+  const etOpts=['Camp','Concert','Workshop'].map(t=>`<option ${pf.event_type===t?'selected':''}>${t}</option>`).join('');
   document.getElementById('lib-edit-perf-form').innerHTML=`
     <div class="fg"><label>Ensemble *</label><select id="edit-perf-ensemble"><option value="">Select…</option>${opts}</select></div>
     <div class="fg"><label>Date *</label><input type="date" id="edit-perf-date" value="${pf.date}"/></div>
     <div class="fg"><label>Event Type *</label><select id="edit-perf-event-type" onchange="toggleEditWorkshopName()"><option value="">Select…</option>${etOpts}</select></div>
-    <div class="fg" id="edit-workshop-wrap" style="display:${pf.event_type==='Workshop'?'block':'none'};"><label>Workshop Name</label><input type="text" id="edit-perf-workshop" value="${esc(pf.workshop_name||'')}"/></div>
+    <div class="fg" id="edit-workshop-wrap" style="display:${(pf.event_type==='Workshop'||pf.event_type==='Concert')?'block':'none'};"><label>Concert / Workshop Name</label><input type="text" id="edit-perf-workshop" value="${esc(pf.workshop_name||'')}"/></div>
     <div style="display:flex;gap:.5rem;">
       <button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="submitEditPerf('${perfId}')">Save</button>
       <button class="btn btn-ghost" style="flex:1;justify-content:center;" onclick="closeModal('lib-edit-perf-modal')">Cancel</button>
@@ -2914,7 +2927,7 @@ function openEditPerf(perfId){
 function toggleEditWorkshopName(){
   const t=document.getElementById('edit-perf-event-type')?.value;
   const w=document.getElementById('edit-workshop-wrap');
-  if(w)w.style.display=t==='Workshop'?'block':'none';
+  if(w)w.style.display=(t==='Workshop'||t==='Concert')?'block':'none';
 }
 
 async function submitEditPerf(id){
@@ -3001,7 +3014,7 @@ function renderLogHistory(){
 
     const pieces=g.entries.map(e=>{
       const piece=libPieces.find(p=>p.id===e.piece_id);
-      const extra=g.type==='performance'?` — ${e.event_type}${e.workshop_name?' ('+e.workshop_name+')':''}`:'' ;
+      const extra=g.type==='performance'?` — ${e.event_type}${(e.event_type==='Workshop'||e.event_type==='Concert')&&e.workshop_name?' ('+e.workshop_name+')':''}`:'';
       return`<div class="log-hist-piece" style="display:flex;justify-content:space-between;align-items:center;">
         <span>${esc(piece?.title||'Unknown')}${piece?.level!=null?` <span style="color:var(--grey-400);font-style:italic;font-size:.72rem;">[${piece.level===99?'Prof':piece.level}]</span>`:''}${extra}</span>
         <span style="display:flex;gap:.3rem;">
@@ -3073,7 +3086,7 @@ function openLogEventModal(){
         <label>Event Type *</label>
         <select id="log-event-type" onchange="logEventToggleWorkshop()">
           <option value="">Select…</option>
-          <option>Camp</option><option>Concert</option><option>Gala</option><option>Workshop</option>
+          <option>Camp</option><option>Concert</option><option>Workshop</option>
         </select>
       </div>
       <div class="fg">
@@ -3082,8 +3095,8 @@ function openLogEventModal(){
       </div>
     </div>
     <div class="fg" id="log-event-workshop-wrap" style="display:none;margin-bottom:.75rem;">
-      <label>Workshop Name *</label>
-      <input type="text" id="log-event-workshop-name" placeholder="e.g. String Workshop"/>
+      <label>Concert / Workshop Name *</label>
+      <input type="text" id="log-event-workshop-name" placeholder="e.g. Winter Concert"/>
     </div>
     <div id="log-event-ensembles"></div>
     <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;border:1.5px dashed var(--grey-200);margin-bottom:.75rem;" onclick="addLogEventEnsemble()">+ Add ensemble</button>
@@ -3095,7 +3108,7 @@ function openLogEventModal(){
 
 function logEventToggleWorkshop(){
   const v=document.getElementById('log-event-type')?.value;
-  document.getElementById('log-event-workshop-wrap').style.display=v==='Workshop'?'block':'none';
+  document.getElementById('log-event-workshop-wrap').style.display=(v==='Workshop'||v==='Concert')?'block':'none';
 }
 
 function addLogEventEnsemble(){
@@ -3231,6 +3244,7 @@ async function submitLogEvent(){
   if(!eventType){showToast('Event type required');return;}
   if(!date){showToast('Date required');return;}
   if(eventType==='Workshop'&&!workshopName){showToast('Workshop name required');return;}
+  if(eventType==='Concert'&&!workshopName){showToast('Concert name required');return;}
 
   // collect all ensemble blocks
   const ensBlocks=[...document.querySelectorAll('[id^="log-ens-block-"]')];
