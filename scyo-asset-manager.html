@@ -2398,8 +2398,8 @@ async function saveRehTile(tileId){
 }
 
 
+function libHistSetFilter(key,value){
   const container=document.getElementById('lib-history');
-  if(key==='year') container._fYear=value;
   if(key==='event') container._fEvent=value;
   if(key==='ens') container._fEns=value;
   renderLibHistory();
