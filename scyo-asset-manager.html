@@ -407,7 +407,7 @@
     <button class="btn btn-primary" id="lib-add-btn" onclick="openAddLibModal()">+ Add Piece</button>
     <button class="btn btn-ghost" id="lib-bulk-borrow-btn" onclick="openBulkBorrowModal()">Bulk Borrow</button>
     <button class="btn btn-ghost" id="lib-hist-bulk-borrow-btn" style="display:none;" onclick="openBulkBorrowModal()">Bulk Borrow</button>
-    <button class="btn btn-ghost" id="lib-hist-log-history-btn" style="display:none;" onclick="openManageEventsModal()">⚙ Manage Events</button>
+    <button class="btn btn-ghost" id="lib-hist-log-history-btn" style="display:none;" onclick="openManageEventsModal()">Manage Events</button>
     <div class="col-picker-wrap no-print" id="lib-col-picker-wrap">
       <button class="btn btn-ghost" onclick="toggleLibColPicker()" id="lib-col-picker-btn">⚙ Columns</button>
       <div class="col-picker" id="lib-col-picker" style="display:none;">
@@ -2315,7 +2315,7 @@ function renderLibHistory(){
       <div class="hist-chk-dropdown">
         <button id="hdd-ens-btn" class="hist-chk-btn${hiddenEnsCount?' hist-chk-active':''}" onclick="toggleHistDropdown('hdd-ens')">Ensemble${hiddenEnsCount?` <span class="hist-chk-badge">${ensColumns.length-hiddenEnsCount}/${ensColumns.length}</span>`:''} ▾</button>
       </div>
-      <button class="btn btn-ghost btn-sm" onclick="openManageEventsModal()">⚙ Manage events</button>
+      <button class="btn btn-ghost btn-sm" onclick="openManageEnsembles()">⚙ Manage ensembles</button>
     </div>
     <div class="lib-hist-body">${bodyHTML}</div>
   `;
