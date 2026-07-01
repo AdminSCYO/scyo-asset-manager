@@ -623,20 +623,13 @@
 </div>
 
 <!-- MANAGE EVENTS MODAL -->
-<div class="modal-backdrop" id="lib-events-modal">
-  <div class="modal" style="max-width:480px;">
-    <div class="modal-header">
-      <span class="modal-title">Manage Events</span>
+<div class="modal-backdrop wide-modal" id="lib-events-modal">
+  <div class="modal" style="max-width:640px;max-height:90vh;display:flex;flex-direction:column;">
+    <div class="modal-header" style="flex-shrink:0;">
+      <span class="modal-title" id="lib-events-modal-title">Manage Events</span>
       <button class="btn-close" onclick="closeModal('lib-events-modal')">✕</button>
     </div>
-    <div style="padding:1.25rem;">
-      <div style="display:flex;gap:.5rem;margin-bottom:1rem;">
-        <input type="text" id="new-event-name" placeholder="Event name (e.g. Winter Concert)" style="flex:1;font-family:'Inter',sans-serif;font-size:.85rem;padding:.45rem .65rem;border:1.5px solid var(--grey-200);border-radius:var(--radius);"/>
-        <input type="date" id="new-event-date" style="font-family:'Inter',sans-serif;font-size:.85rem;padding:.45rem .65rem;border:1.5px solid var(--grey-200);border-radius:var(--radius);width:150px;"/>
-        <button class="btn btn-primary btn-sm" onclick="addLibEvent()">Add</button>
-      </div>
-      <div id="lib-events-list"></div>
-    </div>
+    <div id="lib-events-modal-body" style="overflow-y:auto;flex:1;padding:1.25rem;"></div>
   </div>
 </div>
 
@@ -2786,6 +2779,141 @@ async function submitEditBorrow(id){
 
 document.getElementById('lib-edit-borrow-modal')?.addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal('lib-edit-borrow-modal');});
 
+// ── MANAGE EVENTS ─────────────────────────────────────────────
+function openManageEventsModal(){
+  renderEventsHome();
+  document.getElementById('lib-events-modal').classList.add('open');
+}
+
+function renderEventsHome(){
+  document.getElementById('lib-events-modal-title').textContent='Manage Events';
+  const sorted=[...libEvents].sort((a,b)=>b.date.localeCompare(a.date));
+  document.getElementById('lib-events-modal-body').innerHTML=`
+    <button class="btn btn-primary" style="width:100%;justify-content:center;margin-bottom:1rem;" onclick="renderAddEventForm()">+ Add Event</button>
+    ${sorted.length?sorted.map(e=>{
+      const linkCount=libBorrowPerfs.filter(bp=>bp.event_id===e.id).length;
+      return`<div style="display:flex;align-items:center;gap:.75rem;padding:.6rem 0;border-bottom:1px solid var(--grey-100);">
+        <div style="flex:1;">
+          <div style="font-size:.88rem;font-weight:600;color:var(--navy);">${esc(e.name)}</div>
+          <div style="font-size:.75rem;color:var(--grey-400);">${e.date} · ${linkCount} piece${linkCount!==1?'s':''} linked</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="renderLinkPiecesView('${e.id}')">Link pieces</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteLibEvent('${e.id}')">✕</button>
+      </div>`;
+    }).join(''):'<div style="color:var(--grey-400);font-size:.85rem;">No events yet. Add one above.</div>'}
+  `;
+}
+
+function renderAddEventForm(){
+  document.getElementById('lib-events-modal-title').textContent='Add Event';
+  document.getElementById('lib-events-modal-body').innerHTML=`
+    <div class="fg"><label>Event name *</label><input type="text" id="new-event-name" placeholder="e.g. Winter Concert 2026"/></div>
+    <div class="fg"><label>Date *</label><input type="date" id="new-event-date" value="${new Date().toISOString().slice(0,10)}"/></div>
+    <div style="display:flex;gap:.5rem;margin-top:.75rem;">
+      <button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="addLibEvent()">Create event</button>
+      <button class="btn btn-ghost" style="flex:1;justify-content:center;" onclick="renderEventsHome()">Cancel</button>
+    </div>
+  `;
+  document.getElementById('new-event-name')?.focus();
+}
+
+async function addLibEvent(){
+  const name=document.getElementById('new-event-name')?.value.trim();
+  const date=document.getElementById('new-event-date')?.value;
+  if(!name){showToast('Event name required');return;}
+  if(!date){showToast('Date required');return;}
+  const{data:newEvent,error}=await db.from('library_events').insert({name,date}).select().single();
+  if(error){showToast('Error: '+error.message);return;}
+  await loadLibData();
+  showToast('Event created ✓');
+  renderLinkPiecesView(newEvent.id);
+}
+
+function renderLinkPiecesView(eventId){
+  const event=libEvents.find(e=>e.id===eventId);
+  if(!event)return;
+  document.getElementById('lib-events-modal-title').textContent=`${event.name} — Link pieces`;
+  const internalEns=libEnsembles.filter(e=>!e.name.toLowerCase().startsWith('external'));
+  const eventYear=new Date(event.date).getFullYear();
+  const ensOpts=internalEns.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('');
+  document.getElementById('lib-events-modal-body').innerHTML=`
+    <div style="font-size:.82rem;color:var(--grey-500);margin-bottom:.85rem;">Select an ensemble to see pieces they borrowed in ${eventYear}. Unlinked pieces show first.</div>
+    <div class="fg" style="margin-bottom:.75rem;">
+      <label>Ensemble</label>
+      <select id="link-pieces-ens" onchange="renderLinkPiecesList('${eventId}',${eventYear})" style="width:100%;">
+        <option value="">Select ensemble…</option>
+        ${ensOpts}
+      </select>
+    </div>
+    <div id="link-pieces-list"></div>
+    <div style="margin-top:1rem;padding-top:.75rem;border-top:1px solid var(--grey-100);">
+      <button class="btn btn-ghost btn-sm" onclick="renderEventsHome()">← Back to events</button>
+    </div>
+  `;
+}
+
+function renderLinkPiecesList(eventId, eventYear){
+  const ensId=document.getElementById('link-pieces-ens')?.value;
+  if(!ensId)return;
+  const yearBorrows=libBorrows.filter(b=>String(b.ensemble_id)===String(ensId)&&new Date(b.date).getFullYear()===eventYear);
+  if(!yearBorrows.length){
+    document.getElementById('link-pieces-list').innerHTML=`<div style="color:var(--grey-400);font-size:.82rem;">No borrows found for this ensemble in ${eventYear}.</div>`;
+    return;
+  }
+  // deduplicate by piece_id, keep most recent borrow
+  const byPiece={};
+  yearBorrows.forEach(b=>{if(!byPiece[b.piece_id]||b.date>byPiece[b.piece_id].date)byPiece[b.piece_id]=b;});
+  const uniqueBorrows=Object.values(byPiece);
+  const linkedBorrowIds=new Set(libBorrowPerfs.filter(bp=>bp.event_id===eventId).map(bp=>bp.borrow_id));
+  const unlinked=uniqueBorrows.filter(b=>!linkedBorrowIds.has(b.id));
+  const linked=uniqueBorrows.filter(b=>linkedBorrowIds.has(b.id));
+  const renderRow=(b,isLinked)=>{
+    const piece=libPieces.find(p=>p.id===b.piece_id);
+    const lvl=piece?.level!=null?` <span style="color:var(--grey-400);font-style:italic;font-size:.72rem;">[${piece.level===99?'Prof':piece.level}]</span>`:'';
+    return`<div style="display:flex;align-items:center;gap:.75rem;padding:.45rem 0;border-bottom:1px solid var(--grey-100);">
+      <div style="flex:1;font-size:.83rem;color:var(--grey-800);">${esc(piece?.title||'Unknown')}${lvl}</div>
+      ${isLinked
+        ?`<span style="font-size:.72rem;color:#2e7d32;background:#e8f5e9;padding:.15rem .45rem;border-radius:4px;flex-shrink:0;">Linked</span>
+           <button class="btn btn-ghost btn-sm" style="font-size:.72rem;color:var(--danger);flex-shrink:0;" onclick="unlinkBorrowFromEvent('${b.id}','${eventId}')">Unlink</button>`
+        :`<button class="btn btn-primary btn-sm" style="font-size:.72rem;flex-shrink:0;" onclick="linkBorrowToEventDirect('${b.id}','${eventId}')">Link</button>`}
+    </div>`;
+  };
+  document.getElementById('link-pieces-list').innerHTML=`
+    ${unlinked.length?`<div style="font-size:.72rem;font-weight:700;color:var(--grey-400);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.3rem;">Not yet linked</div>${unlinked.map(b=>renderRow(b,false)).join('')}`:''}
+    ${linked.length?`<div style="font-size:.72rem;font-weight:700;color:var(--grey-400);text-transform:uppercase;letter-spacing:.05em;margin:.75rem 0 .3rem;">Already linked</div>${linked.map(b=>renderRow(b,true)).join('')}`:''}
+  `;
+}
+
+async function linkBorrowToEventDirect(borrowId,eventId){
+  await db.from('library_borrow_performances').insert({borrow_id:borrowId,event_id:eventId});
+  await loadLibData();
+  const event=libEvents.find(e=>e.id===eventId);
+  renderLinkPiecesList(eventId,new Date(event.date).getFullYear());
+  renderLibHistory();
+  showToast('Linked ✓');
+}
+
+async function unlinkBorrowFromEvent(borrowId,eventId){
+  await db.from('library_borrow_performances').delete().eq('borrow_id',borrowId).eq('event_id',eventId);
+  await loadLibData();
+  const event=libEvents.find(e=>e.id===eventId);
+  renderLinkPiecesList(eventId,new Date(event.date).getFullYear());
+  renderLibHistory();
+  showToast('Unlinked ✓');
+}
+
+async function deleteLibEvent(id){
+  if(!confirm('Delete this event? All piece links will be removed.'))return;
+  await db.from('library_events').delete().eq('id',id);
+  await loadLibData();
+  renderEventsHome();
+  renderLibHistory();
+  showToast('Event deleted ✓');
+}
+
+document.getElementById('lib-events-modal')?.addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal('lib-events-modal');});
+
+// ── MANAGE ENSEMBLES ──────────────────────────────────────────
 async function openManageEnsembles(){
   renderEnsemblesList();
   document.getElementById('lib-ensembles-modal').classList.add('open');
