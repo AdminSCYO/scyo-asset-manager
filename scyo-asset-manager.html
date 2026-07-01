@@ -2323,6 +2323,7 @@ function renderLibPieceForm(p=null){
     </div>
     <div class="fg"><label>Composer</label><input type="text" id="lib-composer" value="${esc(p?.composer||'')}" placeholder="Composer / Arranger" ${isEdit?'onblur="autoSaveLibPiece()"':''}/>
     </div>
+    <div style="margin-bottom:.4rem;">
     <button class="lib-research-toggle" id="lib-res-toggle" onclick="toggleLibResearch()" type="button">🔍 Research this piece <span class="res-chevron">▼</span></button>
     <div class="lib-research-panel" id="lib-res-panel">
       <div class="lib-research-grid">
@@ -2333,6 +2334,7 @@ function renderLibPieceForm(p=null){
         <div><button class="lib-rbtn" onclick="libResearch('hl')" type="button">📖 Hal Leonard</button><div class="lib-rbtn-hint">Publisher catalogue + grade</div></div>
         <div><button class="lib-rbtn" onclick="libResearch('alfred')" type="button">📖 Alfred</button><div class="lib-rbtn-hint">Publisher catalogue + grade</div></div>
       </div>
+    </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
       <div class="fg"><label>Category *</label><select id="lib-category" ${isEdit?'onchange="autoSaveLibPiece()"':''}>${['Band','Strings','Orchestra','Jazz Band'].map(c=>`<option ${p?.category===c?'selected':''}>${c}</option>`).join('')}</select></div>
