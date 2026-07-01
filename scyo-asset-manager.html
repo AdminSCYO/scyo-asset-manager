@@ -646,7 +646,22 @@
 </div>
 
 
-<!-- LOG BORROW MODAL -->
+<!-- BORROW DATE EDIT MODAL -->
+<div class="modal-backdrop" id="lib-borrow-date-modal">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <span class="modal-title" id="lib-borrow-date-modal-title">Edit Borrow Dates</span>
+      <button class="btn-close" onclick="closeModal('lib-borrow-date-modal')">✕</button>
+    </div>
+    <div id="lib-borrow-date-body" style="padding:1.25rem;max-height:70vh;overflow-y:auto;"></div>
+    <div style="padding:.75rem 1.25rem;border-top:1px solid var(--grey-100);display:flex;gap:.5rem;justify-content:flex-end;">
+      <button class="btn btn-ghost" onclick="closeModal('lib-borrow-date-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveBorrowDateModal()">Save changes</button>
+    </div>
+  </div>
+</div>
+
+
 <div class="modal-backdrop" id="lib-borrow-modal">
   <div class="modal" style="max-width:420px;">
       <button class="btn-close" onclick="closeModal('lib-borrow-modal')">✕</button>
@@ -2306,24 +2321,11 @@ function renderLibHistory(){
                   const rows=rehearsedByEns[e.id];
                   if(!rows.length)return`<td><div class="lib-hist-cell" style="border-style:dashed;"><span class="lib-hist-empty">—</span></div></td>`;
                   const tileId=`tile-${year}-${e.id}`;
-                  const pieces=rows.map(({borrow,piece})=>`
-                    <div class="reh-tile-row" data-borrow-id="${borrow.id}">
-                      <div class="reh-tile-piece">${esc(piece.title)}${piece.level!=null?`<span class="reh-tile-level"> [${piece.level===99?'Prof':piece.level}]</span>`:''}
-                      </div>
-                      <input type="date" class="reh-tile-date" value="${borrow.date}" onchange="markTileDirty('${tileId}')"/>
-                    </div>`).join('');
+                  const borrowsJson=JSON.stringify(rows.map(({borrow,piece})=>({id:borrow.id,date:borrow.date,title:piece.title,level:piece.level}))).replace(/'/g,'&#39;');
                   return`<td>
-                    <div class="lib-hist-cell reh-tile" style="border-style:dashed;padding:0;cursor:default;" id="${tileId}">
-                      <div class="reh-tile-collapsed" onclick="expandRehTile('${tileId}')">
-                        ${rows.map(({piece})=>`<div class="lib-rehearsed-piece">${esc(piece.title)}${piece.level!=null?`<span style="color:var(--grey-400);font-style:italic;font-size:.7rem;"> [${piece.level===99?'Prof':piece.level}]</span>`:''}</div>`).join('')}
-                      </div>
-                      <div class="reh-tile-expanded" style="display:none;">
-                        <div class="reh-tile-pieces">${pieces}</div>
-                        <div class="reh-tile-actions">
-                          <button class="btn btn-primary btn-sm" onclick="saveRehTile('${tileId}')">Save</button>
-                          <button class="btn btn-ghost btn-sm" onclick="collapseRehTile('${tileId}')">Cancel</button>
-                        </div>
-                      </div>
+                    <div class="lib-hist-cell" style="border-style:dashed;cursor:pointer;" onclick="openBorrowDateModal('${esc(e.name)}',${borrowsJson})">
+                      ${rows.map(({piece})=>`<div class="lib-rehearsed-piece">${esc(piece.title)}${piece.level!=null?`<span style="color:var(--grey-400);font-style:italic;font-size:.7rem;"> [${piece.level===99?'Prof':piece.level}]</span>`:''}</div>`).join('')}
+                      <div style="margin-top:.35rem;font-size:.68rem;color:var(--grey-400);">Click to edit dates</div>
                     </div>
                   </td>`;
                 }).join('')}
@@ -2359,43 +2361,52 @@ function renderLibHistory(){
   `;
 }
 
-function expandRehTile(tileId){
-  const tile=document.getElementById(tileId);
-  if(!tile)return;
-  tile.querySelector('.reh-tile-collapsed').style.display='none';
-  tile.querySelector('.reh-tile-expanded').style.display='block';
+let _borrowDateModalRows=[];
+
+function openBorrowDateModal(ensName, rows){
+  _borrowDateModalRows=rows;
+  document.getElementById('lib-borrow-date-modal-title').textContent=`Edit Borrow Dates — ${ensName}`;
+  document.getElementById('lib-borrow-date-body').innerHTML=`
+    <div style="font-size:.8rem;color:var(--grey-500);margin-bottom:.85rem;">Click a date to change it. Changes apply when you click Save.</div>
+    <table style="width:100%;border-collapse:collapse;">
+      <thead><tr>
+        <th style="text-align:left;font-size:.72rem;font-weight:700;color:var(--grey-400);text-transform:uppercase;letter-spacing:.05em;padding:.3rem .5rem .5rem 0;">Piece</th>
+        <th style="text-align:left;font-size:.72rem;font-weight:700;color:var(--grey-400);text-transform:uppercase;letter-spacing:.05em;padding:.3rem 0 .5rem;">Borrow date</th>
+      </tr></thead>
+      <tbody>
+        ${rows.map((r,i)=>`
+          <tr style="border-top:1px solid var(--grey-100);">
+            <td style="padding:.5rem .5rem .5rem 0;font-size:.83rem;color:var(--grey-800);">
+              ${esc(r.title)}${r.level!=null?`<span style="color:var(--grey-400);font-style:italic;font-size:.72rem;"> [${r.level===99?'Prof':r.level}]</span>`:''}
+            </td>
+            <td style="padding:.5rem 0;white-space:nowrap;">
+              <input type="date" id="bdm-date-${i}" value="${r.date}"
+                style="font-family:'Inter',sans-serif;font-size:.83rem;padding:.3rem .5rem;border:1.5px solid var(--grey-200);border-radius:6px;color:var(--grey-800);"
+                onfocus="this.style.borderColor='var(--navy)'" onblur="this.style.borderColor='var(--grey-200)'"/>
+            </td>
+          </tr>`).join('')}
+      </tbody>
+    </table>`;
+  document.getElementById('lib-borrow-date-modal').classList.add('open');
 }
 
-function collapseRehTile(tileId){
-  const tile=document.getElementById(tileId);
-  if(!tile)return;
-  tile.querySelector('.reh-tile-collapsed').style.display='block';
-  tile.querySelector('.reh-tile-expanded').style.display='none';
-}
-
-function markTileDirty(tileId){
-  const btn=document.querySelector(`#${tileId} .reh-tile-actions .btn-primary`);
-  if(btn)btn.textContent='Save';
-}
-
-async function saveRehTile(tileId){
-  const tile=document.getElementById(tileId);
-  if(!tile)return;
-  const rows=[...tile.querySelectorAll('.reh-tile-row')];
-  const updates=rows.map(row=>({
-    id:row.dataset.borrowId,
-    date:row.querySelector('.reh-tile-date').value
-  }));
-  const btn=tile.querySelector('.reh-tile-actions .btn-primary');
+async function saveBorrowDateModal(){
+  const btn=document.querySelector('#lib-borrow-date-modal .btn-primary');
   if(btn){btn.textContent='Saving…';btn.disabled=true;}
-  for(const u of updates){
-    await db.from('library_borrows')
-      .update({date:u.date,updated_at:new Date().toISOString(),updated_by:currentUser?.email||null})
-      .eq('id',u.id);
+  for(let i=0;i<_borrowDateModalRows.length;i++){
+    const newDate=document.getElementById(`bdm-date-${i}`)?.value;
+    if(newDate&&newDate!==_borrowDateModalRows[i].date){
+      await db.from('library_borrows')
+        .update({date:newDate,updated_at:new Date().toISOString(),updated_by:currentUser?.email||null})
+        .eq('id',_borrowDateModalRows[i].id);
+    }
   }
+  closeModal('lib-borrow-date-modal');
   await loadLibData();
   showToast('Dates updated ✓');
 }
+
+document.getElementById('lib-borrow-date-modal')?.addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal('lib-borrow-date-modal');});
 
 
 function libHistSetFilter(key,value){
