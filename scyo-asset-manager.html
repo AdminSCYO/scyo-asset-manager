@@ -2294,7 +2294,7 @@ function renderLibHistory(){
           return`<tr>${cells}</tr>`;
         }).join('');
         gridHTML=`<div style="overflow-x:auto;">
-          <table class="lib-hist-grid" style="table-layout:fixed;width:100%;">
+          <table class="lib-hist-grid" style="table-layout:fixed;width:100%;min-width:${visibleEns.length*180}px;">
             <thead><tr>${headerCells}</tr></thead>
             <tbody>${rows}</tbody>
           </table>
@@ -2328,9 +2328,8 @@ function renderLibHistory(){
       const hasAnyRehearsed=visibleEns.some(e=>rehearsedByEns[e.id]?.length>0);
       const rehearsedBlock=hasAnyRehearsed?`
         <div class="lib-rehearsed-block">
-          <div class="lib-rehearsed-title">Rehearsed but not performed</div>
           <div style="overflow-x:auto;">
-            <table class="lib-hist-grid" style="table-layout:fixed;width:100%;">
+            <table class="lib-hist-grid" style="table-layout:fixed;width:100%;min-width:${visibleEns.length*180}px;">
               <thead><tr>
                 ${visibleEns.map(e=>`<th>${esc(e.name)}</th>`).join('')}
               </tr></thead>
