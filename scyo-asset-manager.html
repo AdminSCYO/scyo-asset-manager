@@ -229,6 +229,17 @@
     .lib-rbtn{display:flex;align-items:center;gap:.35rem;font-family:'Inter',sans-serif;font-size:.75rem;font-weight:600;color:var(--navy);background:white;border:1.5px solid #c5d0e6;border-radius:var(--radius);padding:.4rem .55rem;cursor:pointer;white-space:nowrap;transition:background .12s;}
     .lib-rbtn:hover{background:#dce6f5;}
     .lib-rbtn-hint{font-size:.68rem;color:var(--grey-400);line-height:1.3;margin-top:.2rem;}
+    .log-hist-tile{border:1.5px solid var(--grey-200);border-radius:var(--radius);margin-bottom:.75rem;overflow:hidden;}
+    .log-hist-tile-header{display:flex;align-items:center;justify-content:space-between;padding:.6rem .85rem;background:var(--grey-50);cursor:pointer;gap:.5rem;}
+    .log-hist-tile-header:hover{background:var(--grey-100);}
+    .log-hist-tile-type{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:.15rem .45rem;border-radius:4px;}
+    .log-hist-tile-type.borrow{background:#e8f0fb;color:#1B3A6B;}
+    .log-hist-tile-type.performance{background:#e8f5e9;color:#2e7d32;}
+    .log-hist-tile-meta{font-size:.72rem;color:var(--grey-400);margin-top:.15rem;}
+    .log-hist-tile-body{padding:.75rem .85rem;border-top:1px solid var(--grey-100);display:none;}
+    .log-hist-tile-body.open{display:block;}
+    .log-hist-piece{font-size:.82rem;color:var(--grey-700);padding:.2rem 0;border-bottom:1px solid var(--grey-100);}
+    .log-hist-piece:last-child{border-bottom:none;}
     .lib-hist-filters{display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;padding:.75rem 1.25rem;border-bottom:1px solid var(--grey-200);background:white;position:sticky;top:0;z-index:10;}
     .lib-hist-filter-group{display:flex;flex-direction:column;gap:.2rem;}
     .lib-hist-filter-label{font-size:.68rem;font-weight:700;color:var(--grey-400);text-transform:uppercase;letter-spacing:.05em;}
@@ -370,6 +381,7 @@
     <button class="btn btn-primary" id="lib-add-btn" onclick="openAddLibModal()">+ Add Piece</button>
     <button class="btn btn-ghost" id="lib-hist-bulk-borrow-btn" style="display:none;" onclick="openBulkBorrowModal()">Bulk Borrow</button>
     <button class="btn btn-primary" id="lib-hist-log-perf-btn" style="display:none;" onclick="openLogEventModal()">+ Log Performance</button>
+    <button class="btn btn-ghost" id="lib-hist-log-history-btn" style="display:none;" onclick="openLogHistoryModal()">Log History</button>
     <div class="col-picker-wrap no-print" id="lib-col-picker-wrap">
       <button class="btn btn-ghost" onclick="toggleLibColPicker()" id="lib-col-picker-btn">⚙ Columns</button>
       <div class="col-picker" id="lib-col-picker" style="display:none;">
@@ -584,7 +596,34 @@
   </div>
 </div>
 
-<!-- LOG PERFORMANCE EVENT MODAL -->
+<!-- LOG HISTORY MODAL -->
+<div class="modal-backdrop wide-modal" id="lib-log-history-modal">
+  <div class="modal" style="max-width:700px;max-height:90vh;display:flex;flex-direction:column;">
+    <div class="modal-header" style="flex-shrink:0;">
+      <span class="modal-title">Log History</span>
+      <button class="btn-close" onclick="closeModal('lib-log-history-modal')">✕</button>
+    </div>
+    <div style="padding:.75rem 1.25rem;border-bottom:1px solid var(--grey-100);flex-shrink:0;display:flex;gap:.75rem;align-items:center;">
+      <div class="lib-hist-filter-group">
+        <div class="lib-hist-filter-label">Ensemble</div>
+        <select id="log-hist-ens-filter" onchange="renderLogHistory()">
+          <option value="all">All ensembles</option>
+        </select>
+      </div>
+      <div class="lib-hist-filter-group">
+        <div class="lib-hist-filter-label">Type</div>
+        <select id="log-hist-type-filter" onchange="renderLogHistory()">
+          <option value="all">Borrows & performances</option>
+          <option value="borrow">Borrows only</option>
+          <option value="performance">Performances only</option>
+        </select>
+      </div>
+    </div>
+    <div id="lib-log-history-body" style="overflow-y:auto;flex:1;padding:1rem 1.25rem;"></div>
+  </div>
+</div>
+
+
 <div class="modal-backdrop wide-modal" id="lib-log-event-modal">
   <div class="modal" style="max-width:680px;">
     <div class="modal-header">
@@ -1968,6 +2007,7 @@ function switchLibView(view){
   document.getElementById('lib-bulk-borrow-btn').style.display=view==='catalogue'?'':'none';
   document.getElementById('lib-hist-bulk-borrow-btn').style.display=view==='history'?'':'none';
   document.getElementById('lib-hist-log-perf-btn').style.display=view==='history'?'':'none';
+  document.getElementById('lib-hist-log-history-btn').style.display=view==='history'?'':'none';
   document.getElementById('lib-col-picker-wrap').style.display=view==='catalogue'?'':'none';
   if(view!=='catalogue')document.getElementById('lib-col-picker').style.display='none';
   document.querySelectorAll('.lib-view-btn').forEach(b=>b.classList.remove('active'));
@@ -2576,7 +2616,7 @@ async function submitLibBorrow(){
   const date=document.getElementById('lib-borrow-date').value;
   if(!ensembleId){showToast('Select an ensemble');return;}
   if(!date){showToast('Date required');return;}
-  await db.from('library_borrows').insert({piece_id:libDetailPieceId,ensemble_id:ensembleId,date});
+  await db.from('library_borrows').insert({piece_id:libDetailPieceId,ensemble_id:ensembleId,date,user_email:currentUser?.email||null});
   closeModal('lib-borrow-modal');
   await loadLibData();
   if(libEditPieceId===libDetailPieceId)renderLibPieceHistory(libEditPieceId);
@@ -2666,7 +2706,7 @@ async function submitLibPerformance(){
     if(!ensembleId){showToast('Select an ensemble');return;}
     // create the borrow automatically
     const{data:newBorrow,error:borrowErr}=await db.from('library_borrows')
-      .insert({piece_id:libDetailPieceId,ensemble_id:ensembleId,date})
+      .insert({piece_id:libDetailPieceId,ensemble_id:ensembleId,date,user_email:currentUser?.email||null})
       .select().single();
     if(borrowErr){showToast('Error creating borrow: '+borrowErr.message);return;}
     borrowId=newBorrow?.id||null;
@@ -2678,7 +2718,8 @@ async function submitLibPerformance(){
     date,
     event_type:eventType,
     workshop_name:workshopName,
-    borrow_id:borrowId
+    borrow_id:borrowId,
+    user_email:currentUser?.email||null
   });
   closeModal('lib-perf-modal');
   await loadLibData();
@@ -2745,9 +2786,11 @@ async function submitEditBorrow(id){
   const ensembleId=document.getElementById('edit-borrow-ensemble').value;
   const date=document.getElementById('edit-borrow-date').value;
   if(!ensembleId||!date){showToast('All fields required');return;}
-  await db.from('library_borrows').update({ensemble_id:ensembleId,date}).eq('id',id);
+  await db.from('library_borrows').update({ensemble_id:ensembleId,date,updated_at:new Date().toISOString(),updated_by:currentUser?.email||null}).eq('id',id);
   closeModal('lib-edit-borrow-modal');
-  await loadLibData();openLibDetail(libDetailPieceId);
+  await loadLibData();
+  if(document.getElementById('lib-log-history-modal')?.classList.contains('open'))renderLogHistory();
+  else if(libDetailPieceId)openLibDetail(libDetailPieceId);
   showToast('Borrow updated ✓');
 }
 
@@ -2788,9 +2831,11 @@ async function submitEditPerf(id){
   const eventType=document.getElementById('edit-perf-event-type').value;
   const workshopName=document.getElementById('edit-perf-workshop')?.value.trim()||null;
   if(!ensembleId||!date||!eventType){showToast('All fields required');return;}
-  await db.from('library_performances').update({ensemble_id:ensembleId,date,event_type:eventType,workshop_name:workshopName}).eq('id',id);
+  await db.from('library_performances').update({ensemble_id:ensembleId,date,event_type:eventType,workshop_name:workshopName,updated_at:new Date().toISOString(),updated_by:currentUser?.email||null}).eq('id',id);
   closeModal('lib-edit-perf-modal');
-  await loadLibData();openLibDetail(libDetailPieceId);
+  await loadLibData();
+  if(document.getElementById('lib-log-history-modal')?.classList.contains('open'))renderLogHistory();
+  else if(libDetailPieceId)openLibDetail(libDetailPieceId);
   showToast('Performance updated ✓');
 }
 
@@ -2806,7 +2851,121 @@ async function deleteLibPerf(id){
 });
 
 // ── BULK BORROW ───────────────────────────────────────────────
-// ── LOG PERFORMANCE EVENT ─────────────────────────────────────
+// ── LOG HISTORY ───────────────────────────────────────────────
+function openLogHistoryModal(){
+  const sel=document.getElementById('log-hist-ens-filter');
+  sel.innerHTML=`<option value="all">All ensembles</option>`
+    +libEnsembles.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('');
+  renderLogHistory();
+  document.getElementById('lib-log-history-modal').classList.add('open');
+}
+
+function renderLogHistory(){
+  const ensFilter=document.getElementById('log-hist-ens-filter')?.value||'all';
+  const typeFilter=document.getElementById('log-hist-type-filter')?.value||'all';
+
+  // combine borrows and performances into flat entries
+  let entries=[];
+  if(typeFilter!=='performance'){
+    libBorrows.forEach(b=>{
+      if(ensFilter!=='all'&&String(b.ensemble_id)!==String(ensFilter))return;
+      entries.push({...b,_type:'borrow'});
+    });
+  }
+  if(typeFilter!=='borrow'){
+    libPerformances.forEach(p=>{
+      if(ensFilter!=='all'&&String(p.ensemble_id)!==String(ensFilter))return;
+      entries.push({...p,_type:'performance'});
+    });
+  }
+
+  if(!entries.length){
+    document.getElementById('lib-log-history-body').innerHTML=
+      '<div style="color:var(--grey-400);padding:1rem 0;">No entries found.</div>';
+    return;
+  }
+
+  // group by type + ensemble + date + user_email (inferred batch: same user, ensemble, date, type)
+  const groups={};
+  entries.forEach(e=>{
+    const key=`${e._type}|${e.ensemble_id}|${e.date}|${e.user_email||'unknown'}`;
+    if(!groups[key])groups[key]={type:e._type,ensemble_id:e.ensemble_id,date:e.date,user_email:e.user_email,created_at:e.created_at,entries:[]};
+    // track earliest created_at for sort
+    if(e.created_at&&(!groups[key].created_at||e.created_at<groups[key].created_at))
+      groups[key].created_at=e.created_at;
+    groups[key].entries.push(e);
+  });
+
+  const sorted=Object.values(groups).sort((a,b)=>(b.created_at||'').localeCompare(a.created_at||''));
+
+  document.getElementById('lib-log-history-body').innerHTML=sorted.map((g,gi)=>{
+    const ens=libEnsembles.find(e=>e.id===g.ensemble_id);
+    const typeLabel=g.type==='borrow'?'Borrow':'Performance';
+    const createdStr=g.created_at?new Date(g.created_at).toLocaleString('en-AU',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'Unknown time';
+    const editedEntry=g.entries.find(e=>e.updated_at);
+    const editedStr=editedEntry
+      ?`Edited by ${editedEntry.updated_by||'unknown'} on ${new Date(editedEntry.updated_at).toLocaleString('en-AU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}`
+      :'';
+
+    const pieces=g.entries.map(e=>{
+      const piece=libPieces.find(p=>p.id===e.piece_id);
+      const extra=g.type==='performance'?` — ${e.event_type}${e.workshop_name?' ('+e.workshop_name+')':''}`:'' ;
+      return`<div class="log-hist-piece" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>${esc(piece?.title||'Unknown')}${piece?.level!=null?` <span style="color:var(--grey-400);font-style:italic;font-size:.72rem;">[${piece.level===99?'Prof':piece.level}]</span>`:''}${extra}</span>
+        <span style="display:flex;gap:.3rem;">
+          ${g.type==='borrow'
+            ?`<button class="btn btn-ghost btn-sm" style="padding:.1rem .4rem;font-size:.7rem;" onclick="openEditBorrow('${e.id}')">Edit</button>
+               <button class="btn btn-ghost btn-sm" style="padding:.1rem .4rem;font-size:.7rem;color:var(--danger);" onclick="logHistDeleteBorrow('${e.id}')">✕</button>`
+            :`<button class="btn btn-ghost btn-sm" style="padding:.1rem .4rem;font-size:.7rem;" onclick="openEditPerf('${e.id}')">Edit</button>
+               <button class="btn btn-ghost btn-sm" style="padding:.1rem .4rem;font-size:.7rem;color:var(--danger);" onclick="logHistDeletePerf('${e.id}')">✕</button>`
+          }
+        </span>
+      </div>`;
+    }).join('');
+
+    return`<div class="log-hist-tile">
+      <div class="log-hist-tile-header" onclick="toggleLogHistTile(${gi})">
+        <div>
+          <div style="display:flex;align-items:center;gap:.5rem;">
+            <span class="log-hist-tile-type ${g.type}">${typeLabel}</span>
+            <span style="font-size:.85rem;font-weight:600;color:var(--navy);">${esc(ens?.name||'Unknown')} — ${g.date} — ${g.entries.length} piece${g.entries.length>1?'s':''}</span>
+          </div>
+          <div class="log-hist-tile-meta">Created by ${g.user_email||'unknown'} · ${createdStr}${editedStr?` · ${editedStr}`:''}</div>
+        </div>
+        <span style="color:var(--grey-400);font-size:.8rem;" id="log-hist-chevron-${gi}">▼</span>
+      </div>
+      <div class="log-hist-tile-body" id="log-hist-body-${gi}">${pieces}</div>
+    </div>`;
+  }).join('');
+}
+
+function toggleLogHistTile(gi){
+  const body=document.getElementById(`log-hist-body-${gi}`);
+  const chev=document.getElementById(`log-hist-chevron-${gi}`);
+  const isOpen=body.classList.contains('open');
+  body.classList.toggle('open',!isOpen);
+  if(chev)chev.textContent=isOpen?'▼':'▲';
+}
+
+async function logHistDeleteBorrow(id){
+  if(!confirm('Delete this borrow record?'))return;
+  await db.from('library_borrows').delete().eq('id',id);
+  await loadLibData();
+  renderLogHistory();
+  showToast('Borrow deleted ✓');
+}
+
+async function logHistDeletePerf(id){
+  if(!confirm('Delete this performance record?'))return;
+  await db.from('library_performances').delete().eq('id',id);
+  await loadLibData();
+  renderLogHistory();
+  showToast('Performance deleted ✓');
+}
+
+document.getElementById('lib-log-history-modal')?.addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal('lib-log-history-modal');});
+
+
 let logEventEnsembleCount=0;
 let logEventPieceCount=0;
 let logEventSelectedPieces={};  // key: `${ensIdx}-${rowId}` → piece obj
@@ -3019,7 +3178,7 @@ async function submitLogEvent(){
 
   // create missing borrows first, then link
   for(const b of borrowInserts){
-    const{data,error}=await db.from('library_borrows').insert({piece_id:b.piece_id,ensemble_id:b.ensemble_id,date:b.date}).select().single();
+    const{data,error}=await db.from('library_borrows').insert({piece_id:b.piece_id,ensemble_id:b.ensemble_id,date:b.date,user_email:currentUser?.email||null}).select().single();
     if(error){showToast('Error creating borrow: '+error.message);return;}
     // patch the matching perf insert
     const perf=perfInserts.find(p=>p._ensIdx===b._ensIdx&&p._rowId===b._rowId);
@@ -3027,7 +3186,7 @@ async function submitLogEvent(){
   }
 
   // clean up internal keys before inserting
-  const cleanPerfs=perfInserts.map(({_ensIdx,_rowId,...rest})=>rest);
+  const cleanPerfs=perfInserts.map(({_ensIdx,_rowId,...rest})=>({...rest,user_email:currentUser?.email||null}));
   const{error}=await db.from('library_performances').insert(cleanPerfs);
   if(error){showToast('Error logging performances: '+error.message);return;}
 
@@ -3129,7 +3288,7 @@ async function submitBulkBorrow(){
   if(!date){showToast('Date required');return;}
   const pieces=Object.values(bulkBorrowSelectedPieces);
   if(!pieces.length){showToast('Add at least one piece');return;}
-  const inserts=pieces.map(p=>({piece_id:p.id,ensemble_id:ensembleId,date}));
+  const inserts=pieces.map(p=>({piece_id:p.id,ensemble_id:ensembleId,date,user_email:currentUser?.email||null}));
   const{error}=await db.from('library_borrows').insert(inserts);
   if(error){showToast('Error: '+error.message);return;}
   closeModal('lib-bulk-borrow-modal');
