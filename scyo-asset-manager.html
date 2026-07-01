@@ -406,7 +406,7 @@
     </div>
     <button class="btn btn-primary" id="lib-add-btn" onclick="openAddLibModal()">+ Add Piece</button>
     <button class="btn btn-ghost" id="lib-bulk-borrow-btn" onclick="openBulkBorrowModal()">Bulk Borrow</button>
-    <button class="btn btn-ghost" id="lib-hist-bulk-borrow-btn" style="display:none;" onclick="openBulkBorrowModal()">Bulk Borrow</button>
+    <button class="btn btn-ghost" id="lib-hist-bulk-borrow-btn" style="display:none;margin-left:auto;" onclick="openBulkBorrowModal()">Bulk Borrow</button>
     <button class="btn btn-ghost" id="lib-hist-log-history-btn" style="display:none;" onclick="openManageEventsModal()">Manage Events</button>
     <div class="col-picker-wrap no-print" id="lib-col-picker-wrap">
       <button class="btn btn-ghost" onclick="toggleLibColPicker()" id="lib-col-picker-btn">⚙ Columns</button>
@@ -2305,24 +2305,27 @@ function renderLibHistory(){
   const hiddenEnsCount=container._hiddenEns.size;
 
   container.innerHTML=`
-    <div class="lib-hist-filters">
-      <div class="hist-chk-dropdown">
-        <button id="hdd-year-btn" class="hist-chk-btn${hiddenYearCount?' hist-chk-active':''}" onclick="toggleHistDropdown('hdd-year')">Year${hiddenYearCount?` <span class="hist-chk-badge">${allYears.length-hiddenYearCount}/${allYears.length}</span>`:''} ▾</button>
+    <div class="lib-hist-filters" style="justify-content:space-between;">
+      <div style="display:flex;gap:.75rem;align-items:center;">
+        <div class="hist-chk-dropdown">
+          <button id="hdd-year-btn" class="hist-chk-btn${hiddenYearCount?' hist-chk-active':''}" onclick="toggleHistDropdown('hdd-year')">Year${hiddenYearCount?` <span class="hist-chk-badge">${allYears.length-hiddenYearCount}/${allYears.length}</span>`:''} ▾</button>
+        </div>
+        <div class="hist-chk-dropdown">
+          <button id="hdd-event-btn" class="hist-chk-btn${hiddenEventCount?' hist-chk-active':''}" onclick="toggleHistDropdown('hdd-event')">Event${hiddenEventCount?` <span class="hist-chk-badge">${libEvents.length-hiddenEventCount}/${libEvents.length}</span>`:''} ▾</button>
+        </div>
+        <div class="hist-chk-dropdown">
+          <button id="hdd-ens-btn" class="hist-chk-btn${hiddenEnsCount?' hist-chk-active':''}" onclick="toggleHistDropdown('hdd-ens')">Ensemble${hiddenEnsCount?` <span class="hist-chk-badge">${ensColumns.length-hiddenEnsCount}/${ensColumns.length}</span>`:''} ▾</button>
+        </div>
       </div>
-      <div class="hist-chk-dropdown">
-        <button id="hdd-event-btn" class="hist-chk-btn${hiddenEventCount?' hist-chk-active':''}" onclick="toggleHistDropdown('hdd-event')">Event${hiddenEventCount?` <span class="hist-chk-badge">${libEvents.length-hiddenEventCount}/${libEvents.length}</span>`:''} ▾</button>
-      </div>
-      <div class="hist-chk-dropdown">
-        <button id="hdd-ens-btn" class="hist-chk-btn${hiddenEnsCount?' hist-chk-active':''}" onclick="toggleHistDropdown('hdd-ens')">Ensemble${hiddenEnsCount?` <span class="hist-chk-badge">${ensColumns.length-hiddenEnsCount}/${ensColumns.length}</span>`:''} ▾</button>
-      </div>
-      <button class="btn btn-ghost btn-sm" onclick="openManageEnsembles()">⚙ Manage ensembles</button>
     </div>
     <div class="lib-hist-body">${bodyHTML}</div>
   `;
   ['hdd-year','hdd-event','hdd-ens'].forEach(id=>{const el=document.getElementById(id);if(el)el.remove();});
   const panelYear=document.createElement('div');panelYear.className='hist-chk-panel';panelYear.id='hdd-year';panelYear.innerHTML=yearItems||'<span style="color:var(--grey-400);font-size:.8rem;padding:.5rem .75rem;display:block;">No data yet</span>';document.body.appendChild(panelYear);
   const panelEvent=document.createElement('div');panelEvent.className='hist-chk-panel';panelEvent.id='hdd-event';panelEvent.innerHTML=eventItems||'<span style="color:var(--grey-400);font-size:.8rem;padding:.5rem .75rem;display:block;">No events yet</span>';document.body.appendChild(panelEvent);
-  const panelEns=document.createElement('div');panelEns.className='hist-chk-panel';panelEns.id='hdd-ens';panelEns.innerHTML=ensItems;document.body.appendChild(panelEns);
+  const panelEns=document.createElement('div');panelEns.className='hist-chk-panel';panelEns.id='hdd-ens';
+  panelEns.innerHTML=ensItems+`<div style="border-top:1px solid var(--grey-100);margin-top:.3rem;padding-top:.3rem;"><button onclick="openManageEnsembles();document.querySelectorAll('.hist-chk-panel').forEach(p=>p.classList.remove('open'));" style="font-family:'Inter',sans-serif;font-size:.78rem;color:var(--grey-500);background:none;border:none;cursor:pointer;padding:.35rem .75rem;width:100%;text-align:left;">⚙ Manage ensembles</button></div>`;
+  document.body.appendChild(panelEns);
 }
 
   // --- build filter bar HTML ---
@@ -2375,6 +2378,9 @@ function openBorrowTileModal(ensName, tileKey, ensId){
                 ${linkedEventIds.length?`<button class="btn btn-ghost btn-sm" style="padding:.2rem .5rem;font-size:.72rem;color:var(--danger);" onclick="unlinkBorrowFromEvents(${i})">Unlink</button>`:''}
               </div>
             </td>
+            <td style="padding:.5rem 0 .5rem .35rem;">
+              <button class="btn btn-ghost btn-sm" style="padding:.2rem .4rem;font-size:.72rem;color:var(--danger);" onclick="deleteBorrowFromTile('${r.id}')" title="Delete this borrow">✕</button>
+            </td>
           </tr>`;
         }).join('')}
       </tbody>
@@ -2382,7 +2388,19 @@ function openBorrowTileModal(ensName, tileKey, ensId){
   document.getElementById('lib-borrow-date-modal').classList.add('open');
 }
 
-async function linkBorrowToEvent(rowIdx){
+async function deleteBorrowFromTile(borrowId){
+  if(!confirm('Delete this borrow record?'))return;
+  await db.from('library_borrows').delete().eq('id',borrowId);
+  await loadLibData();
+  // re-open modal with updated data
+  const ens=libEnsembles.find(e=>String(e.id)===String(_borrowTileEnsId));
+  const tileKey=Object.keys(window._rehTileRegistry||{}).find(k=>window._rehTileRegistry[k].some(r=>r.id!==borrowId));
+  if(ens&&tileKey) openBorrowTileModal(ens.name,tileKey,_borrowTileEnsId);
+  else closeModal('lib-borrow-date-modal');
+  showToast('Borrow deleted ✓');
+}
+
+
   const borrowId=_borrowDateModalRows[rowIdx]?.id;
   const eventId=document.getElementById(`bdm-event-${rowIdx}`)?.value;
   if(!borrowId||!eventId){showToast('Select an event first');return;}
