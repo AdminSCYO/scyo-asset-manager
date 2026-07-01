@@ -2213,6 +2213,33 @@ function renderLibHistory(){
   const n=visibleEns.length||1;
   const performedBorrowIds=new Set(libBorrowPerfs.map(bp=>bp.borrow_id));
 
+  // Helper: render a single event brick (wide or narrow)
+  function renderEventBrick(evData, gridCol=null){
+    const {ev,linkedBorrowIds,firstIdx,lastIdx,brickSpan}=evData;
+    const innerEns=visibleEns.slice(firstIdx,lastIdx+1);
+    const evDate=new Date(ev.date+'T00:00:00').toLocaleDateString('en-AU',{month:'short',day:'numeric'});
+    const colsHTML=innerEns.map(e=>{
+      const pieces=libBorrows
+        .filter(b=>String(b.ensemble_id)===String(e.id)&&linkedBorrowIds.has(b.id))
+        .map(b=>libPieces.find(p=>p.id===b.piece_id))
+        .filter(Boolean)
+        .sort((a,b)=>a.title.localeCompare(b.title));
+      const body=pieces.length
+        ?pieces.map(p=>`<div class="lib-hist-cell-piece"><span class="lib-hist-piece-title">${esc(p.title)}</span>${p.level!=null?`<span class="lib-hist-piece-level">[${p.level===99?'Prof':p.level}]</span>`:''}</div>`).join('')
+        :`<span class="lib-hist-empty">—</span>`;
+      return`<div class="lh-brick-col" onclick="openManageEventsModal();renderLinkPiecesView('${ev.id}');showRightPanel('${ev.id}',year,'${e.id}')">${body}</div>`;
+    }).join('');
+    const posStyle=gridCol!==null
+      ?`grid-column:${gridCol+1};`
+      :`margin-left:calc(${firstIdx}*100%/${n});width:calc(${brickSpan}*100%/${n});`;
+    return`<div class="lh-event-brick" style="${posStyle}">
+      <div class="lh-brick-header" onclick="openManageEventsModal();renderLinkPiecesView('${ev.id}')">
+        <span class="lh-tile-name">${esc(ev.name)}</span><span class="lh-tile-date">${evDate}</span>
+      </div>
+      <div class="lh-brick-cols" style="grid-template-columns:repeat(${brickSpan},1fr);">${colsHTML}</div>
+    </div>`;
+  }
+
   let bodyHTML='';
   if(!visibleYears.length){
     bodyHTML='<div style="color:var(--grey-400);padding:2rem;">No data for the selected filters.</div>';
@@ -2231,36 +2258,49 @@ function renderLibHistory(){
       const yearBorrows=libBorrows.filter(b=>new Date(b.date).getFullYear()===year);
       bodyHTML+=`<div class="lib-hist-year-divider">${year}</div>`;
 
+      // Group events into rows: wide events get own row, narrow (span=1) events pack together
+      const rows=[];
+      let packRow=null; // {occupiedCols:Set, events:[]}
+
       yearEvents.forEach(ev=>{
         const linkedBorrowIds=new Set(libBorrowPerfs.filter(bp=>bp.event_id===ev.id).map(bp=>bp.borrow_id));
         const ensHasPieces=visibleEns.map(e=>libBorrows.some(b=>String(b.ensemble_id)===String(e.id)&&linkedBorrowIds.has(b.id)));
         const firstIdx=ensHasPieces.indexOf(true);
         const lastIdx=ensHasPieces.lastIndexOf(true);
         if(firstIdx===-1)return;
-
         const brickSpan=lastIdx-firstIdx+1;
-        const evDate=new Date(ev.date+'T00:00:00').toLocaleDateString('en-AU',{month:'short',day:'numeric'});
+        const evData={ev,linkedBorrowIds,firstIdx,lastIdx,brickSpan};
 
-        // inner columns = only the ensembles from firstIdx to lastIdx
-        const innerEns=visibleEns.slice(firstIdx,lastIdx+1);
-        const colsHTML=innerEns.map(e=>{
-          const pieces=libBorrows
-            .filter(b=>String(b.ensemble_id)===String(e.id)&&linkedBorrowIds.has(b.id))
-            .map(b=>libPieces.find(p=>p.id===b.piece_id))
-            .filter(Boolean)
-            .sort((a,b)=>a.title.localeCompare(b.title));
-          const body=pieces.length
-            ?pieces.map(p=>`<div class="lib-hist-cell-piece"><span class="lib-hist-piece-title">${esc(p.title)}</span>${p.level!=null?`<span class="lib-hist-piece-level">[${p.level===99?'Prof':p.level}]</span>`:''}</div>`).join('')
-            :`<span class="lib-hist-empty">—</span>`;
-          return`<div class="lh-brick-col" onclick="openManageEventsModal();renderLinkPiecesView('${ev.id}');showRightPanel('${ev.id}',${year},'${e.id}')">${body}</div>`;
-        }).join('');
+        if(brickSpan>1){
+          // Wide: flush pack row, then own row
+          if(packRow&&packRow.events.length){rows.push({type:'pack',events:packRow.events});packRow=null;}
+          rows.push({type:'wide',events:[evData]});
+        } else {
+          // Narrow (span=1): try to add to current pack row
+          const col=firstIdx;
+          if(!packRow){
+            packRow={occupiedCols:new Set([col]),events:[evData]};
+          } else if(!packRow.occupiedCols.has(col)){
+            packRow.occupiedCols.add(col);
+            packRow.events.push(evData);
+          } else {
+            // Column taken: flush and start new pack row
+            rows.push({type:'pack',events:packRow.events});
+            packRow={occupiedCols:new Set([col]),events:[evData]};
+          }
+        }
+      });
+      if(packRow&&packRow.events.length)rows.push({type:'pack',events:packRow.events});
 
-        bodyHTML+=`<div class="lh-event-brick" style="margin-left:calc(${firstIdx}*100%/${n});width:calc(${brickSpan}*100%/${n});">
-          <div class="lh-brick-header" onclick="openManageEventsModal();renderLinkPiecesView('${ev.id}')">
-            <span class="lh-tile-name">${esc(ev.name)}</span><span class="lh-tile-date">${evDate}</span>
-          </div>
-          <div class="lh-brick-cols" style="grid-template-columns:repeat(${brickSpan},1fr);">${colsHTML}</div>
-        </div>`;
+      // Render rows
+      rows.forEach(row=>{
+        if(row.type==='wide'){
+          bodyHTML+=renderEventBrick(row.events[0]);
+        } else {
+          // Pack row: CSS grid, each event at its column
+          const bricksHTML=row.events.map(evData=>renderEventBrick(evData,evData.firstIdx)).join('');
+          bodyHTML+=`<div style="display:grid;grid-template-columns:repeat(${n},1fr);gap:.4rem;margin-bottom:.4rem;">${bricksHTML}</div>`;
+        }
       });
 
       // Rehearsed but Not Performed — full width brick
