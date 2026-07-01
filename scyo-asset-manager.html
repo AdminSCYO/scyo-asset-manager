@@ -2858,9 +2858,8 @@ async function saveEditEvent(eventId){
 }
 
 
+function renderLinkPiecesView(eventId){
   const event=libEvents.find(e=>e.id===eventId);
-  if(!event)return;
-  document.getElementById('lib-events-modal-title').textContent=`${event.name} — Link pieces`;
   const internalEns=libEnsembles.filter(e=>!e.name.toLowerCase().startsWith('external'));
   const eventYear=new Date(event.date).getFullYear();
   const ensOpts=internalEns.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('');
