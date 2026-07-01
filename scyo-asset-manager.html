@@ -2222,7 +2222,7 @@ function renderLibHistory(){
         const rows=yearEvents.map(ev=>{
           // find borrow_ids linked to this event
           const linkedBorrowIds=new Set(libBorrowPerfs.filter(bp=>bp.event_id===ev.id).map(bp=>bp.borrow_id));
-          const cellHeader=`<div class="lib-hist-cell-header">${esc(ev.name)} · ${new Date(ev.date+'T00:00:00').toLocaleDateString('en-AU',{month:'short',day:'numeric'})}</div>`;
+          const cellHeader=`<div class="lib-hist-cell-header" style="cursor:pointer;" onclick="openManageEventsModal();renderLinkPiecesView('${ev.id}')">${esc(ev.name)} · ${new Date(ev.date+'T00:00:00').toLocaleDateString('en-AU',{month:'short',day:'numeric'})}</div>`;
           const cells=visibleEns.map(e=>{
             // pieces performed by this ensemble at this event
             const pieces=libBorrows
