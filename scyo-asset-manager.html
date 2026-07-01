@@ -2860,22 +2860,57 @@ async function saveEditEvent(eventId){
 
 function renderLinkPiecesView(eventId){
   const event=libEvents.find(e=>e.id===eventId);
+  if(!event)return;
+  document.getElementById('lib-events-modal-title').textContent=event.name;
   const internalEns=libEnsembles.filter(e=>!e.name.toLowerCase().startsWith('external'));
   const eventYear=new Date(event.date).getFullYear();
   const ensOpts=internalEns.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('');
+
+  // left panel: linked pieces grouped by ensemble
+  const linkedBorrowIds=new Set(libBorrowPerfs.filter(bp=>bp.event_id===eventId).map(bp=>bp.borrow_id));
+  const linkedBorrows=libBorrows.filter(b=>linkedBorrowIds.has(b.id));
+  const byEns={};
+  linkedBorrows.forEach(b=>{
+    const ensName=libEnsembles.find(e=>e.id===b.ensemble_id)?.name||'Unknown';
+    if(!byEns[ensName])byEns[ensName]=[];
+    const piece=libPieces.find(p=>p.id===b.piece_id);
+    if(piece)byEns[ensName].push({borrow:b,piece});
+  });
+  const linkedHTML=Object.keys(byEns).sort().length
+    ?Object.keys(byEns).sort().map(ensName=>`
+      <div style="margin-bottom:.85rem;">
+        <div style="font-size:.72rem;font-weight:700;color:var(--grey-400);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.3rem;">${esc(ensName)}</div>
+        ${byEns[ensName].sort((a,b)=>a.piece.title.localeCompare(b.piece.title)).map(({borrow,piece})=>`
+          <div style="display:flex;align-items:center;gap:.4rem;padding:.2rem 0;border-bottom:1px solid var(--grey-100);">
+            <div style="flex:1;font-size:.8rem;color:var(--grey-800);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(piece.title)}${piece.level!=null?`<span style="color:var(--grey-400);font-style:italic;font-size:.7rem;"> [${piece.level===99?'Prof':piece.level}]</span>`:''}</div>
+            <button onclick="unlinkBorrowFromEvent('${borrow.id}','${eventId}')" style="background:none;border:none;color:var(--grey-300);cursor:pointer;font-size:.75rem;flex-shrink:0;padding:0 .15rem;" title="Unlink">✕</button>
+          </div>`).join('')}
+      </div>`).join('')
+    :`<div style="color:var(--grey-400);font-size:.82rem;font-style:italic;">No pieces linked yet.</div>`;
+
   document.getElementById('lib-events-modal-body').innerHTML=`
-    <div style="font-size:.82rem;color:var(--grey-500);margin-bottom:.85rem;">Select an ensemble to see pieces they borrowed in ${eventYear}. Unlinked pieces show first.</div>
-    <div class="fg" style="margin-bottom:.75rem;">
-      <label>Ensemble</label>
-      <select id="link-pieces-ens" onchange="renderLinkPiecesList('${eventId}',${eventYear})" style="width:100%;">
-        <option value="">Select ensemble…</option>
-        ${ensOpts}
-      </select>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;min-height:300px;">
+      <div style="min-width:0;">
+        <div style="font-size:.72rem;font-weight:700;color:var(--grey-400);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.6rem;">Linked pieces</div>
+        <div id="linked-pieces-left">${linkedHTML}</div>
+      </div>
+      <div style="border-left:1px solid var(--grey-100);padding-left:1.25rem;min-width:0;">
+        <div style="font-size:.72rem;font-weight:700;color:var(--grey-400);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.6rem;">Add pieces — ${eventYear}</div>
+        <div class="fg" style="margin-bottom:.6rem;">
+          <label>Ensemble</label>
+          <select id="link-pieces-ens" onchange="renderLinkPiecesList('${eventId}',${eventYear})" style="width:100%;">
+            <option value="">Select ensemble…</option>
+            ${ensOpts}
+          </select>
+        </div>
+        <div id="link-pieces-list" style="max-height:280px;overflow-y:auto;"></div>
+        <div id="borrow-btn-wrap" style="display:none;margin-top:.5rem;">
+          <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;border:1.5px dashed var(--grey-200);" onclick="renderBorrowAndLinkForm('${eventId}')">+ Borrow a piece not listed</button>
+        </div>
+      </div>
     </div>
-    <div id="link-pieces-list"></div>
-    <div style="margin-top:1rem;padding-top:.75rem;border-top:1px solid var(--grey-100);display:flex;gap:.5rem;align-items:center;">
+    <div style="margin-top:1rem;padding-top:.75rem;border-top:1px solid var(--grey-100);">
       <button class="btn btn-ghost btn-sm" onclick="renderEventsHome()">← Back to events</button>
-      <button class="btn btn-ghost btn-sm" id="borrow-piece-btn" style="display:none;margin-left:auto;" onclick="renderBorrowAndLinkForm('${eventId}')">+ Borrow a piece</button>
     </div>
   `;
 }
@@ -2883,7 +2918,7 @@ function renderLinkPiecesView(eventId){
 function renderLinkPiecesList(eventId, eventYear){
   const ensId=document.getElementById('link-pieces-ens')?.value;
   if(!ensId)return;
-  document.getElementById('borrow-piece-btn').style.display='';
+  document.getElementById('borrow-btn-wrap').style.display='';
   const yearBorrows=libBorrows.filter(b=>String(b.ensemble_id)===String(ensId)&&new Date(b.date).getFullYear()===eventYear);
   if(!yearBorrows.length){
     document.getElementById('link-pieces-list').innerHTML=`<div style="color:var(--grey-400);font-size:.82rem;">No borrows found for this ensemble in ${eventYear}.</div>`;
@@ -2979,7 +3014,32 @@ async function submitBorrowAndLink(eventId,ensId,date){
   await db.from('library_borrow_performances').insert({borrow_id:newBorrow.id,event_id:eventId});
   await loadLibData();
   showToast('Borrowed & linked ✓');
-  renderLinkPiecesView(eventId);
+  renderLinkPiecesView(eventId);}
+
+
+function refreshLinkedPiecesLeft(eventId){
+  const el=document.getElementById('linked-pieces-left');
+  if(!el)return;
+  const linkedBorrowIds=new Set(libBorrowPerfs.filter(bp=>bp.event_id===eventId).map(bp=>bp.borrow_id));
+  const linkedBorrows=libBorrows.filter(b=>linkedBorrowIds.has(b.id));
+  const byEns={};
+  linkedBorrows.forEach(b=>{
+    const ensName=libEnsembles.find(e=>e.id===b.ensemble_id)?.name||'Unknown';
+    if(!byEns[ensName])byEns[ensName]=[];
+    const piece=libPieces.find(p=>p.id===b.piece_id);
+    if(piece)byEns[ensName].push({borrow:b,piece});
+  });
+  el.innerHTML=Object.keys(byEns).sort().length
+    ?Object.keys(byEns).sort().map(ensName=>`
+      <div style="margin-bottom:.85rem;">
+        <div style="font-size:.72rem;font-weight:700;color:var(--grey-400);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.3rem;">${esc(ensName)}</div>
+        ${byEns[ensName].sort((a,b)=>a.piece.title.localeCompare(b.piece.title)).map(({borrow,piece})=>`
+          <div style="display:flex;align-items:center;gap:.4rem;padding:.2rem 0;border-bottom:1px solid var(--grey-100);">
+            <div style="flex:1;font-size:.8rem;color:var(--grey-800);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(piece.title)}${piece.level!=null?`<span style="color:var(--grey-400);font-style:italic;font-size:.7rem;"> [${piece.level===99?'Prof':piece.level}]</span>`:''}</div>
+            <button onclick="unlinkBorrowFromEvent('${borrow.id}','${eventId}')" style="background:none;border:none;color:var(--grey-300);cursor:pointer;font-size:.75rem;flex-shrink:0;padding:0 .15rem;" title="Unlink">✕</button>
+          </div>`).join('')}
+      </div>`).join('')
+    :`<div style="color:var(--grey-400);font-size:.82rem;font-style:italic;">No pieces linked yet.</div>`;
 }
 
 
@@ -2987,6 +3047,7 @@ async function linkBorrowToEventDirect(borrowId,eventId){
   await db.from('library_borrow_performances').insert({borrow_id:borrowId,event_id:eventId});
   await loadLibData();
   const event=libEvents.find(e=>e.id===eventId);
+  refreshLinkedPiecesLeft(eventId);
   renderLinkPiecesList(eventId,new Date(event.date).getFullYear());
   renderLibHistory();
   showToast('Linked ✓');
@@ -2996,6 +3057,7 @@ async function unlinkBorrowFromEvent(borrowId,eventId){
   await db.from('library_borrow_performances').delete().eq('borrow_id',borrowId).eq('event_id',eventId);
   await loadLibData();
   const event=libEvents.find(e=>e.id===eventId);
+  refreshLinkedPiecesLeft(eventId);
   renderLinkPiecesList(eventId,new Date(event.date).getFullYear());
   renderLibHistory();
   showToast('Unlinked ✓');
