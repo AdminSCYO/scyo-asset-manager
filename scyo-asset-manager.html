@@ -624,7 +624,7 @@
 
 <!-- MANAGE EVENTS MODAL -->
 <div class="modal-backdrop wide-modal" id="lib-events-modal">
-  <div class="modal" style="max-width:640px;max-height:90vh;display:flex;flex-direction:column;">
+  <div class="modal" style="max-width:700px;max-height:90vh;display:flex;flex-direction:column;">
     <div class="modal-header" style="flex-shrink:0;">
       <span class="modal-title" id="lib-events-modal-title">Manage Events</span>
       <button class="btn-close" onclick="closeModal('lib-events-modal')">✕</button>
@@ -2792,13 +2792,14 @@ function renderEventsHome(){
     <button class="btn btn-primary" style="width:100%;justify-content:center;margin-bottom:1rem;" onclick="renderAddEventForm()">+ Add Event</button>
     ${sorted.length?sorted.map(e=>{
       const linkCount=libBorrowPerfs.filter(bp=>bp.event_id===e.id).length;
-      return`<div style="display:flex;align-items:center;gap:.75rem;padding:.6rem 0;border-bottom:1px solid var(--grey-100);">
-        <div style="flex:1;">
+      return`<div style="display:flex;align-items:center;gap:.5rem;padding:.6rem 0;border-bottom:1px solid var(--grey-100);">
+        <div style="flex:1;min-width:0;">
           <div style="font-size:.88rem;font-weight:600;color:var(--navy);">${esc(e.name)}</div>
           <div style="font-size:.75rem;color:var(--grey-400);">${e.date} · ${linkCount} piece${linkCount!==1?'s':''} linked</div>
         </div>
-        <button class="btn btn-ghost btn-sm" onclick="renderLinkPiecesView('${e.id}')">Link pieces</button>
-        <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteLibEvent('${e.id}')">✕</button>
+        <button class="btn btn-ghost btn-sm" style="flex-shrink:0;" onclick="renderEditEventForm('${e.id}')">Edit</button>
+        <button class="btn btn-ghost btn-sm" style="flex-shrink:0;" onclick="renderLinkPiecesView('${e.id}')">Link pieces</button>
+        <button class="btn btn-ghost btn-sm" style="flex-shrink:0;color:var(--danger);padding:.3rem .5rem;" onclick="deleteLibEvent('${e.id}')">✕</button>
       </div>`;
     }).join(''):'<div style="color:var(--grey-400);font-size:.85rem;">No events yet. Add one above.</div>'}
   `;
@@ -2829,7 +2830,34 @@ async function addLibEvent(){
   renderLinkPiecesView(newEvent.id);
 }
 
-function renderLinkPiecesView(eventId){
+function renderEditEventForm(eventId){
+  const event=libEvents.find(e=>e.id===eventId);
+  if(!event)return;
+  document.getElementById('lib-events-modal-title').textContent='Edit Event';
+  document.getElementById('lib-events-modal-body').innerHTML=`
+    <div class="fg"><label>Event name *</label><input type="text" id="edit-event-name" value="${esc(event.name)}"/></div>
+    <div class="fg"><label>Date *</label><input type="date" id="edit-event-date" value="${event.date}"/></div>
+    <div style="display:flex;gap:.5rem;margin-top:.75rem;">
+      <button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="saveEditEvent('${eventId}')">Save</button>
+      <button class="btn btn-ghost" style="flex:1;justify-content:center;" onclick="renderEventsHome()">Cancel</button>
+    </div>
+  `;
+  document.getElementById('edit-event-name')?.focus();
+}
+
+async function saveEditEvent(eventId){
+  const name=document.getElementById('edit-event-name')?.value.trim();
+  const date=document.getElementById('edit-event-date')?.value;
+  if(!name){showToast('Event name required');return;}
+  if(!date){showToast('Date required');return;}
+  await db.from('library_events').update({name,date}).eq('id',eventId);
+  await loadLibData();
+  renderEventsHome();
+  renderLibHistory();
+  showToast('Event updated ✓');
+}
+
+
   const event=libEvents.find(e=>e.id===eventId);
   if(!event)return;
   document.getElementById('lib-events-modal-title').textContent=`${event.name} — Link pieces`;
