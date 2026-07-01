@@ -2887,7 +2887,7 @@ function renderLinkPiecesView(eventId){
       return`<div style="margin-bottom:.85rem;border:1.5px solid var(--grey-200);border-radius:var(--radius);overflow:hidden;">
         <div style="background:#1B3A6B;color:white;padding:.4rem .75rem;display:flex;align-items:center;justify-content:space-between;">
           <span style="font-size:.78rem;font-weight:700;letter-spacing:.04em;">${esc(ensName)}</span>
-          <button onclick="showRightPanel('${eventId}',${eventYear},'${ensId}')" style="background:rgba(255,255,255,.15);border:none;color:white;font-size:.7rem;font-weight:600;padding:.15rem .5rem;border-radius:3px;cursor:pointer;">+ Add piece</button>
+          <button onclick="showRightPanel('${eventId}',${eventYear},'${ensId}');renderBorrowAndLinkForm('${eventId}','${ensId}')" style="background:rgba(255,255,255,.15);border:none;color:white;font-size:.7rem;font-weight:600;padding:.15rem .5rem;border-radius:3px;cursor:pointer;">+ Add piece</button>
         </div>
         <div style="padding:.35rem .65rem;">
           ${pieces.map(({borrow,piece})=>`
@@ -2969,10 +2969,10 @@ function renderLinkPiecesList(eventId, eventYear){
   `;
 }
 
-function renderBorrowAndLinkForm(eventId){
+function renderBorrowAndLinkForm(eventId, passedEnsId){
   const event=libEvents.find(e=>e.id===eventId);
   if(!event)return;
-  const ensId=document.getElementById('link-pieces-ens')?.value;
+  const ensId=passedEnsId||document.getElementById('link-pieces-ens')?.value;
   const ens=libEnsembles.find(e=>e.id===ensId);
   document.getElementById('lib-events-modal-title').textContent='Borrow & Link';
 
