@@ -1939,13 +1939,17 @@ async function loadLibData(){
   libPieces=pieces||[];libBorrows=borrows||[];libPerformances=perfs||[];libEnsembles=ensembles||[];
   const _savedCat=sessionStorage.getItem('scyo-lib-cat');
   if(_savedCat&&['Band','Strings','Orchestra','Jazz Band'].includes(_savedCat))libActiveCat=_savedCat;
+  const _savedView=sessionStorage.getItem('scyo-lib-view');
+  if(_savedView&&['catalogue','history'].includes(_savedView))libActiveView=_savedView;
   showLibView();
   renderLibCatTabs();
-  renderLibCatalogue();
+  switchLibView(libActiveView);
+  if(libActiveView!=='history')renderLibCatalogue();
 }
 
 function switchLibView(view){
   libActiveView=view;
+  sessionStorage.setItem('scyo-lib-view',view);
   document.getElementById('lib-catalogue').style.display=view==='catalogue'?'block':'none';
   document.getElementById('lib-history').style.display=view==='history'?'flex':'none';
   document.getElementById('lib-search-wrap').style.display=view==='catalogue'?'flex':'none';
