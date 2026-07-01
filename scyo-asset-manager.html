@@ -2207,6 +2207,11 @@ function renderLibCatalogue(){
 function renderLibHistory(){
   const container=document.getElementById('lib-history');
 
+  // initialise filter state
+  if(!container._hiddenYears) container._hiddenYears=new Set();
+  if(!container._hiddenEvents) container._hiddenEvents=new Set();
+  if(!container._hiddenEns) container._hiddenEns=new Set();
+
   // --- collect available years and event types for filters ---
   const allYears=[...new Set([
     ...libPerformances.map(p=>new Date(p.date).getFullYear()),
@@ -2352,10 +2357,6 @@ function renderLibHistory(){
   }
 
   // build checkbox dropdown filters
-  if(!container._hiddenYears) container._hiddenYears=new Set();
-  if(!container._hiddenEvents) container._hiddenEvents=new Set();
-  if(!container._hiddenEns) container._hiddenEns=new Set();
-
   const yearItems=allYears.map(y=>`
     <label class="hist-chk-item">
       <input type="checkbox" ${container._hiddenYears.has(String(y))?'':'checked'} onchange="libHistToggleItem('years','${y}',this.checked)"/>
