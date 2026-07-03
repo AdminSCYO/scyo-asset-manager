@@ -1821,7 +1821,12 @@ function openPercItemModal(assetId){
 
   document.getElementById('perc-item-fields').innerHTML=`
     <div class="field-row"><div class="field-label">Asset ID</div><div class="field-val" style="font-family:monospace;font-size:.85rem;">${esc(assetId)}</div></div>
-    <div class="field-row"><div class="field-label">Type</div><div class="field-val">${esc(type?.name||'—')}</div></div>
+    <div class="field-row"><div class="field-label">Type</div><div class="field-val" style="display:flex;gap:.5rem;align-items:center;">
+      <select id="perc-type-sel-${assetId}" onchange="savePercType('${assetId}')" style="flex:1;padding:.35rem .5rem;border:1.5px solid var(--grey-200);border-radius:4px;font-family:'Inter',sans-serif;font-size:.85rem;outline:none;">
+        ${percTypes.map(t=>`<option value="${t.id}" ${asset.type_id===t.id?'selected':''}>${esc(t.name)}${t.is_bulk?' (bulk)':''}</option>`).join('')}
+      </select>
+      <button class="btn btn-ghost btn-sm" onclick="openPercTypesModal()">⚙ Manage</button>
+    </div></div>
     ${percFields.map(f=>{
       const val=state[f.name]||'';
       if(f.type==='status'){
@@ -1877,6 +1882,18 @@ async function savePercStatus(assetId){
   const loc=locSel?.value||'';
   const combined=isStorage?(loc?`In Storage at ${loc}`:'In Storage'):status;
   await savePercField(assetId,'Status',combined);
+}
+
+async function savePercType(assetId){
+  const sel=document.getElementById(`perc-type-sel-${assetId}`);
+  const typeId=sel?.value;
+  if(!typeId)return;
+  const{error}=await db.from('perc_assets').update({type_id:typeId}).eq('display_id',assetId);
+  if(error){showToast('Error: '+error.message);return;}
+  const a=percAssets.find(x=>x.display_id===assetId);
+  if(a)a.type_id=typeId;
+  renderPercView();
+  showToast('Type updated ✓');
 }
 
 async function savePercField(assetId,field,value){
