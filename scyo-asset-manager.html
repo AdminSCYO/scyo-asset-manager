@@ -518,6 +518,7 @@
         </div>
       </div>
       <div class="fg"><label>Item *</label><input type="text" id="perc-add-item" placeholder="e.g. Timpani 26inch"/></div>
+      <div class="fg"><label>Model</label><input type="text" id="perc-add-model" placeholder="e.g. Yamaha TP-5026"/></div>
       <div class="fg"><label>Serial Number</label><input type="text" id="perc-add-serial" placeholder="Serial Number"/></div>
       <div class="fg">
         <label>Status</label>
@@ -531,6 +532,8 @@
       <div class="fg"><label>Last Sighted</label><input type="date" id="perc-add-lastsighted"/></div>
       <div class="fg"><label>Last Serviced</label><input type="date" id="perc-add-lastserviced"/></div>
       <div class="fg"><label>Replacement Value (Insurance)</label><input type="number" id="perc-add-value" placeholder="0.00" min="0" step="0.01"/></div>
+      <div class="fg"><label>Acquisition Date</label><input type="date" id="perc-add-acqdate"/></div>
+      <div class="fg"><label>Purchase Price</label><input type="number" id="perc-add-price" placeholder="0.00" min="0" step="0.01"/></div>
       <div class="fg"><label>Notes</label><input type="text" id="perc-add-notes" placeholder="Notes"/></div>
       <button class="btn btn-primary" style="width:100%;justify-content:center;padding:.75rem;" onclick="submitAddPercAsset()">Add Asset</button>
     </div>
@@ -1577,7 +1580,7 @@ async function loadPercData(){
 function getPercAssetState(assetId){
   const state={};
   const entries=percLog.filter(l=>l.asset_id===assetId);
-  const fields=['Item','Serial Number','Status','Location','Last Sighted','Last Serviced','Replacement Value (Insurance)','Notes'];
+  const fields=['Item','Model','Serial Number','Status','Location','Last Sighted','Last Serviced','Replacement Value (Insurance)','Acquisition Date','Purchase Price','Notes'];
   fields.forEach(f=>{
     const entry=entries.find(l=>l.field===f);
     if(entry)state[f]=entry.data;
@@ -1756,12 +1759,15 @@ async function submitAddPercAsset(){
   const displayId=document.getElementById('perc-add-id').value.trim();
   const typeId=document.getElementById('perc-add-type').value;
   const item=document.getElementById('perc-add-item').value.trim();
+  const model=document.getElementById('perc-add-model').value.trim();
   const serial=document.getElementById('perc-add-serial').value.trim();
   const status=document.getElementById('perc-add-status').value;
   const location=document.getElementById('perc-add-location')?.value.trim()||'';
   const lastSighted=document.getElementById('perc-add-lastsighted').value;
   const lastServiced=document.getElementById('perc-add-lastserviced').value;
   const value=document.getElementById('perc-add-value').value;
+  const acqDate=document.getElementById('perc-add-acqdate').value;
+  const price=document.getElementById('perc-add-price').value;
   const notes=document.getElementById('perc-add-notes').value.trim();
 
   if(!item){showToast('Item name required');return;}
@@ -1774,10 +1780,13 @@ async function submitAddPercAsset(){
     {asset_id:displayId,user_email:currentUser.email,field:'Item',data:item},
     {asset_id:displayId,user_email:currentUser.email,field:'Status',data:status==='In Storage'?(location?`In Storage at ${location}`:'In Storage'):status},
   ];
+  if(model)logEntries.push({asset_id:displayId,user_email:currentUser.email,field:'Model',data:model});
   if(serial)logEntries.push({asset_id:displayId,user_email:currentUser.email,field:'Serial Number',data:serial});
   if(lastSighted)logEntries.push({asset_id:displayId,user_email:currentUser.email,field:'Last Sighted',data:lastSighted});
   if(lastServiced)logEntries.push({asset_id:displayId,user_email:currentUser.email,field:'Last Serviced',data:lastServiced});
   if(value)logEntries.push({asset_id:displayId,user_email:currentUser.email,field:'Replacement Value (Insurance)',data:value});
+  if(acqDate)logEntries.push({asset_id:displayId,user_email:currentUser.email,field:'Acquisition Date',data:acqDate});
+  if(price)logEntries.push({asset_id:displayId,user_email:currentUser.email,field:'Purchase Price',data:price});
   if(notes)logEntries.push({asset_id:displayId,user_email:currentUser.email,field:'Notes',data:notes});
 
   await db.from('perc_log').insert(logEntries);
@@ -1795,11 +1804,14 @@ function openPercItemModal(assetId){
 
   const percFields=[
     {name:'Item',type:'text'},
+    {name:'Model',type:'text'},
     {name:'Serial Number',type:'text'},
     {name:'Status',type:'status'},
     {name:'Last Sighted',type:'date'},
     {name:'Last Serviced',type:'date'},
     {name:'Replacement Value (Insurance)',type:'number'},
+    {name:'Acquisition Date',type:'date'},
+    {name:'Purchase Price',type:'number'},
     {name:'Notes',type:'text'},
   ];
 
