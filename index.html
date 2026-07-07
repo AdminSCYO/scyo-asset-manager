@@ -596,12 +596,6 @@
       <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--grey-100);">
         <div style="font-size:.82rem;font-weight:700;color:var(--grey-600);margin-bottom:.5rem;">Add New Type</div>
         <div class="fg"><label>Type Name *</label><input type="text" id="perc-new-type-name" placeholder="e.g. Music Stand"/></div>
-        <div class="fg" style="display:flex;align-items:center;gap:.75rem;">
-          <label style="text-transform:none;letter-spacing:0;font-size:.875rem;display:flex;align-items:center;gap:.5rem;cursor:pointer;">
-            <input type="checkbox" id="perc-new-type-bulk" style="width:auto;padding:0;border:none;"/>
-            Bulk item (group in table view)
-          </label>
-        </div>
         <button class="btn btn-primary" onclick="submitAddPercType()">Add Type</button>
       </div>
     </div>
@@ -1667,9 +1661,9 @@ function renderPercView(){
     }).join('')}
   </tr>`;
 
-  // Separate bulk and non-bulk types
-  const bulkTypes=percTypes.filter(t=>t.is_bulk);
-  const nonBulkTypeIds=new Set(percTypes.filter(t=>!t.is_bulk).map(t=>t.id));
+  // Every type groups in the table view.
+  const bulkTypes=percTypes;
+  const typedIds=new Set(percTypes.map(t=>t.id));
 
   // Filter assets
   const filtered=percAssets.filter(a=>{
@@ -1697,8 +1691,8 @@ function renderPercView(){
     return 0;
   });
 
-  // Non-bulk: individual rows
-  sortedFiltered.filter(a=>!a.type_id||nonBulkTypeIds.has(a.type_id)).forEach(a=>{
+  // Untyped assets (no matching type) render as individual rows.
+  sortedFiltered.filter(a=>!a.type_id||!typedIds.has(a.type_id)).forEach(a=>{
     const state=getPercAssetState(a.display_id);
     const type=percTypes.find(t=>t.id===a.type_id);
     rows+=`<tr style="border-bottom:1px solid var(--grey-100);cursor:pointer;" onclick="openPercItemModal('${a.display_id}')" onmouseover="this.style.background='var(--grey-50)'" onmouseout="this.style.background=''">
@@ -1772,7 +1766,7 @@ function openAddPercModal(presetTypeId=''){
 
   // Populate type dropdown
   const sel=document.getElementById('perc-add-type');
-  sel.innerHTML=`<option value="">Select type…</option>`+percTypes.map(t=>`<option value="${t.id}">${esc(t.name)}${t.is_bulk?' (bulk)':''}</option>`).join('');
+  sel.innerHTML=`<option value="">Select type…</option>`+percTypes.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('');
   if(presetTypeId)sel.value=presetTypeId;
 
   // Clear fields
@@ -1871,7 +1865,7 @@ function openPercItemModal(assetId){
     <div class="field-row"><div class="field-label">Asset ID</div><div class="field-val" style="font-family:monospace;font-size:.85rem;">${esc(assetId)}</div></div>
     <div class="field-row"><div class="field-label">Type</div><div class="field-val" style="display:flex;gap:.5rem;align-items:center;">
       <select id="perc-type-sel-${assetId}" onchange="savePercType('${assetId}')" style="flex:1;padding:.35rem .5rem;border:1.5px solid var(--grey-200);border-radius:4px;font-family:'Inter',sans-serif;font-size:.85rem;outline:none;">
-        ${percTypes.map(t=>`<option value="${t.id}" ${asset.type_id===t.id?'selected':''}>${esc(t.name)}${t.is_bulk?' (bulk)':''}</option>`).join('')}
+        ${percTypes.map(t=>`<option value="${t.id}" ${asset.type_id===t.id?'selected':''}>${esc(t.name)}</option>`).join('')}
       </select>
       <button class="btn btn-ghost btn-sm" onclick="openPercTypesModal()">⚙ Manage</button>
     </div></div>
@@ -2024,26 +2018,20 @@ async function renderPercTypesList(){
           onfocus="this.style.borderColor='var(--grey-200)';this.style.background='white';"
           onmouseover="if(document.activeElement!==this)this.style.borderColor='var(--grey-100)';"
           onmouseout="if(document.activeElement!==this)this.style.borderColor='transparent';"/>
-        <div style="font-size:.75rem;color:var(--grey-400);padding-left:.5rem;">${t.is_bulk?'Bulk':'Individual'}</div>
       </div>
-      <label style="display:flex;align-items:center;gap:.35rem;font-size:.78rem;cursor:pointer;">
-        <input type="checkbox" ${t.is_bulk?'checked':''} onchange="updatePercType('${t.id}','is_bulk',this.checked)" style="width:auto;padding:0;border:none;"/> Bulk
-      </label>
       <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deletePercType('${t.id}')">✕</button>
     </div>
   `).join(''):'<div style="color:var(--grey-400);font-size:.82rem;padding:.5rem 0;">No types yet.</div>';
   // Also refresh dropdown in add modal if open
   const sel=document.getElementById('perc-add-type');
-  if(sel)sel.innerHTML=`<option value="">Select type…</option>`+percTypes.map(t=>`<option value="${t.id}">${esc(t.name)}${t.is_bulk?' (bulk)':''}</option>`).join('');
+  if(sel)sel.innerHTML=`<option value="">Select type…</option>`+percTypes.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('');
 }
 
 async function submitAddPercType(){
   const name=document.getElementById('perc-new-type-name').value.trim();
-  const isBulk=document.getElementById('perc-new-type-bulk').checked;
   if(!name){showToast('Type name required');return;}
-  await db.from('perc_types').insert({name,is_bulk:isBulk,sort_order:percTypes.length});
+  await db.from('perc_types').insert({name,is_bulk:true,sort_order:percTypes.length});
   document.getElementById('perc-new-type-name').value='';
-  document.getElementById('perc-new-type-bulk').checked=false;
   await renderPercTypesList();
   showToast('Type added ✓');
 }
