@@ -397,6 +397,13 @@
       <input type="text" id="perc-search" placeholder="Search..." oninput="renderPercView()" style="padding-left:2.2rem;"/>
     </div>
     <button class="btn btn-primary" onclick="openAddPercModal()">+ Add Asset</button>
+    <div class="col-picker-wrap no-print">
+      <button class="btn btn-ghost" onclick="togglePercColPicker()" id="perc-col-picker-btn">⚙ Columns</button>
+      <div class="col-picker" id="perc-col-picker" style="display:none;">
+        <div class="col-picker-title">Visible Columns</div>
+        <div id="perc-col-picker-list"></div>
+      </div>
+    </div>
   </div>
   <div id="perc-view" style="display:none;">
     <table id="perc-table" style="width:100%;border-collapse:collapse;">
@@ -531,9 +538,9 @@
       <div id="perc-add-status-detail"></div>
       <div class="fg"><label>Last Sighted</label><input type="date" id="perc-add-lastsighted"/></div>
       <div class="fg"><label>Last Serviced</label><input type="date" id="perc-add-lastserviced"/></div>
-      <div class="fg"><label>Replacement Value (Insurance)</label><input type="number" id="perc-add-value" placeholder="0.00" min="0" step="0.01"/></div>
+      <div class="fg"><label>Replacement Value (Insurance)</label><div style="position:relative;display:flex;align-items:center;"><span style="position:absolute;left:.6rem;color:var(--grey-500);font-size:.875rem;pointer-events:none;">$</span><input type="number" id="perc-add-value" placeholder="0.00" min="0" step="0.01" style="padding-left:1.4rem;"/></div></div>
       <div class="fg"><label>Acquisition Date</label><input type="date" id="perc-add-acqdate"/></div>
-      <div class="fg"><label>Purchase Price</label><input type="number" id="perc-add-price" placeholder="0.00" min="0" step="0.01"/></div>
+      <div class="fg"><label>Purchase Price</label><div style="position:relative;display:flex;align-items:center;"><span style="position:absolute;left:.6rem;color:var(--grey-500);font-size:.875rem;pointer-events:none;">$</span><input type="number" id="perc-add-price" placeholder="0.00" min="0" step="0.01" style="padding-left:1.4rem;"/></div></div>
       <div class="fg"><label>Notes</label><input type="text" id="perc-add-notes" placeholder="Notes"/></div>
       <button class="btn btn-primary" style="width:100%;justify-content:center;padding:.75rem;" onclick="submitAddPercAsset()">Add Asset</button>
     </div>
@@ -1006,6 +1013,7 @@ function toggleCol(id,visible){
 
 document.addEventListener('click',e=>{
   if(!e.target.closest('.col-picker-wrap'))document.getElementById('col-picker').style.display='none';
+  if(!e.target.closest('#perc-col-picker')&&!e.target.closest('#perc-col-picker-btn')){const pp=document.getElementById('perc-col-picker');if(pp)pp.style.display='none';}
   if(!e.target.closest('#status-picker')&&!e.target.closest('#status-picker-btn'))document.getElementById('status-picker').style.display='none';
 });
 
@@ -1591,6 +1599,56 @@ function getPercAssetState(assetId){
 let percSortCol='id',percSortAsc=true;
 function percSortBy(col){if(percSortCol===col)percSortAsc=!percSortAsc;else{percSortCol=col;percSortAsc=true;}renderPercView();}
 
+// ── PERC COLUMN PICKER ────────────────────────────────────────
+const PERC_COLS=[
+  {key:'item',label:'Item',sort:'item'},
+  {key:'type',label:'Type',sort:'type'},
+  {key:'model',label:'Model',sort:null},
+  {key:'serial',label:'Serial #',sort:null},
+  {key:'status',label:'Status',sort:'status'},
+  {key:'lastsighted',label:'Last Sighted',sort:'lastsighted'},
+  {key:'lastserviced',label:'Last Serviced',sort:null},
+  {key:'value',label:'Repl. Value (Ins.)',sort:null},
+  {key:'acqdate',label:'Acquisition Date',sort:null},
+  {key:'price',label:'Purchase Price',sort:null},
+  {key:'notes',label:'Notes',sort:null},
+];
+// Default: show what was previously shown; new columns hidden until enabled.
+let percHiddenCols=new Set(['model','serial','lastserviced','value','acqdate','price','notes']);
+
+function renderPercColPicker(){
+  const el=document.getElementById('perc-col-picker-list');
+  if(!el)return;
+  el.innerHTML=PERC_COLS.map(c=>`
+    <label><input type="checkbox" ${percHiddenCols.has(c.key)?'':'checked'} onchange="togglePercCol('${c.key}',this.checked)"/> ${esc(c.label)}</label>
+  `).join('');
+}
+function togglePercColPicker(){const p=document.getElementById('perc-col-picker');p.style.display=p.style.display==='none'?'block':'none';}
+function togglePercCol(key,visible){if(visible)percHiddenCols.delete(key);else percHiddenCols.add(key);renderPercView();}
+
+function fmtPercMoney(v){const n=parseFloat(v);return isNaN(n)?esc(v):'$'+n.toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2});}
+
+function percDataCells(state,type,cols){
+  const pad='padding:.65rem 1rem;';
+  return cols.map(key=>{
+    if(key==='item')return `<td style="${pad}font-weight:600;">${esc(state['Item']||'—')}</td>`;
+    if(key==='type')return `<td style="${pad}font-size:.82rem;color:var(--grey-600);">${esc(type?.name||'—')}</td>`;
+    if(key==='model')return `<td style="${pad}font-size:.85rem;">${esc(state['Model']||'—')}</td>`;
+    if(key==='serial')return `<td style="${pad}font-size:.82rem;font-family:monospace;color:var(--grey-600);">${esc(state['Serial Number']||'—')}</td>`;
+    if(key==='status'){
+      const {cls,label,location}=parsePercStatus(state['Status']||'In Storage');
+      return `<td style="${pad}"><span class="status-chip sc-${cls}">${label}</span>${location?`<span style="font-size:.75rem;color:var(--grey-500);margin-left:.4rem;">${esc(location)}</span>`:''}</td>`;
+    }
+    if(key==='lastsighted')return `<td style="${pad}font-size:.85rem;">${state['Last Sighted']?fmtDate(state['Last Sighted']):'—'}</td>`;
+    if(key==='lastserviced')return `<td style="${pad}font-size:.85rem;">${state['Last Serviced']?fmtDate(state['Last Serviced']):'—'}</td>`;
+    if(key==='value')return `<td style="${pad}font-size:.85rem;">${state['Replacement Value (Insurance)']?fmtPercMoney(state['Replacement Value (Insurance)']):'—'}</td>`;
+    if(key==='acqdate')return `<td style="${pad}font-size:.85rem;">${state['Acquisition Date']?fmtDate(state['Acquisition Date']):'—'}</td>`;
+    if(key==='price')return `<td style="${pad}font-size:.85rem;">${state['Purchase Price']?fmtPercMoney(state['Purchase Price']):'—'}</td>`;
+    if(key==='notes')return `<td style="${pad}font-size:.85rem;color:var(--grey-600);">${esc(state['Notes']||'—')}</td>`;
+    return '';
+  }).join('');
+}
+
 function renderPercView(){
   const q=(document.getElementById('perc-search')?.value||'').toLowerCase();
   const thead=document.getElementById('perc-thead');
@@ -1598,13 +1656,17 @@ function renderPercView(){
 
   const arr=col=>percSortCol===col?(percSortAsc?'▲':'▼'):'';
   const thStyle='padding:.6rem 1rem;text-align:left;font-size:.75rem;font-weight:700;color:var(--grey-600);text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid var(--grey-200);background:var(--grey-50);cursor:pointer;user-select:none;white-space:nowrap;';
+  const visCols=PERC_COLS.filter(c=>!percHiddenCols.has(c.key)).map(c=>c.key);
+  renderPercColPicker();
   thead.innerHTML=`<tr>
     <th style="${thStyle}" onclick="percSortBy('id')">ID <span style="font-size:.65rem;">${arr('id')}</span></th>
-    <th style="${thStyle}" onclick="percSortBy('item')">Item <span style="font-size:.65rem;">${arr('item')}</span></th>
-    <th style="${thStyle}" onclick="percSortBy('type')">Type <span style="font-size:.65rem;">${arr('type')}</span></th>
-    <th style="${thStyle}" onclick="percSortBy('status')">Status <span style="font-size:.65rem;">${arr('status')}</span></th>
-    <th style="${thStyle}" onclick="percSortBy('lastsighted')">Last Sighted <span style="font-size:.65rem;">${arr('lastsighted')}</span></th>
-    <th style="${thStyle}">Action</th>
+    ${visCols.map(key=>{
+      const c=PERC_COLS.find(x=>x.key===key);
+      return c.sort
+        ? `<th style="${thStyle}" onclick="percSortBy('${c.sort}')">${esc(c.label)} <span style="font-size:.65rem;">${arr(c.sort)}</span></th>`
+        : `<th style="${thStyle}cursor:default;">${esc(c.label)}</th>`;
+    }).join('')}
+    <th style="${thStyle}cursor:default;">Action</th>
   </tr>`;
 
   // Separate bulk and non-bulk types
@@ -1641,17 +1703,9 @@ function renderPercView(){
   sortedFiltered.filter(a=>!a.type_id||nonBulkTypeIds.has(a.type_id)).forEach(a=>{
     const state=getPercAssetState(a.display_id);
     const type=percTypes.find(t=>t.id===a.type_id);
-    const rawStatus=state['Status']||'In Storage';
-    const {cls:statusCls,label:statusLabel,location:statusLoc}=parsePercStatus(rawStatus);
     rows+=`<tr style="border-bottom:1px solid var(--grey-100);cursor:pointer;" onclick="openPercItemModal('${a.display_id}')" onmouseover="this.style.background='var(--grey-50)'" onmouseout="this.style.background=''">
       <td style="padding:.65rem 1rem;font-family:monospace;font-size:.82rem;color:var(--grey-600);">${esc(a.display_id)}</td>
-      <td style="padding:.65rem 1rem;font-weight:600;">${esc(state['Item']||'—')}</td>
-      <td style="padding:.65rem 1rem;font-size:.82rem;color:var(--grey-600);">${esc(type?.name||'—')}</td>
-      <td style="padding:.65rem 1rem;">
-        <span class="status-chip sc-${statusCls}">${statusLabel}</span>
-        ${statusLoc?`<span style="font-size:.75rem;color:var(--grey-500);margin-left:.4rem;">${esc(statusLoc)}</span>`:''}
-      </td>
-      <td style="padding:.65rem 1rem;font-size:.85rem;">${state['Last Sighted']?fmtDate(state['Last Sighted']):'—'}</td>
+      ${percDataCells(state,type,visCols)}
       <td style="padding:.65rem 1rem;"><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openPercItemModal('${a.display_id}')">Edit</button></td>
     </tr>`;
   });
@@ -1674,36 +1728,32 @@ function renderPercView(){
 
     const expandId=`perc-bulk-${type.id}`;
     rows+=`<tr style="border-bottom:1px solid var(--grey-200);background:var(--grey-50);cursor:pointer;" onclick="togglePercBulk('${type.id}')">
-      <td style="padding:.65rem 1rem;" colspan="2">
-        <span style="font-weight:700;color:var(--navy);">${esc(type.name)}</span>
-        <span style="font-size:.82rem;color:var(--grey-500);margin-left:.5rem;">× ${count}</span>
-        <span id="perc-bulk-arrow-${type.id}" style="font-size:.75rem;color:var(--grey-400);margin-left:.5rem;">▶</span>
+      <td style="padding:.65rem 1rem;" colspan="${1+visCols.length}">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;">
+          <span>
+            <span style="font-weight:700;color:var(--navy);">${esc(type.name)}</span>
+            <span style="font-size:.82rem;color:var(--grey-500);margin-left:.5rem;">× ${count}</span>
+            <span id="perc-bulk-arrow-${type.id}" style="font-size:.75rem;color:var(--grey-400);margin-left:.5rem;">▶</span>
+          </span>
+          <span style="text-align:right;">${locSummary}</span>
+        </div>
       </td>
-      <td style="padding:.65rem 1rem;font-size:.82rem;color:var(--grey-600);"></td>
-      <td style="padding:.65rem 1rem;" colspan="3">${locSummary}</td>
       <td style="padding:.65rem 1rem;"><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openAddPercModal('${type.id}')">+ Add</button></td>
     </tr>`;
 
     // Individual units (hidden by default)
     typeAssets.forEach(a=>{
       const state=getPercAssetState(a.display_id);
-      const rawStatus=state['Status']||'In Storage';
-      const {cls:statusCls,label:statusLabel,location:statusLoc}=parsePercStatus(rawStatus);
+      const type2=percTypes.find(t=>t.id===a.type_id);
       rows+=`<tr class="${expandId}" style="display:none;border-bottom:1px solid var(--grey-100);background:#fafbfc;cursor:pointer;" onclick="openPercItemModal('${a.display_id}')" onmouseover="this.style.background='var(--grey-50)'" onmouseout="this.style.background='#fafbfc'">
         <td style="padding:.5rem 1rem .5rem 2rem;font-family:monospace;font-size:.78rem;color:var(--grey-500);">${esc(a.display_id)}</td>
-        <td style="padding:.5rem 1rem;font-size:.85rem;">${esc(state['Item']||'—')}</td>
-        <td style="padding:.5rem 1rem;"></td>
-        <td style="padding:.5rem 1rem;">
-          <span class="status-chip sc-${statusCls}" style="font-size:.7rem;padding:.2rem .5rem;">${statusLabel}</span>
-          ${statusLoc?`<span style="font-size:.72rem;color:var(--grey-500);margin-left:.3rem;">${esc(statusLoc)}</span>`:''}
-        </td>
-        <td style="padding:.5rem 1rem;font-size:.82rem;">${state['Last Sighted']?fmtDate(state['Last Sighted']):'—'}</td>
+        ${percDataCells(state,type2,visCols)}
         <td style="padding:.5rem 1rem;"><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openPercItemModal('${a.display_id}')">Edit</button></td>
       </tr>`;
     });
   });
 
-  tbody.innerHTML=rows||`<tr><td colspan="7" style="text-align:center;padding:3rem;color:var(--grey-400);">No assets found.</td></tr>`;
+  tbody.innerHTML=rows||`<tr><td colspan="${visCols.length+2}" style="text-align:center;padding:3rem;color:var(--grey-400);">No assets found.</td></tr>`;
 }
 
 function togglePercBulk(typeId){
@@ -1809,9 +1859,9 @@ function openPercItemModal(assetId){
     {name:'Status',type:'status'},
     {name:'Last Sighted',type:'date'},
     {name:'Last Serviced',type:'date'},
-    {name:'Replacement Value (Insurance)',type:'number'},
+    {name:'Replacement Value (Insurance)',type:'currency'},
     {name:'Acquisition Date',type:'date'},
-    {name:'Purchase Price',type:'number'},
+    {name:'Purchase Price',type:'currency'},
     {name:'Notes',type:'text'},
   ];
 
@@ -1846,6 +1896,17 @@ function openPercItemModal(assetId){
                 ${locOpts}
               </select>
               <button class="btn btn-ghost btn-sm" onclick="openPercLocationsModal()">⚙</button>
+            </div>
+          </div>
+        </div>`;
+      }
+      if(f.type==='currency'){
+        return`<div class="field-row">
+          <div class="field-label">${esc(f.name)}</div>
+          <div class="field-val">
+            <div style="position:relative;display:flex;align-items:center;">
+              <span style="position:absolute;left:.6rem;color:var(--grey-500);font-size:.875rem;pointer-events:none;">$</span>
+              <input class="field-input" style="padding-left:1.4rem;" type="number" min="0" step="0.01" value="${esc(val)}" placeholder="0.00" onblur="savePercField('${assetId}','${f.name}',this.value)" data-orig="${esc(val)}"/>
             </div>
           </div>
         </div>`;
