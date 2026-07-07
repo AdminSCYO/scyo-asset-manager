@@ -299,6 +299,8 @@
     .lib-rehearsed-piece-level{flex-shrink:0;white-space:nowrap;color:var(--grey-400);font-style:italic;font-size:.7rem;}
 
   </style>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="https://apis.google.com/js/api.js" async defer></script>
 </head>
 <body>
 
@@ -2100,6 +2102,97 @@ function _svcAmountVal(a){return(a!=null&&a!=='')?a:'';}
 
 function _svcPrefix(containerId){return containerId==='perc-service-log'?'perc':'ins';}
 
+// ── GOOGLE DRIVE RECEIPT UPLOAD ───────────────────────────────
+const DRIVE_CLIENT_ID='922198352469-27qu80v9cbqe2uiikcsurbo7k5nb39ig.apps.googleusercontent.com';
+const DRIVE_FOLDER_ID='17oLmzY-nOmI2aFQAuNNbKqcZVJ--hPH7';
+const DRIVE_SCOPE='https://www.googleapis.com/auth/drive.file';
+let _driveTokenClient=null,_driveToken=null,_driveTokenExp=0;
+let _svcAddReceipts=[],_svcEditReceipts=[];
+const _svcCache={};
+
+function _driveGetToken(){
+  return new Promise((resolve,reject)=>{
+    if(_driveToken&&Date.now()<_driveTokenExp-60000){resolve(_driveToken);return;}
+    if(!window.google||!google.accounts||!google.accounts.oauth2){reject(new Error('Google sign-in not loaded yet — refresh and retry.'));return;}
+    if(!_driveTokenClient){
+      _driveTokenClient=google.accounts.oauth2.initTokenClient({client_id:DRIVE_CLIENT_ID,scope:DRIVE_SCOPE,callback:()=>{}});
+    }
+    _driveTokenClient.callback=(resp)=>{
+      if(resp.error){reject(new Error(resp.error));return;}
+      _driveToken=resp.access_token;
+      _driveTokenExp=Date.now()+(resp.expires_in?resp.expires_in*1000:3600000);
+      resolve(_driveToken);
+    };
+    try{_driveTokenClient.requestAccessToken({prompt:_driveToken?'':'consent'});}catch(e){reject(e);}
+  });
+}
+
+async function driveUploadFile(file){
+  const token=await _driveGetToken();
+  const metadata={name:file.name,parents:[DRIVE_FOLDER_ID]};
+  const form=new FormData();
+  form.append('metadata',new Blob([JSON.stringify(metadata)],{type:'application/json'}));
+  form.append('file',file);
+  const res=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink',{
+    method:'POST',headers:{Authorization:'Bearer '+token},body:form
+  });
+  if(!res.ok){throw new Error('Drive upload failed ('+res.status+')');}
+  const data=await res.json();
+  return {name:data.name,url:data.webViewLink};
+}
+
+function _receiptChipsHtml(arr,scope){
+  if(!arr||!arr.length)return '<div style="font-size:.72rem;color:var(--grey-400);">No receipts attached.</div>';
+  return arr.map((r,i)=>`<div style="display:flex;align-items:center;gap:.4rem;font-size:.78rem;padding:.15rem 0;">
+    <a href="${esc(r.url)}" target="_blank" rel="noopener" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--navy);">📎 ${esc(r.name)}</a>
+    <button class="btn btn-ghost btn-sm" style="color:var(--danger);padding:.05rem .35rem;" onclick="removeReceipt('${scope}',${i})">✕</button>
+  </div>`).join('');
+}
+
+function renderReceiptBox(containerId,scope){
+  const box=document.getElementById(`svc-receipts-${containerId}`);
+  if(!box)return;
+  const arr=scope==='add'?_svcAddReceipts:_svcEditReceipts;
+  box.innerHTML=`
+    <label style="${_svcLbl}">Receipts</label>
+    <div id="svc-drop-${containerId}"
+      ondragover="event.preventDefault();this.style.background='var(--grey-50)';"
+      ondragleave="this.style.background='';"
+      ondrop="handleReceiptDrop(event,'${containerId}','${scope}')"
+      onclick="document.getElementById('svc-file-${containerId}').click()"
+      style="border:1.5px dashed var(--grey-200);border-radius:6px;padding:.6rem;text-align:center;font-size:.75rem;color:var(--grey-500);cursor:pointer;">
+      Drag &amp; drop or click to upload
+    </div>
+    <input type="file" id="svc-file-${containerId}" multiple style="display:none;" onchange="handleReceiptPick(event,'${containerId}','${scope}')"/>
+    <div style="margin-top:.4rem;">${_receiptChipsHtml(arr,scope)}</div>
+  `;
+}
+
+async function _uploadReceipts(fileList,containerId,scope){
+  const arr=scope==='add'?_svcAddReceipts:_svcEditReceipts;
+  const drop=document.getElementById(`svc-drop-${containerId}`);
+  for(const f of Array.from(fileList)){
+    if(drop){drop.textContent='Uploading '+f.name+'…';drop.style.background='var(--grey-50)';}
+    try{arr.push(await driveUploadFile(f));}
+    catch(e){showToast(e.message||'Upload failed');}
+  }
+  renderReceiptBox(containerId,scope);
+}
+
+function handleReceiptDrop(e,containerId,scope){
+  e.preventDefault();
+  if(e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files.length)_uploadReceipts(e.dataTransfer.files,containerId,scope);
+}
+function handleReceiptPick(e,containerId,scope){
+  if(e.target.files&&e.target.files.length)_uploadReceipts(e.target.files,containerId,scope);
+}
+function removeReceipt(scope,i){
+  const arr=scope==='add'?_svcAddReceipts:_svcEditReceipts;
+  arr.splice(i,1);
+  ['ins-service-log','perc-service-log'].forEach(cid=>{if(document.getElementById(`svc-receipts-${cid}`))renderReceiptBox(cid,scope);});
+}
+
+
 function openServicePanel(prefix,assetId,mode){
   const panel=document.getElementById(`${prefix}-service-panel`);
   if(!panel)return;
@@ -2147,6 +2240,7 @@ async function renderServiceLog(assetId,containerId){
   const mode=_svcMode[containerId]||'history';
   const{data,error}=await db.from('service_log').select('*').eq('asset_id',assetId).order('service_date',{ascending:false});
   const services=error?[]:(data||[]);
+  _svcCache[containerId]=services;
 
   if(mode==='add'){
     el.innerHTML=`
@@ -2157,10 +2251,12 @@ async function renderServiceLog(assetId,containerId){
         </div>
         <div style="margin-top:.4rem;"><label style="${_svcLbl}">Business</label><input type="text" id="svc-business-${containerId}" placeholder="Where was it serviced?" style="${_svcInp}"/></div>
         <div style="margin-top:.4rem;"><label style="${_svcLbl}">Details</label><textarea id="svc-details-${containerId}" rows="3" placeholder="What was done?" style="${_svcInp}resize:vertical;"></textarea></div>
+        <div id="svc-receipts-${containerId}" style="margin-top:.5rem;"></div>
         <button class="btn btn-primary btn-sm" style="margin-top:.6rem;width:100%;justify-content:center;" onclick="addServiceLog('${assetId}','${containerId}')">+ Log Service</button>
       </div>
       <button class="btn btn-ghost btn-sm" style="margin-top:.6rem;" onclick="showServiceHistory('${assetId}','${containerId}')">← Service history</button>
     `;
+    renderReceiptBox(containerId,'add');
     return;
   }
 
@@ -2175,6 +2271,7 @@ async function renderServiceLog(assetId,containerId){
       </div>
       <div style="margin-top:.4rem;"><label style="${_svcLbl}">Business</label><input type="text" id="svce-business-${containerId}" value="${esc(s.business||'')}" style="${_svcInp}"/></div>
       <div style="margin-top:.4rem;"><label style="${_svcLbl}">Details</label><textarea id="svce-details-${containerId}" rows="3" style="${_svcInp}resize:vertical;">${esc(s.details||'')}</textarea></div>
+      <div id="svc-receipts-${containerId}" style="margin-top:.5rem;"></div>
       <div style="display:flex;gap:.4rem;margin-top:.5rem;">
         <button class="btn btn-primary btn-sm" onclick="saveServiceEdit('${s.id}','${assetId}','${containerId}')">Save changes</button>
         <button class="btn btn-ghost btn-sm" onclick="cancelServiceEdit('${assetId}','${containerId}')">Cancel</button>
@@ -2194,6 +2291,7 @@ async function renderServiceLog(assetId,containerId){
       </div>
       ${s.business?`<div style="font-size:.8rem;color:var(--grey-800);margin-top:.2rem;">${esc(s.business)}</div>`:''}
       ${s.details?`<div style="font-size:.78rem;color:var(--grey-600);margin-top:.2rem;white-space:pre-wrap;">${esc(s.details)}</div>`:''}
+      ${(s.receipt_files&&s.receipt_files.length)?`<div style="margin-top:.35rem;">${s.receipt_files.map(r=>`<a href="${esc(r.url)}" target="_blank" rel="noopener" style="display:block;font-size:.75rem;color:var(--navy);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📎 ${esc(r.name)}</a>`).join('')}</div>`:''}
       <div style="font-size:.7rem;color:var(--grey-400);margin-top:.35rem;">Logged by ${esc(s.user_email||'unknown')} · ${s.created_at?fmtDate(s.created_at):''}</div>
     </div>`;
   }).join(''):'<div style="color:var(--grey-400);font-size:.8rem;padding:.25rem 0 .5rem;">No services logged.</div>';
@@ -2202,11 +2300,12 @@ async function renderServiceLog(assetId,containerId){
     <button class="btn btn-primary btn-sm" style="width:100%;justify-content:center;margin-bottom:.75rem;" onclick="showServiceAdd('${assetId}','${containerId}')">+ Log a service</button>
     ${list}
   `;
+  if(_svcEditingId)renderReceiptBox(containerId,'edit');
 }
 
-function showServiceAdd(assetId,containerId){_svcMode[containerId]='add';_svcEditingId=null;renderServiceLog(assetId,containerId);const d=document.getElementById(`svc-date-${containerId}`);if(d)d.focus();}
+function showServiceAdd(assetId,containerId){_svcMode[containerId]='add';_svcEditingId=null;_svcAddReceipts=[];renderServiceLog(assetId,containerId);const d=document.getElementById(`svc-date-${containerId}`);if(d)d.focus();}
 function showServiceHistory(assetId,containerId){_svcMode[containerId]='history';_svcEditingId=null;renderServiceLog(assetId,containerId);}
-function editServiceLog(id,assetId,containerId){_svcMode[containerId]='history';_svcEditingId=id;renderServiceLog(assetId,containerId);}
+function editServiceLog(id,assetId,containerId){_svcMode[containerId]='history';_svcEditingId=id;const rec=(_svcCache[containerId]||[]).find(x=>x.id===id);_svcEditReceipts=rec&&rec.receipt_files?JSON.parse(JSON.stringify(rec.receipt_files)):[];renderServiceLog(assetId,containerId);}
 function cancelServiceEdit(assetId,containerId){_svcEditingId=null;renderServiceLog(assetId,containerId);}
 
 async function addServiceLog(assetId,containerId){
@@ -2217,9 +2316,11 @@ async function addServiceLog(assetId,containerId){
   if(!date){showToast('Service date required');return;}
   const{error}=await db.from('service_log').insert({
     asset_id:assetId,service_date:date,business:business||null,
-    amount:amount===''?null:parseFloat(amount),details:details||null,user_email:currentUser.email
+    amount:amount===''?null:parseFloat(amount),details:details||null,user_email:currentUser.email,
+    receipt_files:_svcAddReceipts
   });
   if(error){showToast('Error: '+error.message);return;}
+  _svcAddReceipts=[];
   _svcMode[containerId]='history';
   await renderServiceLog(assetId,containerId);
   await syncLastServiced(assetId,containerId);
@@ -2236,7 +2337,8 @@ async function saveServiceEdit(id,assetId,containerId){
   const{error}=await db.from('service_log').update({
     service_date:date,business:business||null,
     amount:amount===''?null:parseFloat(amount),details:details||null,
-    user_email:currentUser.email,created_at:new Date().toISOString()
+    user_email:currentUser.email,created_at:new Date().toISOString(),
+    receipt_files:_svcEditReceipts
   }).eq('id',id);
   if(error){showToast('Error: '+error.message);return;}
   _svcEditingId=null;
