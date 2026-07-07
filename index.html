@@ -460,6 +460,13 @@
         <div class="hist-title">History</div>
         <div id="edit-history"></div>
       </div>
+      <div id="ins-service-panel" style="display:none;width:320px;padding:1.25rem;overflow-y:auto;background:white;border-left:1px solid var(--grey-100);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;">
+          <div class="hist-title" style="margin:0;">Service Log</div>
+          <button class="btn-close" style="width:26px;height:26px;font-size:.85rem;" onclick="closeServicePanel('ins')">✕</button>
+        </div>
+        <div id="ins-service-log"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -559,6 +566,13 @@
       <div class="modal-history" style="width:280px;padding:1.25rem;overflow-y:auto;background:var(--grey-50);border-left:1px solid var(--grey-100);">
         <div class="hist-title">History</div>
         <div id="perc-item-history"></div>
+      </div>
+      <div id="perc-service-panel" style="display:none;width:320px;padding:1.25rem;overflow-y:auto;background:white;border-left:1px solid var(--grey-100);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;">
+          <div class="hist-title" style="margin:0;">Service Log</div>
+          <button class="btn-close" style="width:26px;height:26px;font-size:.85rem;" onclick="closeServicePanel('perc')">✕</button>
+        </div>
+        <div id="perc-service-log"></div>
       </div>
     </div>
   </div>
@@ -1058,9 +1072,9 @@ async function openEditModal(assetId){
     return`<div class="field-row">
       <div class="field-label">${esc(f.name)}</div>
       <div class="field-val">${input}</div>
-    </div>`;
+    </div>${f.name==='Last Serviced'?serviceButtonsHtml('ins',assetId):''}`;
   }).join('');
-  document.getElementById('edit-fields').innerHTML=fieldsHtml+`<div id="ins-service-log"></div>`;
+  document.getElementById('edit-fields').innerHTML=fieldsHtml;
   // Init inline status detail field
   _inlineStatusDetail={assetId,statusType,statusDetail};
   renderInlineStatusDetail(assetId);
@@ -1075,7 +1089,7 @@ async function openEditModal(assetId){
   `).join(''):'<div style="color:var(--grey-400);font-size:.82rem;">No history yet.</div>';
 
   document.getElementById('edit-modal').classList.add('open');
-  renderServiceLog(assetId,'ins-service-log');
+  resetServicePanel('ins');
 }
 
 function markChanged(el){
@@ -1908,9 +1922,8 @@ function openPercItemModal(assetId){
         <div class="field-val">
           <input class="field-input" type="${f.type==='number'?'number':f.type==='date'?'date':'text'}" value="${esc(val)}" placeholder="${esc(f.name)}" data-field="${esc(f.name)}" onblur="savePercField('${assetId}','${f.name}',this.value)" data-orig="${esc(val)}"/>
         </div>
-      </div>`;
+      </div>${f.name==='Last Serviced'?serviceButtonsHtml('perc',assetId):''}`;
     }).join('')}
-    <div id="perc-service-log"></div>
   `;
 
   // History
@@ -1924,7 +1937,7 @@ function openPercItemModal(assetId){
   `).join(''):'<div style="color:var(--grey-400);font-size:.82rem;">No history yet.</div>';
 
   document.getElementById('perc-item-modal').classList.add('open');
-  renderServiceLog(assetId,'perc-service-log');
+  resetServicePanel('perc');
 }
 
 async function savePercStatus(assetId){
@@ -2070,14 +2083,78 @@ async function deletePercType(typeId){
 let _svcEditingId=null;
 const _svcInp="padding:.4rem .5rem;border:1.5px solid var(--grey-200);border-radius:6px;font-family:'Inter',sans-serif;font-size:.82rem;outline:none;width:100%;box-sizing:border-box;";
 const _svcLbl='font-size:.7rem;color:var(--grey-600);display:block;margin-bottom:.15rem;';
+// Per-panel view mode: 'history' (list of blocks) or 'add' (new-service form).
+const _svcMode={'ins-service-log':'history','perc-service-log':'history'};
 
 function _svcAmountVal(a){return(a!=null&&a!=='')?a:'';}
+
+function _svcPrefix(containerId){return containerId==='perc-service-log'?'perc':'ins';}
+
+function openServicePanel(prefix,assetId,mode){
+  const panel=document.getElementById(`${prefix}-service-panel`);
+  if(!panel)return;
+  panel.style.display='block';
+  const modalSel=prefix==='perc'?'#perc-item-modal .modal':'#edit-modal .modal';
+  const modalEl=document.querySelector(modalSel);
+  if(modalEl)modalEl.style.maxWidth=prefix==='perc'?'1120px':'1200px';
+  const containerId=`${prefix}-service-log`;
+  _svcMode[containerId]=mode||'history';
+  _svcEditingId=null;
+  renderServiceLog(assetId,containerId);
+  if((mode||'history')==='add'){const d=document.getElementById(`svc-date-${containerId}`);if(d)d.focus();}
+}
+
+function closeServicePanel(prefix){
+  const panel=document.getElementById(`${prefix}-service-panel`);
+  if(panel)panel.style.display='none';
+  const modalSel=prefix==='perc'?'#perc-item-modal .modal':'#edit-modal .modal';
+  const modalEl=document.querySelector(modalSel);
+  if(modalEl)modalEl.style.maxWidth=prefix==='perc'?'780px':'860px';
+  _svcEditingId=null;
+}
+
+function resetServicePanel(prefix){
+  const panel=document.getElementById(`${prefix}-service-panel`);
+  if(panel)panel.style.display='none';
+  const modalSel=prefix==='perc'?'#perc-item-modal .modal':'#edit-modal .modal';
+  const modalEl=document.querySelector(modalSel);
+  if(modalEl)modalEl.style.maxWidth=prefix==='perc'?'780px':'860px';
+  _svcMode[`${prefix}-service-log`]='history';
+  _svcEditingId=null;
+}
+
+function serviceButtonsHtml(prefix,assetId){
+  return`<div style="display:flex;gap:.5rem;padding:.15rem 0 .6rem;flex-wrap:wrap;">
+    <button class="btn btn-ghost btn-sm" onclick="openServicePanel('${prefix}','${assetId}','add')">+ Log a service</button>
+    <button class="btn btn-ghost btn-sm" onclick="openServicePanel('${prefix}','${assetId}','history')">View service history</button>
+  </div>`;
+}
 
 async function renderServiceLog(assetId,containerId){
   const el=document.getElementById(containerId);
   if(!el)return;
+  const prefix=_svcPrefix(containerId);
+  const mode=_svcMode[containerId]||'history';
   const{data,error}=await db.from('service_log').select('*').eq('asset_id',assetId).order('service_date',{ascending:false});
   const services=error?[]:(data||[]);
+
+  if(mode==='add'){
+    el.innerHTML=`
+      <div style="padding:.6rem;border:1px solid var(--grey-200);border-radius:6px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;">
+          <div><label style="${_svcLbl}">Date</label><input type="date" id="svc-date-${containerId}" style="${_svcInp}"/></div>
+          <div><label style="${_svcLbl}">Amount</label><div style="position:relative;display:flex;align-items:center;"><span style="position:absolute;left:.55rem;color:var(--grey-400);font-size:.82rem;pointer-events:none;">$</span><input type="number" min="0" step="0.01" id="svc-amount-${containerId}" placeholder="0.00" style="${_svcInp}padding-left:1.3rem;"/></div></div>
+        </div>
+        <div style="margin-top:.4rem;"><label style="${_svcLbl}">Business</label><input type="text" id="svc-business-${containerId}" placeholder="Where was it serviced?" style="${_svcInp}"/></div>
+        <div style="margin-top:.4rem;"><label style="${_svcLbl}">Details</label><textarea id="svc-details-${containerId}" rows="3" placeholder="What was done?" style="${_svcInp}resize:vertical;"></textarea></div>
+        <button class="btn btn-primary btn-sm" style="margin-top:.6rem;width:100%;justify-content:center;" onclick="addServiceLog('${assetId}','${containerId}')">+ Log Service</button>
+      </div>
+      <button class="btn btn-ghost btn-sm" style="margin-top:.6rem;" onclick="showServiceHistory('${assetId}','${containerId}')">← Service history</button>
+    `;
+    return;
+  }
+
+  // history mode
   const list=services.length?services.map(s=>{
     if(s.id===_svcEditingId){
       return`
@@ -2087,7 +2164,7 @@ async function renderServiceLog(assetId,containerId){
         <div><label style="${_svcLbl}">Amount</label><div style="position:relative;display:flex;align-items:center;"><span style="position:absolute;left:.55rem;color:var(--grey-400);font-size:.82rem;pointer-events:none;">$</span><input type="number" min="0" step="0.01" id="svce-amount-${containerId}" value="${esc(_svcAmountVal(s.amount))}" placeholder="0.00" style="${_svcInp}padding-left:1.3rem;"/></div></div>
       </div>
       <div style="margin-top:.4rem;"><label style="${_svcLbl}">Business</label><input type="text" id="svce-business-${containerId}" value="${esc(s.business||'')}" style="${_svcInp}"/></div>
-      <div style="margin-top:.4rem;"><label style="${_svcLbl}">Details</label><textarea id="svce-details-${containerId}" rows="2" style="${_svcInp}resize:vertical;">${esc(s.details||'')}</textarea></div>
+      <div style="margin-top:.4rem;"><label style="${_svcLbl}">Details</label><textarea id="svce-details-${containerId}" rows="3" style="${_svcInp}resize:vertical;">${esc(s.details||'')}</textarea></div>
       <div style="display:flex;gap:.4rem;margin-top:.5rem;">
         <button class="btn btn-primary btn-sm" onclick="saveServiceEdit('${s.id}','${assetId}','${containerId}')">Save changes</button>
         <button class="btn btn-ghost btn-sm" onclick="cancelServiceEdit('${assetId}','${containerId}')">Cancel</button>
@@ -2112,21 +2189,14 @@ async function renderServiceLog(assetId,containerId){
   }).join(''):'<div style="color:var(--grey-400);font-size:.8rem;padding:.25rem 0 .5rem;">No services logged.</div>';
 
   el.innerHTML=`
-    <div style="font-size:.75rem;font-weight:700;color:var(--grey-600);text-transform:uppercase;letter-spacing:.04em;margin:1.25rem 0 .6rem;border-top:1px solid var(--grey-100);padding-top:1rem;">Service Log</div>
+    <button class="btn btn-primary btn-sm" style="width:100%;justify-content:center;margin-bottom:.75rem;" onclick="showServiceAdd('${assetId}','${containerId}')">+ Log a service</button>
     ${list}
-    <div style="margin-top:.6rem;padding:.6rem;border:1px dashed var(--grey-200);border-radius:6px;">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;">
-        <div><label style="${_svcLbl}">Date</label><input type="date" id="svc-date-${containerId}" style="${_svcInp}"/></div>
-        <div><label style="${_svcLbl}">Amount</label><div style="position:relative;display:flex;align-items:center;"><span style="position:absolute;left:.55rem;color:var(--grey-400);font-size:.82rem;pointer-events:none;">$</span><input type="number" min="0" step="0.01" id="svc-amount-${containerId}" placeholder="0.00" style="${_svcInp}padding-left:1.3rem;"/></div></div>
-      </div>
-      <div style="margin-top:.4rem;"><label style="${_svcLbl}">Business</label><input type="text" id="svc-business-${containerId}" placeholder="Where was it serviced?" style="${_svcInp}"/></div>
-      <div style="margin-top:.4rem;"><label style="${_svcLbl}">Details</label><textarea id="svc-details-${containerId}" rows="2" placeholder="What was done?" style="${_svcInp}resize:vertical;"></textarea></div>
-      <button class="btn btn-primary btn-sm" style="margin-top:.5rem;width:100%;justify-content:center;" onclick="addServiceLog('${assetId}','${containerId}')">+ Log Service</button>
-    </div>
   `;
 }
 
-function editServiceLog(id,assetId,containerId){_svcEditingId=id;renderServiceLog(assetId,containerId);}
+function showServiceAdd(assetId,containerId){_svcMode[containerId]='add';_svcEditingId=null;renderServiceLog(assetId,containerId);const d=document.getElementById(`svc-date-${containerId}`);if(d)d.focus();}
+function showServiceHistory(assetId,containerId){_svcMode[containerId]='history';_svcEditingId=null;renderServiceLog(assetId,containerId);}
+function editServiceLog(id,assetId,containerId){_svcMode[containerId]='history';_svcEditingId=id;renderServiceLog(assetId,containerId);}
 function cancelServiceEdit(assetId,containerId){_svcEditingId=null;renderServiceLog(assetId,containerId);}
 
 async function addServiceLog(assetId,containerId){
@@ -2140,6 +2210,7 @@ async function addServiceLog(assetId,containerId){
     amount:amount===''?null:parseFloat(amount),details:details||null,user_email:currentUser.email
   });
   if(error){showToast('Error: '+error.message);return;}
+  _svcMode[containerId]='history';
   await renderServiceLog(assetId,containerId);
   await syncLastServiced(assetId,containerId);
   showToast('Service logged ✓');
