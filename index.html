@@ -1068,7 +1068,7 @@ async function openEditModal(assetId){
       <div class="field-val">${input}</div>
     </div>`;
   }).join('');
-  document.getElementById('edit-fields').innerHTML=fieldsHtml;
+  document.getElementById('edit-fields').innerHTML=fieldsHtml+`<div id="ins-service-log"></div>`;
   // Init inline status detail field
   _inlineStatusDetail={assetId,statusType,statusDetail};
   renderInlineStatusDetail(assetId);
@@ -1083,6 +1083,7 @@ async function openEditModal(assetId){
   `).join(''):'<div style="color:var(--grey-400);font-size:.82rem;">No history yet.</div>';
 
   document.getElementById('edit-modal').classList.add('open');
+  renderServiceLog(assetId,'ins-service-log');
 }
 
 function markChanged(el){
@@ -1906,7 +1907,7 @@ function openPercItemModal(assetId){
           <div class="field-val">
             <div style="position:relative;display:flex;align-items:center;">
               <span style="position:absolute;left:.6rem;color:var(--grey-500);font-size:.875rem;pointer-events:none;">$</span>
-              <input class="field-input" style="padding-left:1.4rem;" type="number" min="0" step="0.01" value="${esc(val)}" placeholder="0.00" onblur="savePercField('${assetId}','${f.name}',this.value)" data-orig="${esc(val)}"/>
+              <input class="field-input" style="padding-left:1.4rem;" type="number" min="0" step="0.01" value="${esc(val)}" placeholder="0.00" data-field="${esc(f.name)}" onblur="savePercField('${assetId}','${f.name}',this.value)" data-orig="${esc(val)}"/>
             </div>
           </div>
         </div>`;
@@ -1914,10 +1915,11 @@ function openPercItemModal(assetId){
       return`<div class="field-row">
         <div class="field-label">${esc(f.name)}</div>
         <div class="field-val">
-          <input class="field-input" type="${f.type==='number'?'number':f.type==='date'?'date':'text'}" value="${esc(val)}" placeholder="${esc(f.name)}" onblur="savePercField('${assetId}','${f.name}',this.value)" data-orig="${esc(val)}"/>
+          <input class="field-input" type="${f.type==='number'?'number':f.type==='date'?'date':'text'}" value="${esc(val)}" placeholder="${esc(f.name)}" data-field="${esc(f.name)}" onblur="savePercField('${assetId}','${f.name}',this.value)" data-orig="${esc(val)}"/>
         </div>
       </div>`;
     }).join('')}
+    <div id="perc-service-log"></div>
   `;
 
   // History
@@ -1931,6 +1933,7 @@ function openPercItemModal(assetId){
   `).join(''):'<div style="color:var(--grey-400);font-size:.82rem;">No history yet.</div>';
 
   document.getElementById('perc-item-modal').classList.add('open');
+  renderServiceLog(assetId,'perc-service-log');
 }
 
 async function savePercStatus(assetId){
@@ -2077,6 +2080,135 @@ async function deletePercType(typeId){
 ['perc-add-modal','perc-item-modal','perc-types-modal'].forEach(id=>{
   document.getElementById(id).addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal(id);});
 });
+
+// ── SERVICE LOG (INS + PERC) ──────────────────────────────────
+let _svcEditingId=null;
+const _svcInp="padding:.4rem .5rem;border:1.5px solid var(--grey-200);border-radius:6px;font-family:'Inter',sans-serif;font-size:.82rem;outline:none;width:100%;box-sizing:border-box;";
+const _svcLbl='font-size:.7rem;color:var(--grey-600);display:block;margin-bottom:.15rem;';
+
+function _svcAmountVal(a){return(a!=null&&a!=='')?a:'';}
+
+async function renderServiceLog(assetId,containerId){
+  const el=document.getElementById(containerId);
+  if(!el)return;
+  const{data,error}=await db.from('service_log').select('*').eq('asset_id',assetId).order('service_date',{ascending:false});
+  const services=error?[]:(data||[]);
+  const list=services.length?services.map(s=>{
+    if(s.id===_svcEditingId){
+      return`
+    <div style="padding:.6rem;border:1.5px solid var(--navy);border-radius:6px;margin-bottom:.5rem;background:white;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;">
+        <div><label style="${_svcLbl}">Date</label><input type="date" id="svce-date-${containerId}" value="${esc(s.service_date||'')}" style="${_svcInp}"/></div>
+        <div><label style="${_svcLbl}">Amount</label><div style="position:relative;display:flex;align-items:center;"><span style="position:absolute;left:.55rem;color:var(--grey-400);font-size:.82rem;pointer-events:none;">$</span><input type="number" min="0" step="0.01" id="svce-amount-${containerId}" value="${esc(_svcAmountVal(s.amount))}" placeholder="0.00" style="${_svcInp}padding-left:1.3rem;"/></div></div>
+      </div>
+      <div style="margin-top:.4rem;"><label style="${_svcLbl}">Business</label><input type="text" id="svce-business-${containerId}" value="${esc(s.business||'')}" style="${_svcInp}"/></div>
+      <div style="margin-top:.4rem;"><label style="${_svcLbl}">Details</label><textarea id="svce-details-${containerId}" rows="2" style="${_svcInp}resize:vertical;">${esc(s.details||'')}</textarea></div>
+      <div style="display:flex;gap:.4rem;margin-top:.5rem;">
+        <button class="btn btn-primary btn-sm" onclick="saveServiceEdit('${s.id}','${assetId}','${containerId}')">Save changes</button>
+        <button class="btn btn-ghost btn-sm" onclick="cancelServiceEdit('${assetId}','${containerId}')">Cancel</button>
+      </div>
+      <div style="font-size:.7rem;color:var(--warning);margin-top:.5rem;">Saving re-logs this record under your name with the current timestamp, replacing the existing entry.</div>
+    </div>`;
+    }
+    return`
+    <div style="padding:.6rem;border:1px solid var(--grey-100);border-radius:6px;margin-bottom:.5rem;background:white;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.5rem;">
+        <div style="font-weight:600;font-size:.82rem;">${s.service_date?fmtDate(s.service_date):'—'}</div>
+        <div style="display:flex;align-items:center;gap:.35rem;">
+          ${(s.amount!=null&&s.amount!=='')?`<span style="font-size:.82rem;font-weight:600;color:var(--navy);">${fmtPercMoney(s.amount)}</span>`:''}
+          <button class="btn btn-ghost btn-sm" style="padding:.1rem .4rem;" title="Edit" onclick="editServiceLog('${s.id}','${assetId}','${containerId}')">✎</button>
+          <button class="btn btn-ghost btn-sm" style="padding:.1rem .4rem;color:var(--danger);" title="Delete" onclick="deleteServiceLog('${s.id}','${assetId}','${containerId}')">✕</button>
+        </div>
+      </div>
+      ${s.business?`<div style="font-size:.8rem;color:var(--grey-800);margin-top:.2rem;">${esc(s.business)}</div>`:''}
+      ${s.details?`<div style="font-size:.78rem;color:var(--grey-600);margin-top:.2rem;white-space:pre-wrap;">${esc(s.details)}</div>`:''}
+      <div style="font-size:.7rem;color:var(--grey-400);margin-top:.35rem;">Logged by ${esc(s.user_email||'unknown')} · ${s.created_at?fmtDate(s.created_at):''}</div>
+    </div>`;
+  }).join(''):'<div style="color:var(--grey-400);font-size:.8rem;padding:.25rem 0 .5rem;">No services logged.</div>';
+
+  el.innerHTML=`
+    <div style="font-size:.75rem;font-weight:700;color:var(--grey-600);text-transform:uppercase;letter-spacing:.04em;margin:1.25rem 0 .6rem;border-top:1px solid var(--grey-100);padding-top:1rem;">Service Log</div>
+    ${list}
+    <div style="margin-top:.6rem;padding:.6rem;border:1px dashed var(--grey-200);border-radius:6px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;">
+        <div><label style="${_svcLbl}">Date</label><input type="date" id="svc-date-${containerId}" style="${_svcInp}"/></div>
+        <div><label style="${_svcLbl}">Amount</label><div style="position:relative;display:flex;align-items:center;"><span style="position:absolute;left:.55rem;color:var(--grey-400);font-size:.82rem;pointer-events:none;">$</span><input type="number" min="0" step="0.01" id="svc-amount-${containerId}" placeholder="0.00" style="${_svcInp}padding-left:1.3rem;"/></div></div>
+      </div>
+      <div style="margin-top:.4rem;"><label style="${_svcLbl}">Business</label><input type="text" id="svc-business-${containerId}" placeholder="Where was it serviced?" style="${_svcInp}"/></div>
+      <div style="margin-top:.4rem;"><label style="${_svcLbl}">Details</label><textarea id="svc-details-${containerId}" rows="2" placeholder="What was done?" style="${_svcInp}resize:vertical;"></textarea></div>
+      <button class="btn btn-primary btn-sm" style="margin-top:.5rem;width:100%;justify-content:center;" onclick="addServiceLog('${assetId}','${containerId}')">+ Log Service</button>
+    </div>
+  `;
+}
+
+function editServiceLog(id,assetId,containerId){_svcEditingId=id;renderServiceLog(assetId,containerId);}
+function cancelServiceEdit(assetId,containerId){_svcEditingId=null;renderServiceLog(assetId,containerId);}
+
+async function addServiceLog(assetId,containerId){
+  const date=document.getElementById(`svc-date-${containerId}`).value;
+  const business=document.getElementById(`svc-business-${containerId}`).value.trim();
+  const amount=document.getElementById(`svc-amount-${containerId}`).value;
+  const details=document.getElementById(`svc-details-${containerId}`).value.trim();
+  if(!date){showToast('Service date required');return;}
+  const{error}=await db.from('service_log').insert({
+    asset_id:assetId,service_date:date,business:business||null,
+    amount:amount===''?null:parseFloat(amount),details:details||null,user_email:currentUser.email
+  });
+  if(error){showToast('Error: '+error.message);return;}
+  await renderServiceLog(assetId,containerId);
+  await syncLastServiced(assetId,containerId);
+  showToast('Service logged ✓');
+}
+
+async function saveServiceEdit(id,assetId,containerId){
+  const date=document.getElementById(`svce-date-${containerId}`).value;
+  const business=document.getElementById(`svce-business-${containerId}`).value.trim();
+  const amount=document.getElementById(`svce-amount-${containerId}`).value;
+  const details=document.getElementById(`svce-details-${containerId}`).value.trim();
+  if(!date){showToast('Service date required');return;}
+  if(!confirm(`This service record will be re-logged as entered by ${currentUser.email} at the current time, replacing the existing entry. Continue?`))return;
+  const{error}=await db.from('service_log').update({
+    service_date:date,business:business||null,
+    amount:amount===''?null:parseFloat(amount),details:details||null,
+    user_email:currentUser.email,created_at:new Date().toISOString()
+  }).eq('id',id);
+  if(error){showToast('Error: '+error.message);return;}
+  _svcEditingId=null;
+  await renderServiceLog(assetId,containerId);
+  await syncLastServiced(assetId,containerId);
+  showToast('Service updated ✓');
+}
+
+async function deleteServiceLog(id,assetId,containerId){
+  if(!confirm('Delete this service record?'))return;
+  const{error}=await db.from('service_log').delete().eq('id',id);
+  if(error){showToast('Error: '+error.message);return;}
+  if(_svcEditingId===id)_svcEditingId=null;
+  await renderServiceLog(assetId,containerId);
+  await syncLastServiced(assetId,containerId);
+  showToast('Service deleted ✓');
+}
+
+// Write the most recent service date back into the "Last Serviced" field.
+async function syncLastServiced(assetId,containerId){
+  const{data}=await db.from('service_log').select('service_date').eq('asset_id',assetId).order('service_date',{ascending:false}).limit(1);
+  const latest=(data&&data.length)?data[0].service_date:'';
+  const isPerc=containerId==='perc-service-log';
+  const current=(isPerc?getPercAssetState(assetId):getAssetState(assetId))['Last Serviced']||'';
+  if((latest||'')===(current||''))return;
+  const nowIso=new Date().toISOString();
+  if(isPerc){
+    await db.from('perc_log').insert({asset_id:assetId,user_email:currentUser.email,field:'Last Serviced',data:latest});
+    percLog.unshift({asset_id:assetId,user_email:currentUser.email,field:'Last Serviced',data:latest,timestamp:nowIso});
+  }else{
+    await db.from(getCatTables().log).insert({asset_id:assetId,user_email:currentUser.email,field:'Last Serviced',data:latest});
+    allLog.unshift({asset_id:assetId,user_email:currentUser.email,field:'Last Serviced',data:latest,timestamp:nowIso});
+  }
+  const sel=isPerc?'#perc-item-fields [data-field="Last Serviced"]':'#edit-fields [data-field="Last Serviced"]';
+  const inputEl=document.querySelector(sel);
+  if(inputEl){inputEl.value=latest;inputEl.dataset.orig=latest;}
+}
+
 
 // ── MUSIC LIBRARY ─────────────────────────────────────────────
 let libPieces=[],libBorrows=[],libEvents=[],libBorrowPerfs=[],libEnsembles=[];
