@@ -916,7 +916,6 @@ function renderTable(){
       const isItem=f.sort_order===1||f.name==='Item';
       return`<th class="${sortCol===f.id?'sorted':''}" onclick="sortBy('${f.id}')" style="white-space:normal;min-width:80px;max-width:140px;word-break:break-word;${isItem?'position:sticky;left:105px;z-index:11;background:var(--grey-50);':''}">${esc(header)}<span class="sort-arrow">${arrow}</span></th>`;
     }).join('')}
-    <th style="white-space:nowrap;">Action</th>
   </tr>`;
 
   let rows=getFilteredRows();
@@ -930,7 +929,7 @@ function renderTable(){
   }
 
   if(!rows.length){
-    document.getElementById('table-body').innerHTML=`<tr class="empty-row"><td colspan="${visFields.length+2}">No assets found.</td></tr>`;
+    document.getElementById('table-body').innerHTML=`<tr class="empty-row"><td colspan="${visFields.length+1}">No assets found.</td></tr>`;
     return;
   }
 
@@ -943,7 +942,7 @@ function renderTable(){
     else if(status==='Retired'){statusCls='retired';statusLabel='Retired';}
     else if(status==='Missing'){statusCls='missing';statusLabel='Missing';}
     else if(status==='In Storage'){statusCls='storage';statusLabel='In Storage';}
-    return`<tr>
+    return`<tr style="cursor:pointer;" onclick="openEditModal('${asset.display_id}')" onmouseover="this.style.background='var(--grey-50)'" onmouseout="this.style.background=''">
       <td class="id-col" style="position:sticky;left:0;background:white;z-index:1;box-shadow:2px 0 4px rgba(0,0,0,.06);">${esc(asset.display_id)}</td>
       ${visFields.map(f=>{
         if(f.name==='Status'){
@@ -960,7 +959,6 @@ function renderTable(){
         const isItem=f.sort_order===1||f.name==='Item';
         return`<td${isItem?' style="position:sticky;left:105px;background:white;z-index:1;box-shadow:2px 0 4px rgba(0,0,0,.06);"':''}>${display}</td>`;
       }).join('')}
-      <td><button class="action-btn" onclick="openEditModal('${asset.display_id}')">Edit</button></td>
     </tr>`;
   }).join('');
 }
@@ -1667,7 +1665,6 @@ function renderPercView(){
         ? `<th style="${thStyle}" onclick="percSortBy('${c.sort}')">${esc(c.label)} <span style="font-size:.65rem;">${arr(c.sort)}</span></th>`
         : `<th style="${thStyle}cursor:default;">${esc(c.label)}</th>`;
     }).join('')}
-    <th style="${thStyle}cursor:default;">Action</th>
   </tr>`;
 
   // Separate bulk and non-bulk types
@@ -1707,7 +1704,6 @@ function renderPercView(){
     rows+=`<tr style="border-bottom:1px solid var(--grey-100);cursor:pointer;" onclick="openPercItemModal('${a.display_id}')" onmouseover="this.style.background='var(--grey-50)'" onmouseout="this.style.background=''">
       <td style="padding:.65rem 1rem;font-family:monospace;font-size:.82rem;color:var(--grey-600);">${esc(a.display_id)}</td>
       ${percDataCells(state,type,visCols)}
-      <td style="padding:.65rem 1rem;"><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openPercItemModal('${a.display_id}')">Edit</button></td>
     </tr>`;
   });
 
@@ -1736,10 +1732,12 @@ function renderPercView(){
             <span style="font-size:.82rem;color:var(--grey-500);margin-left:.5rem;">× ${count}</span>
             <span id="perc-bulk-arrow-${type.id}" style="font-size:.75rem;color:var(--grey-400);margin-left:.5rem;">▶</span>
           </span>
-          <span style="text-align:right;">${locSummary}</span>
+          <span style="display:flex;align-items:center;gap:1rem;">
+            <span style="text-align:right;">${locSummary}</span>
+            <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openAddPercModal('${type.id}')">+ Add</button>
+          </span>
         </div>
       </td>
-      <td style="padding:.65rem 1rem;"><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openAddPercModal('${type.id}')">+ Add</button></td>
     </tr>`;
 
     // Individual units (hidden by default)
@@ -1749,12 +1747,11 @@ function renderPercView(){
       rows+=`<tr class="${expandId}" style="display:none;border-bottom:1px solid var(--grey-100);background:#fafbfc;cursor:pointer;" onclick="openPercItemModal('${a.display_id}')" onmouseover="this.style.background='var(--grey-50)'" onmouseout="this.style.background='#fafbfc'">
         <td style="padding:.5rem 1rem .5rem 2rem;font-family:monospace;font-size:.78rem;color:var(--grey-500);">${esc(a.display_id)}</td>
         ${percDataCells(state,type2,visCols)}
-        <td style="padding:.5rem 1rem;"><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openPercItemModal('${a.display_id}')">Edit</button></td>
       </tr>`;
     });
   });
 
-  tbody.innerHTML=rows||`<tr><td colspan="${visCols.length+2}" style="text-align:center;padding:3rem;color:var(--grey-400);">No assets found.</td></tr>`;
+  tbody.innerHTML=rows||`<tr><td colspan="${visCols.length+1}" style="text-align:center;padding:3rem;color:var(--grey-400);">No assets found.</td></tr>`;
 }
 
 function togglePercBulk(typeId){
