@@ -2016,8 +2016,14 @@ async function renderPercTypesList(){
   document.getElementById('perc-types-list').innerHTML=percTypes.length?percTypes.map(t=>`
     <div style="display:flex;align-items:center;gap:.75rem;padding:.6rem 0;border-bottom:1px solid var(--grey-100);">
       <div style="flex:1;">
-        <div style="font-weight:600;font-size:.875rem;">${esc(t.name)}</div>
-        <div style="font-size:.75rem;color:var(--grey-400);">${t.is_bulk?'Bulk':'Individual'}</div>
+        <input type="text" value="${esc(t.name)}" data-orig="${esc(t.name)}"
+          onblur="renamePercType('${t.id}',this)"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
+          style="width:100%;font-weight:600;font-size:.875rem;padding:.35rem .5rem;border:1.5px solid transparent;border-radius:4px;background:transparent;font-family:'Inter',sans-serif;outline:none;"
+          onfocus="this.style.borderColor='var(--grey-200)';this.style.background='white';"
+          onmouseover="if(document.activeElement!==this)this.style.borderColor='var(--grey-100)';"
+          onmouseout="if(document.activeElement!==this)this.style.borderColor='transparent';"/>
+        <div style="font-size:.75rem;color:var(--grey-400);padding-left:.5rem;">${t.is_bulk?'Bulk':'Individual'}</div>
       </div>
       <label style="display:flex;align-items:center;gap:.35rem;font-size:.78rem;cursor:pointer;">
         <input type="checkbox" ${t.is_bulk?'checked':''} onchange="updatePercType('${t.id}','is_bulk',this.checked)" style="width:auto;padding:0;border:none;"/> Bulk
@@ -2045,6 +2051,17 @@ async function updatePercType(typeId,field,value){
   await db.from('perc_types').update({[field]:value}).eq('id',typeId);
   await renderPercTypesList();
   await loadPercData();
+}
+
+async function renamePercType(typeId,el){
+  const name=el.value.trim();
+  const orig=el.dataset.orig;
+  if(name===orig)return;
+  if(!name){el.value=orig;showToast('Type name required');return;}
+  const dup=percTypes.some(t=>t.id!==typeId&&t.name.toLowerCase()===name.toLowerCase());
+  if(dup){el.value=orig;showToast('A type with that name already exists');return;}
+  await updatePercType(typeId,'name',name);
+  showToast('Type renamed ✓');
 }
 
 async function deletePercType(typeId){
