@@ -220,6 +220,21 @@
     .lib-icon-btn{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;border:1.5px solid var(--grey-200);border-radius:6px;background:white;font-size:.9rem;cursor:pointer;line-height:1;}
     .lib-icon-btn:hover{border-color:var(--navy);background:var(--grey-50);}
     .lib-icon-btn.active{background:#fff3cd;border-color:#e0b400;}
+    .lib-hist-card{border:1px solid var(--grey-200);border-radius:var(--radius);padding:.6rem .75rem;margin-bottom:.6rem;background:white;}
+    .lib-hist-card-top{display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.35rem;}
+    .lib-hist-type-badge{font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:.15rem .45rem;border-radius:4px;white-space:nowrap;}
+    .lib-hist-type-badge.borrow{background:#e8f0fb;color:#1B3A6B;}
+    .lib-hist-type-badge.missing{background:#fde8e8;color:var(--danger);}
+    .lib-hist-type-badge.found{background:#d4f4e3;color:var(--success);}
+    .lib-hist-date{font-size:.7rem;color:var(--grey-400);white-space:nowrap;flex-shrink:0;}
+    .lib-hist-card-main{display:flex;align-items:center;justify-content:space-between;gap:.5rem;font-size:.84rem;font-weight:600;color:var(--grey-800);}
+    .lib-hist-card-meta{font-size:.72rem;color:var(--grey-400);}
+    .lib-hist-perf-row{display:flex;align-items:baseline;gap:.4rem;padding:.25rem 0 .25rem .6rem;margin-top:.4rem;border-left:2px solid #e8f0fb;}
+    .lib-hist-perf-label{font-size:.65rem;font-weight:700;color:#1B3A6B;white-space:nowrap;}
+    .lib-hist-perf-name{font-size:.75rem;color:var(--grey-800);flex:1;}
+    .lib-hist-perf-date{font-size:.66rem;color:var(--grey-400);white-space:nowrap;}
+    .lib-hist-link-row{display:flex;gap:.3rem;align-items:center;margin-top:.5rem;padding-top:.4rem;border-top:1px dashed var(--grey-100);}
+    .lib-hist-link-row select{font-family:'Inter',sans-serif;font-size:.68rem;padding:.15rem .3rem;border:1.5px solid var(--grey-200);border-radius:4px;flex:1;color:var(--grey-500);background:var(--grey-50);}
     .lib-catalogue-table{width:auto;border-collapse:collapse;min-width:100%;}
     .lib-catalogue-table thead th{position:sticky;top:0;background:var(--grey-50);border-bottom:2px solid var(--grey-200);padding:.4rem 1rem;text-align:left;font-size:.72rem;font-weight:700;color:var(--grey-500);text-transform:uppercase;letter-spacing:.04em;cursor:pointer;user-select:none;white-space:nowrap;z-index:5;}
     .lib-catalogue-table thead th:hover{color:var(--navy);}
@@ -1560,6 +1575,7 @@ function initDrag(catId){
 function closeModal(id){document.getElementById(id)?.classList.remove('open');}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function fmtDate(iso){if(!iso)return'';return new Date(iso).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});}
+function fmtDateOnly(dateStr){if(!dateStr)return'';return new Date(dateStr+'T00:00:00').toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});}
 let _tt;function showToast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),2800);}
 
 ['edit-modal','add-modal','settings-modal','action-modal'].forEach(id=>{
@@ -2632,6 +2648,7 @@ function renderLibLabels(){
         <input type="checkbox" ${showPrinted?'checked':''} onchange="toggleLibLabelsShowPrinted(this.checked)" style="width:auto;padding:0;border:none;"/> Show printed
       </label>
       <button class="btn btn-ghost btn-sm" onclick="printLibLabels()">🖨 Print pending labels</button>
+      <button class="btn btn-ghost btn-sm" onclick="copyLibLabelTitles()">📋 Copy titles</button>
       <button class="btn btn-primary btn-sm" style="margin-left:auto;" onclick="bulkMarkLabelsPrinted()" ${pendingCount?'':'disabled'}>Mark all as printed (${pendingCount})</button>
     </div>
     <div style="overflow:auto;flex:1;min-height:0;">
@@ -2688,6 +2705,26 @@ function printLibLabels(){
   w.document.close();
   w.focus();
   setTimeout(()=>w.print(),300);
+}
+
+async function copyLibLabelTitles(){
+  const pending=libLabelRequests.filter(r=>!r.printed);
+  if(!pending.length){showToast('No pending labels to copy');return;}
+  const titles=pending.map(r=>libPieces.find(pc=>pc.id===r.piece_id)?.title).filter(Boolean);
+  const text=titles.join('\n');
+  try{
+    await navigator.clipboard.writeText(text);
+  }catch(e){
+    const ta=document.createElement('textarea');
+    ta.value=text;
+    ta.style.position='fixed';
+    ta.style.opacity='0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  }
+  showToast(`${titles.length} title${titles.length!==1?'s':''} copied — paste into your sheet ✓`);
 }
 
 function renderLibHistory(){
@@ -3119,26 +3156,29 @@ function renderLibPieceHistory(pieceId){
     const linkedEventIds=libBorrowPerfs.filter(bp=>bp.borrow_id===b.id).map(bp=>bp.event_id);
     const linkedEvents=linkedEventIds.map(eid=>libEvents.find(e=>e.id===eid)).filter(Boolean).sort((a,b)=>a.date.localeCompare(b.date));
     const perfEntries=linkedEvents.map(e=>`
-      <div style="display:flex;align-items:baseline;gap:.4rem;padding:.2rem 0 .2rem .75rem;border-left:2px solid #e8f0fb;">
-        <span style="font-size:.68rem;font-weight:700;color:#1B3A6B;white-space:nowrap;">Performed</span>
-        <span style="font-size:.75rem;color:var(--grey-800);flex:1;">${esc(e.name)}</span>
-        <span style="font-size:.68rem;color:var(--grey-400);white-space:nowrap;">${e.date}</span>
+      <div class="lib-hist-perf-row">
+        <span class="lib-hist-perf-label">Performed</span>
+        <span class="lib-hist-perf-name">${esc(e.name)}</span>
+        <span class="lib-hist-perf-date">${fmtDateOnly(e.date)}</span>
         <button onclick="unlinkBorrowEventFromEdit('${b.id}','${e.id}')" style="background:none;border:none;color:var(--grey-300);cursor:pointer;font-size:.75rem;padding:0 .1rem;line-height:1;" title="Unlink">×</button>
       </div>`).join('');
     const selectId=`hpe-${b.id}`;
     const eventOpts=eventOptGroupsHtml();
-    return{sortKey:b.date,html:`<div class="hist-entry">
-      <div class="hist-field">Borrowed${linkedEvents.length?` · ${linkedEvents.length} performance${linkedEvents.length>1?'s':''}`:''}</div>
-      <div class="hist-val">${esc(ens?.name||'Unknown')}</div>
-      <div class="hist-meta" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:${perfEntries?'.4rem':'0'};">${b.date}
-        <span style="display:flex;gap:.2rem;">
+    return{sortKey:b.date,html:`<div class="lib-hist-card">
+      <div class="lib-hist-card-top">
+        <span class="lib-hist-type-badge borrow">Borrowed${linkedEvents.length?` · ${linkedEvents.length} perf.`:''}</span>
+        <span class="lib-hist-date">${fmtDateOnly(b.date)}</span>
+      </div>
+      <div class="lib-hist-card-main">
+      <span>${esc(ens?.name||'Unknown')}</span>
+        <span style="display:flex;gap:.2rem;flex-shrink:0;">
           <button class="btn btn-ghost btn-sm" style="padding:.1rem .4rem;font-size:.7rem;" onclick="openEditBorrow('${b.id}')">Edit</button>
           <button class="btn btn-ghost btn-sm" style="padding:.1rem .4rem;font-size:.7rem;color:var(--danger);" onclick="deleteLibBorrowFromEdit('${b.id}')">\u2715</button>
         </span>
       </div>
       ${perfEntries}
-      <div style="display:flex;gap:.3rem;align-items:center;margin-top:.35rem;">
-        <select id="${selectId}" style="font-family:'Inter',sans-serif;font-size:.72rem;padding:.15rem .3rem;border:1.5px solid var(--grey-200);border-radius:4px;flex:1;color:var(--grey-600);">
+      <div class="lib-hist-link-row">
+        <select id="${selectId}">
           <option value="">+ Link to event…</option>
           ${eventOpts}
         </select>
@@ -3148,9 +3188,12 @@ function renderLibPieceHistory(pieceId){
   });
   const missingEntries=libMissingLog.filter(m=>m.piece_id===pieceId).map(m=>({
     sortKey:m.at,
-    html:`<div class="hist-entry">
-      <div class="hist-field" style="color:${m.action==='marked_missing'?'var(--danger)':'var(--success)'};">${m.action==='marked_missing'?'⚠ Marked Missing':'✓ Marked Found'}</div>
-      <div class="hist-meta">${new Date(m.at).toLocaleString()}${m.user_email?' · '+esc(m.user_email):''}</div>
+    html:`<div class="lib-hist-card">
+      <div class="lib-hist-card-top">
+        <span class="lib-hist-type-badge ${m.action==='marked_missing'?'missing':'found'}">${m.action==='marked_missing'?'⚠ Marked Missing':'✓ Marked Found'}</span>
+        <span class="lib-hist-date">${fmtDate(m.at)}</span>
+      </div>
+      ${m.user_email?`<div class="lib-hist-card-meta">${esc(m.user_email)}</div>`:''}
     </div>`
   }));
   const combined=[...borrowEntries,...missingEntries].sort((a,b)=>String(b.sortKey).localeCompare(String(a.sortKey)));
