@@ -217,6 +217,9 @@
     .lib-not-owned{display:inline-block;font-size:.68rem;font-weight:700;padding:.1rem .35rem;border-radius:3px;background:#fff3cd;color:#856404;text-transform:uppercase;margin-left:.4rem;}
     .lib-missing-badge{display:inline-flex;align-items:center;gap:.2rem;font-size:.68rem;font-weight:700;padding:.1rem .4rem;border-radius:3px;background:#fde8e8;color:var(--danger);text-transform:uppercase;white-space:nowrap;}
     .lib-label-badge{display:inline-flex;align-items:center;gap:.2rem;font-size:.68rem;font-weight:700;padding:.1rem .4rem;border-radius:3px;background:#fff3cd;color:#856404;text-transform:uppercase;white-space:nowrap;}
+    .lib-icon-btn{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;border:1.5px solid var(--grey-200);border-radius:6px;background:white;font-size:.9rem;cursor:pointer;line-height:1;}
+    .lib-icon-btn:hover{border-color:var(--navy);background:var(--grey-50);}
+    .lib-icon-btn.active{background:#fff3cd;border-color:#e0b400;}
     .lib-catalogue-table{width:auto;border-collapse:collapse;min-width:100%;}
     .lib-catalogue-table thead th{position:sticky;top:0;background:var(--grey-50);border-bottom:2px solid var(--grey-200);padding:.4rem 1rem;text-align:left;font-size:.72rem;font-weight:700;color:var(--grey-500);text-transform:uppercase;letter-spacing:.04em;cursor:pointer;user-select:none;white-space:nowrap;z-index:5;}
     .lib-catalogue-table thead th:hover{color:var(--navy);}
@@ -2581,8 +2584,10 @@ function renderLibCatalogue(){
       ${show('usage')?`<td class="lib-piece-stat">${borrows>0?'Borrowed '+borrows+'x, incl. '+perfs+' perf.':'Not used'}</td>`:''}
       <td style="text-align:center;width:30px;">${p.notes?`<span title="${esc(p.notes)}" style="font-size:.9rem;cursor:default;">📋</span>`:''}</td>
       <td style="white-space:nowrap;">
-        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openLibBorrowModal('${p.id}')">Borrow</button>
-        <button class="btn btn-ghost btn-sm" style="white-space:normal;line-height:1.15;text-align:center;width:78px;" onclick="event.stopPropagation();toggleLibLabelRequestFromEdit('${p.id}')" title="${hasPendingLabel?'Cancel filing label request':'Request a filing label'}">${hasPendingLabel?'🏷 Requested (cancel)':'Request Filing Label'}</button>
+        <div style="display:flex;gap:.35rem;">
+          <button class="lib-icon-btn" onclick="event.stopPropagation();openLibBorrowModal('${p.id}')" title="Log a borrow">🔁</button>
+          <button class="lib-icon-btn ${hasPendingLabel?'active':''}" onclick="event.stopPropagation();toggleLibLabelRequestFromEdit('${p.id}')" title="${hasPendingLabel?'Filing label requested — click to cancel':'Request a filing label'}">🏷</button>
+        </div>
       </td>
     </tr>`;
   }).join('');
