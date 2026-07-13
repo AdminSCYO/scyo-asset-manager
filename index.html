@@ -2582,7 +2582,7 @@ function renderLibCatalogue(){
       <td style="text-align:center;width:30px;">${p.notes?`<span title="${esc(p.notes)}" style="font-size:.9rem;cursor:default;">📋</span>`:''}</td>
       <td style="white-space:nowrap;">
         <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openLibBorrowModal('${p.id}')">Borrow</button>
-        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();requestLibLabel('${p.id}')" ${hasPendingLabel?'disabled':''}>${hasPendingLabel?'🏷 Requested':'🏷 Label'}</button>
+        <button class="btn btn-ghost btn-sm" style="white-space:normal;line-height:1.15;text-align:center;width:78px;" onclick="event.stopPropagation();toggleLibLabelRequestFromEdit('${p.id}')" title="${hasPendingLabel?'Cancel filing label request':'Request a filing label'}">${hasPendingLabel?'🏷 Requested (cancel)':'Request Filing Label'}</button>
       </td>
     </tr>`;
   }).join('');
@@ -3108,8 +3108,8 @@ function libHistEnsSelectAll(){
 
 
 function renderLibPieceHistory(pieceId){
-  const borrows=libBorrows.filter(b=>b.piece_id===pieceId).sort((a,b)=>b.date.localeCompare(a.date));
-  document.getElementById('lib-piece-history').innerHTML=borrows.length?borrows.map(b=>{
+  const borrows=libBorrows.filter(b=>b.piece_id===pieceId);
+  const borrowEntries=borrows.map(b=>{
     const ens=libEnsembles.find(e=>e.id===b.ensemble_id);
     const linkedEventIds=libBorrowPerfs.filter(bp=>bp.borrow_id===b.id).map(bp=>bp.event_id);
     const linkedEvents=linkedEventIds.map(eid=>libEvents.find(e=>e.id===eid)).filter(Boolean).sort((a,b)=>a.date.localeCompare(b.date));
@@ -3122,7 +3122,7 @@ function renderLibPieceHistory(pieceId){
       </div>`).join('');
     const selectId=`hpe-${b.id}`;
     const eventOpts=eventOptGroupsHtml();
-    return`<div class="hist-entry">
+    return{sortKey:b.date,html:`<div class="hist-entry">
       <div class="hist-field">Borrowed${linkedEvents.length?` · ${linkedEvents.length} performance${linkedEvents.length>1?'s':''}`:''}</div>
       <div class="hist-val">${esc(ens?.name||'Unknown')}</div>
       <div class="hist-meta" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:${perfEntries?'.4rem':'0'};">${b.date}
@@ -3139,8 +3139,17 @@ function renderLibPieceHistory(pieceId){
         </select>
         <button class="btn btn-ghost btn-sm" style="padding:.15rem .45rem;font-size:.7rem;flex-shrink:0;" onclick="linkBorrowEventFromEdit('${b.id}','${selectId}')">Link</button>
       </div>
-    </div>`;
-  }).join(''):'<div style="color:var(--grey-400);font-size:.82rem;">No borrow history yet.</div>';
+    </div>`};
+  });
+  const missingEntries=libMissingLog.filter(m=>m.piece_id===pieceId).map(m=>({
+    sortKey:m.at,
+    html:`<div class="hist-entry">
+      <div class="hist-field" style="color:${m.action==='marked_missing'?'var(--danger)':'var(--success)'};">${m.action==='marked_missing'?'⚠ Marked Missing':'✓ Marked Found'}</div>
+      <div class="hist-meta">${new Date(m.at).toLocaleString()}${m.user_email?' · '+esc(m.user_email):''}</div>
+    </div>`
+  }));
+  const combined=[...borrowEntries,...missingEntries].sort((a,b)=>String(b.sortKey).localeCompare(String(a.sortKey)));
+  document.getElementById('lib-piece-history').innerHTML=combined.length?combined.map(e=>e.html).join(''):'<div style="color:var(--grey-400);font-size:.82rem;">No history yet.</div>';
 }
 
 async function linkBorrowEventFromEdit(borrowId, selectId){
@@ -3234,8 +3243,16 @@ function renderLibPieceForm(p=null){
     </div>
     <div class="fg"><label>Notes</label><textarea id="lib-notes" style="height:70px;resize:vertical;" ${isEdit?'onblur="autoSaveLibPiece()"':''}>${esc(p?.notes||'')}</textarea></div>
     ${isEdit?`
-    <div style="display:flex;gap:.5rem;margin-top:.25rem;">
-      <button class="btn btn-ghost" style="flex:1;justify-content:center;" onclick="closeModal('lib-piece-modal');openLibBorrowModal(libEditPieceId)">+ Log Borrow</button>
+    <div class="fg"><label>Status</label>
+      <div style="display:flex;gap:.4rem;flex-wrap:wrap;align-items:center;">
+        ${p.is_missing?'<span class="lib-missing-badge">⚠ Missing</span>':'<span style="font-size:.82rem;color:var(--success);font-weight:600;">In library</span>'}
+        ${libLabelRequests.some(r=>r.piece_id===p.id&&!r.printed)?'<span class="lib-label-badge">🏷 Filing label requested</span>':''}
+      </div>
+    </div>
+    <div style="display:flex;gap:.5rem;margin-top:.25rem;flex-wrap:wrap;">
+      <button class="btn btn-ghost" style="flex:1;justify-content:center;min-width:120px;" onclick="closeModal('lib-piece-modal');openLibBorrowModal(libEditPieceId)">+ Log Borrow</button>
+      <button class="btn" style="flex:1;justify-content:center;min-width:120px;background:${p.is_missing?'#d4f4e3':'#fde8e8'};color:${p.is_missing?'var(--success)':'var(--danger)'};border:none;font-weight:700;" onclick="toggleLibMissing('${p.id}')">${p.is_missing?'✓ Mark Found':'⚠ Mark Missing'}</button>
+      <button class="btn btn-ghost" style="flex:1;justify-content:center;min-width:120px;" onclick="toggleLibLabelRequestFromEdit('${p.id}')">${libLabelRequests.some(r=>r.piece_id===p.id&&!r.printed)?'✕ Cancel Filing Label Request':'🏷 Request Filing Label'}</button>
     </div>`:'<button class="btn btn-primary" style="width:100%;justify-content:center;padding:.75rem;" onclick="submitLibPiece()">Add Piece</button>'}
   `;
 }
@@ -3468,6 +3485,13 @@ function openLibDetail(pieceId){
   document.getElementById('lib-detail-modal').classList.add('open');
 }
 
+function refreshLibPieceModalIfOpen(pieceId){
+  if(libEditPieceId===pieceId&&document.getElementById('lib-piece-modal')?.classList.contains('open')){
+    renderLibPieceForm(libPieces.find(pc=>pc.id===pieceId));
+    renderLibPieceHistory(pieceId);
+  }
+}
+
 async function toggleLibMissing(pieceId){
   const p=libPieces.find(pc=>pc.id===pieceId);
   if(!p)return;
@@ -3477,7 +3501,7 @@ async function toggleLibMissing(pieceId){
   if(error){showToast('Error: '+error.message);return;}
   await db.from('library_missing_log').insert({piece_id:pieceId,action:newVal?'marked_missing':'unmarked_missing',user_email:currentUser.email});
   await loadLibData();
-  openLibDetail(pieceId);
+  refreshLibPieceModalIfOpen(pieceId);
   showToast(newVal?'Marked missing':'Marked found ✓');
 }
 
@@ -3488,8 +3512,24 @@ async function requestLibLabel(pieceId){
   const{error}=await db.from('library_label_requests').insert({piece_id:pieceId,requested_by:currentUser.email});
   if(error){showToast('Error: '+error.message);return;}
   await loadLibData();
-  if(document.getElementById('lib-detail-modal').classList.contains('open'))openLibDetail(pieceId);
+  refreshLibPieceModalIfOpen(pieceId);
   showToast('Filing label requested ✓');
+}
+
+async function cancelLibLabelRequest(pieceId){
+  const req=libLabelRequests.find(r=>r.piece_id===pieceId&&!r.printed);
+  if(!req)return;
+  if(!confirm('Cancel this filing label request?'))return;
+  const{error}=await db.from('library_label_requests').delete().eq('id',req.id);
+  if(error){showToast('Error: '+error.message);return;}
+  await loadLibData();
+  refreshLibPieceModalIfOpen(pieceId);
+  showToast('Filing label request cancelled');
+}
+
+function toggleLibLabelRequestFromEdit(pieceId){
+  if(libLabelRequests.some(r=>r.piece_id===pieceId&&!r.printed))cancelLibLabelRequest(pieceId);
+  else requestLibLabel(pieceId);
 }
 
 function openLibBorrowModal(pieceId){
