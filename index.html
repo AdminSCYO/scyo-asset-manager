@@ -3191,7 +3191,10 @@ function renderLibPieceHistory(pieceId){
     html:`<div class="lib-hist-card">
       <div class="lib-hist-card-top">
         <span class="lib-hist-type-badge ${m.action==='marked_missing'?'missing':'found'}">${m.action==='marked_missing'?'⚠ Marked Missing':'✓ Marked Found'}</span>
-        <span class="lib-hist-date">${fmtDate(m.at)}</span>
+        <span style="display:flex;align-items:center;gap:.4rem;flex-shrink:0;">
+          <span class="lib-hist-date">${fmtDate(m.at)}</span>
+          <button class="btn btn-ghost btn-sm" style="padding:.1rem .35rem;font-size:.7rem;color:var(--danger);" onclick="deleteLibMissingLogEntry('${m.id}')" title="Delete this record">✕</button>
+        </span>
       </div>
       ${m.user_email?`<div class="lib-hist-card-meta">${esc(m.user_email)}</div>`:''}
     </div>`
@@ -3222,6 +3225,14 @@ async function unlinkBorrowEventFromEdit(borrowId, eventId){
 async function deleteLibBorrowFromEdit(id){
   if(!confirm('Delete this borrow record?'))return;
   await db.from('library_borrows').delete().eq('id',id);
+  await loadLibData();
+  renderLibPieceHistory(libEditPieceId);
+  showToast('Deleted ✓');
+}
+
+async function deleteLibMissingLogEntry(id){
+  if(!confirm('Delete this missing/found record?'))return;
+  await db.from('library_missing_log').delete().eq('id',id);
   await loadLibData();
   renderLibPieceHistory(libEditPieceId);
   showToast('Deleted ✓');
