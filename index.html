@@ -820,7 +820,7 @@
   <div class="modal" style="max-width:620px;">
     <div class="modal-header">
       <span class="modal-title" id="stk-email-title">Restock email</span>
-      <button class="btn-close" onclick="closeModal('stk-email-modal')">✕</button>
+      <button class="btn-close" onclick="closeStkEmail()">✕</button>
     </div>
     <div style="padding:1.25rem;max-height:80vh;overflow-y:auto;" id="stk-email-form"></div>
   </div>
@@ -4675,84 +4675,181 @@ async function deleteStkVariantFromEdit(){
 }
 
 // ── STOCK RESTOCK EMAIL ───────────────────────────────────────
-let stkEmailItemId=null;
+// Templates are stored as rows in stock_log (field='email_template', new_value=JSON {subject,body}).
+// Latest row per item wins. No schema change needed; old versions are kept as history.
+// Placeholders: {{order}} = auto order list, {{sender}} = signed-in user's first name.
+const STK_TPL_FIELD='email_template';
+const STK_DEFAULT_TPL={
+  subject:'Order request – {{item}} – Sunshine Coast Youth Orchestra',
+  body:`Hi,
+
+We'd like to place an order for the following:
+
+{{order}}
+
+Could you please confirm availability, pricing and an expected delivery date?
+
+Thanks,
+{{sender}}
+Sunshine Coast Youth Orchestra`
+};
+let stkEmailItemId=null,stkEmailBaseline=null,stkEmailParts=null;
+
+function stkGetTemplate(itemId){
+  const row=stockLog.find(l=>l.item_id===itemId&&l.field===STK_TPL_FIELD);
+  if(!row)return null;
+  try{const t=JSON.parse(row.new_value);return{subject:t.subject||'',body:t.body||'',by:row.user_email,at:row.timestamp};}catch(e){return null;}
+}
+
+function stkEmailOrder(item){
+  const vars=stockVariants.filter(v=>v.item_id===item.id);
+  const isSimple=!vars.some(v=>v.variant_name!==null);
+  const lines=vars.map(v=>({name:v.variant_name??item.name,qty:Math.max(0,(v.min_qty||0)-(v.qty||0))})).filter(x=>x.qty>0);
+  const total=lines.reduce((a,x)=>a+x.qty,0);
+  let text;
+  if(!lines.length)text='[Nothing is below target]';
+  else if(isSimple)text=`- ${item.name} × ${lines[0].qty}`;
+  else text=`${item.name}:\n`+lines.map(x=>`- ${x.name} × ${x.qty}`).join('\n')+(lines.length>1?`\n\nTotal: ${total}`:'');
+  return{text,lines,total};
+}
+
+function stkFill(tpl,parts){
+  return tpl.split('{{order}}').join(parts.order).split('{{sender}}').join(parts.sender).split('{{item}}').join(parts.item);
+}
+// Reverse of stkFill: turn the generated bits back into placeholders so the template stays live.
+function stkUnfill(text,parts){
+  let t=text;
+  if(parts.order&&t.includes(parts.order))t=t.split(parts.order).join('{{order}}');
+  if(parts.sender&&new RegExp('(^|\\n)'+parts.sender.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(\\n|$)').test(t))
+    t=t.replace(new RegExp('(^|\\n)'+parts.sender.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(?=\\n|$)'),'$1{{sender}}');
+  if(parts.item)t=t.split(parts.item).join('{{item}}');
+  return t;
+}
 
 function openStkRestockEmail(itemId){
   const item=stockItems.find(i=>i.id===itemId);
   if(!item)return;
   stkEmailItemId=itemId;
-  const vars=stockVariants.filter(v=>v.item_id===itemId);
-  const isSimple=!vars.some(v=>v.variant_name!==null);
   const notes=(item.reorder_notes||'').trim();
   const emailMatch=notes.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
-  const anyShort=vars.some(v=>(v.min_qty||0)>(v.qty||0));
-  const td='padding:.45rem .6rem;border-bottom:1px solid var(--grey-100);font-size:.85rem;';
-  const th='padding:.4rem .6rem;font-size:.68rem;font-weight:700;color:var(--grey-500);text-transform:uppercase;letter-spacing:.04em;border-bottom:1.5px solid var(--grey-200);background:var(--grey-50);';
+  const order=stkEmailOrder(item);
+  const meta=currentUser?.user_metadata||{};
+  stkEmailParts={order:order.text,sender:(meta.full_name||meta.name||'').split(' ')[0],item:item.name};
+  const tpl=stkGetTemplate(itemId);
+  const src=tpl||STK_DEFAULT_TPL;
+  const subject=stkFill(src.subject,stkEmailParts);
+  const body=stkFill(src.body,stkEmailParts).replace(/\n{3,}/g,'\n\n');
+  stkEmailBaseline={subject,body};
+  const summary=order.lines.length
+    ?`${order.lines.length} ${order.lines.length===1?'variant':'variants'} · ${order.total} total — enough to bring everything back up to target.`
+    :'Everything is at or above target, so there’s nothing to order right now.';
   document.getElementById('stk-email-title').textContent=`Restock email — ${item.name}`;
   document.getElementById('stk-email-form').innerHTML=`
-    <div style="font-size:.68rem;font-weight:700;color:var(--grey-400);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.2rem;">Restock instructions</div>
-    <div style="font-size:.85rem;color:${notes?'var(--grey-700)':'var(--grey-300)'};white-space:pre-wrap;margin-bottom:1rem;">${esc(notes||'None set — add them in the item header.')}</div>
-    <div style="font-size:.78rem;color:var(--grey-500);margin-bottom:.4rem;">${anyShort?'Order amounts default to what’s needed to reach target. Change any number to adjust the email.':'Everything is at or above target. Enter amounts to order anyway.'}</div>
-    <table style="width:100%;border-collapse:collapse;border:1.5px solid var(--grey-200);border-radius:var(--radius);margin-bottom:1rem;">
-      <thead><tr>
-        <th style="${th}text-align:left;">${isSimple?'Item':'Variant'}</th>
-        <th style="${th}text-align:center;">On hand</th>
-        <th style="${th}text-align:center;">Target</th>
-        <th style="${th}text-align:center;width:90px;">Order</th>
-      </tr></thead>
-      <tbody>${vars.map(v=>{
-        const need=Math.max(0,(v.min_qty||0)-(v.qty||0));
-        return`<tr>
-          <td style="${td}font-weight:600;">${esc(v.variant_name??item.name)}</td>
-          <td style="${td}text-align:center;color:${need?'var(--danger)':'var(--grey-600)'};">${v.qty||0}</td>
-          <td style="${td}text-align:center;color:var(--grey-500);">${v.min_qty||0}</td>
-          <td style="${td}text-align:center;"><input type="number" min="0" class="stk-email-qty" data-name="${esc(v.variant_name??item.name)}" value="${need}" oninput="renderStkEmailText()" style="width:70px;text-align:center;font-weight:700;padding:.3rem;"/></td>
-        </tr>`;}).join('')}
-      </tbody>
-    </table>
+    ${notes?`<div style="background:var(--grey-50);border:1px solid var(--grey-200);border-radius:var(--radius);padding:.6rem .8rem;margin-bottom:1rem;">
+      <div style="font-size:.68rem;font-weight:700;color:var(--grey-400);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.15rem;">Restock instructions</div>
+      <div style="font-size:.85rem;color:var(--grey-700);white-space:pre-wrap;">${esc(notes)}</div></div>`:''}
+    <div style="font-size:.82rem;color:${order.lines.length?'var(--navy)':'var(--grey-500)'};font-weight:600;margin-bottom:.9rem;">${summary}</div>
     <div class="fg"><label>Subject</label>
-      <div style="display:flex;gap:.4rem;"><input type="text" id="stk-email-subject" value="${esc('Order request – '+item.name+' – Sunshine Coast Youth Orchestra')}" style="flex:1;"/>
+      <div style="display:flex;gap:.4rem;"><input type="text" id="stk-email-subject" value="${esc(subject)}" oninput="stkEmailDirtyCheck()" style="flex:1;"/>
       <button class="btn btn-ghost btn-sm" onclick="copyStkEmail('subject')">Copy</button></div>
     </div>
-    <div class="fg"><label>Email</label>
-      <textarea id="stk-email-body" style="height:260px;resize:vertical;font-family:inherit;font-size:.85rem;line-height:1.45;"></textarea>
-      <div style="font-size:.72rem;color:var(--grey-400);margin-top:.25rem;">You can edit the text before copying. Changing an order number rebuilds it.</div>
+    <div class="fg" style="margin-bottom:.4rem;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;">
+        <label style="margin:0;">Email</label>
+        <span id="stk-email-status" style="font-size:.72rem;color:var(--grey-400);"></span>
+      </div>
+      <textarea id="stk-email-body" oninput="stkEmailDirtyCheck()" style="height:300px;resize:vertical;font-family:inherit;font-size:.85rem;line-height:1.45;margin-top:.25rem;">${esc(body)}</textarea>
+    </div>
+    <div style="display:flex;gap:.75rem;align-items:center;margin-bottom:1rem;font-size:.75rem;">
+      <button class="btn btn-ghost btn-sm" id="stk-email-save" onclick="saveStkEmailTemplate()" disabled style="font-size:.75rem;">Save as template</button>
+      <button class="btn btn-ghost btn-sm" id="stk-email-revert" onclick="revertStkEmail()" style="font-size:.75rem;display:none;">Undo changes</button>
+      ${tpl?`<button class="btn btn-ghost btn-sm" onclick="resetStkEmailTemplate()" style="font-size:.75rem;color:var(--grey-500);margin-left:auto;">Reset to default</button>`:''}
+    </div>
+    <div id="stk-email-confirm" style="display:none;background:#fff8e1;border:1.5px solid #f5c400;border-radius:var(--radius);padding:.75rem .9rem;margin-bottom:1rem;">
+      <div style="font-size:.85rem;font-weight:600;color:var(--navy);margin-bottom:.2rem;">You’ve edited this email</div>
+      <div style="font-size:.8rem;color:var(--grey-600);margin-bottom:.6rem;">Save it as the template for ${esc(item.name)}, or your changes will be lost.</div>
+      <div style="display:flex;gap:.4rem;flex-wrap:wrap;">
+        <button class="btn btn-primary btn-sm" onclick="saveStkEmailTemplate(true)">Save template &amp; close</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="closeStkEmail(true)">Discard changes</button>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('stk-email-confirm').style.display='none';document.getElementById('stk-email-body').focus();">Keep editing</button>
+      </div>
     </div>
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
       <button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="copyStkEmail('body')">Copy email</button>
       ${emailMatch?`<button class="btn btn-ghost" style="flex:1;justify-content:center;" onclick="openStkMailto('${esc(emailMatch[0])}')">Open in mail app</button>`:''}
-      <button class="btn btn-ghost" style="flex:1;justify-content:center;" onclick="closeModal('stk-email-modal')">Close</button>
+      <button class="btn btn-ghost" style="flex:1;justify-content:center;" onclick="closeStkEmail()">Close</button>
     </div>
   `;
-  renderStkEmailText();
+  stkEmailDirtyCheck();
   document.getElementById('stk-email-modal').classList.add('open');
 }
 
-function renderStkEmailText(){
+function stkEmailIsDirty(){
+  if(!stkEmailBaseline)return false;
+  const s=document.getElementById('stk-email-subject')?.value,b=document.getElementById('stk-email-body')?.value;
+  return s!==stkEmailBaseline.subject||b!==stkEmailBaseline.body;
+}
+
+function stkEmailDirtyCheck(){
+  const dirty=stkEmailIsDirty();
+  const tpl=stkGetTemplate(stkEmailItemId);
+  const save=document.getElementById('stk-email-save');
+  if(save){save.disabled=!dirty;save.className=dirty?'btn btn-primary btn-sm':'btn btn-ghost btn-sm';}
+  const rev=document.getElementById('stk-email-revert');
+  if(rev)rev.style.display=dirty?'':'none';
+  const st=document.getElementById('stk-email-status');
+  if(st){
+    if(dirty){st.innerHTML='<span style="color:#b07d00;font-weight:600;">● Unsaved changes</span>';}
+    else if(tpl){st.textContent=`Saved template · ${(tpl.by||'').split('@')[0]} · ${fmtDate(tpl.at)}`;}
+    else st.textContent='Default template';
+  }
+  if(!dirty){const c=document.getElementById('stk-email-confirm');if(c)c.style.display='none';}
+}
+
+function revertStkEmail(){
+  document.getElementById('stk-email-subject').value=stkEmailBaseline.subject;
+  document.getElementById('stk-email-body').value=stkEmailBaseline.body;
+  stkEmailDirtyCheck();
+}
+
+function closeStkEmail(force){
+  if(!force&&stkEmailIsDirty()){
+    const c=document.getElementById('stk-email-confirm');
+    c.style.display='block';
+    c.scrollIntoView({behavior:'smooth',block:'nearest'});
+    return;
+  }
+  stkEmailBaseline=null;
+  closeModal('stk-email-modal');
+}
+
+async function saveStkEmailTemplate(thenClose){
   const item=stockItems.find(i=>i.id===stkEmailItemId);
   if(!item)return;
-  const isSimple=!stockVariants.some(v=>v.item_id===item.id&&v.variant_name!==null);
-  const lines=[...document.querySelectorAll('.stk-email-qty')]
-    .map(el=>({name:el.dataset.name,qty:parseInt(el.value)||0}))
-    .filter(x=>x.qty>0);
-  const total=lines.reduce((a,x)=>a+x.qty,0);
-  const meta=currentUser?.user_metadata||{};
-  const sender=(meta.full_name||meta.name||'').split(' ')[0];
-  let order;
-  if(!lines.length)order='[No quantities entered]';
-  else if(isSimple)order=`- ${item.name} × ${lines[0].qty}`;
-  else order=`${item.name}:\n`+lines.map(x=>`- ${x.name} × ${x.qty}`).join('\n')+(lines.length>1?`\n\nTotal: ${total}`:'');
-  document.getElementById('stk-email-body').value=
-`Hi,
+  const subject=document.getElementById('stk-email-subject').value;
+  const body=document.getElementById('stk-email-body').value;
+  const bodyTpl=stkUnfill(body,stkEmailParts);
+  if(stkEmailParts.order&&!bodyTpl.includes('{{order}}')){
+    if(!confirm('The order list was changed by hand, so future emails will keep this exact list instead of updating the numbers automatically.\n\nTip: leave the list untouched and edit around it.\n\nSave anyway?'))return;
+  }
+  const tpl={subject:stkUnfill(subject,stkEmailParts),body:bodyTpl};
+  const{data,error}=await db.from('stock_log').insert({item_id:item.id,variant_id:null,user_email:currentUser.email,field:STK_TPL_FIELD,old_value:null,new_value:JSON.stringify(tpl),reason:'Restock email template saved'}).select().single();
+  if(error){showToast('Error: '+error.message);return;}
+  stockLog.unshift(data||{item_id:item.id,field:STK_TPL_FIELD,new_value:JSON.stringify(tpl),user_email:currentUser.email,timestamp:new Date().toISOString()});
+  stkEmailBaseline={subject,body};
+  stkEmailDirtyCheck();
+  showToast('Template saved ✓');
+  if(thenClose)closeStkEmail(true);
+}
 
-We'd like to place an order for the following:
-
-${order}
-
-Could you please confirm availability, pricing and an expected delivery date?
-
-Thanks,
-${sender?sender+'\n':''}Sunshine Coast Youth Orchestra`;
+async function resetStkEmailTemplate(){
+  if(!confirm('Go back to the default email for this item? Your saved template will no longer be used.'))return;
+  const item=stockItems.find(i=>i.id===stkEmailItemId);
+  const{data,error}=await db.from('stock_log').insert({item_id:item.id,variant_id:null,user_email:currentUser.email,field:STK_TPL_FIELD,old_value:null,new_value:JSON.stringify(STK_DEFAULT_TPL),reason:'Restock email template reset to default'}).select().single();
+  if(error){showToast('Error: '+error.message);return;}
+  stockLog.unshift(data);
+  openStkRestockEmail(item.id);
+  showToast('Reset to default ✓');
 }
 
 async function copyStkEmail(which){
@@ -4767,6 +4864,10 @@ function openStkMailto(addr){
   const body=document.getElementById('stk-email-body').value;
   window.location.href=`mailto:${addr}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&document.getElementById('stk-email-modal')?.classList.contains('open')){e.preventDefault();closeStkEmail();}
+});
 
 // ── STOCK DETAIL ──────────────────────────────────────────────
 function openStockDetail(itemId,variantId){
@@ -4788,7 +4889,7 @@ function openStockDetail(itemId,variantId){
   `;
 
   // History
-  const logs=stockLog.filter(l=>l.item_id===itemId&&(!variantId||l.variant_id===variantId));
+  const logs=stockLog.filter(l=>l.item_id===itemId&&l.field!==STK_TPL_FIELD&&(!variantId||l.variant_id===variantId));
   document.getElementById('stk-detail-history').innerHTML=logs.length?logs.map(l=>{
     const diff=l.old_value!==null&&l.new_value!==null?` (${l.old_value}→${l.new_value})`:'';
     const price=l.unit_price?` · $${parseFloat(l.unit_price).toFixed(2)}/unit`:'';
@@ -4802,7 +4903,8 @@ function openStockDetail(itemId,variantId){
   document.getElementById('stk-detail-modal').classList.add('open');
 }
 
-['stk-item-modal','stk-detail-modal','stk-adj-modal','stk-email-modal'].forEach(id=>{
+document.getElementById('stk-email-modal')?.addEventListener('click',e=>{if(e.target===e.currentTarget)closeStkEmail();});
+['stk-item-modal','stk-detail-modal','stk-adj-modal'].forEach(id=>{
   document.getElementById(id)?.addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal(id);});
 });
 
