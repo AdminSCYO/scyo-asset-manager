@@ -815,6 +815,34 @@
   </div>
 </div>
 
+<!-- STOCK MOVEMENT MODAL -->
+<div class="modal-backdrop" id="stk-move-modal">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-header">
+      <span class="modal-title" id="stk-move-title">Stock movement</span>
+      <button class="btn-close" onclick="closeModal('stk-move-modal')">✕</button>
+    </div>
+    <div style="padding:1.25rem;max-height:80vh;overflow-y:auto;" id="stk-move-form"></div>
+  </div>
+</div>
+
+<!-- STOCK USAGE MODAL -->
+<div class="modal-backdrop" id="stk-usage-modal">
+  <div class="modal" style="max-width:900px;">
+    <div class="modal-header">
+      <span class="modal-title" id="stk-usage-title">Usage</span>
+      <button class="btn-close" onclick="closeModal('stk-usage-modal')">✕</button>
+    </div>
+    <div style="padding:1.25rem;max-height:80vh;overflow-y:auto;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin-bottom:.75rem;flex-wrap:wrap;">
+        <div id="stk-usage-controls"></div>
+        <button class="btn btn-ghost btn-sm" onclick="exportStkUsageCsv()" title="Every stock movement, all items, for analysis in Excel">Export all movements (CSV)</button>
+      </div>
+      <div id="stk-usage-body"></div>
+    </div>
+  </div>
+</div>
+
 <!-- STOCK RESTOCK EMAIL MODAL -->
 <div class="modal-backdrop" id="stk-email-modal">
   <div class="modal" style="max-width:620px;">
@@ -4189,7 +4217,7 @@ document.getElementById('lib-bulk-borrow-modal')?.addEventListener('click',e=>{i
 
 // ── STOCK ─────────────────────────────────────────────────────
 let stockItems=[],stockVariants=[],stockLog=[];
-let stkEditItemId=null,stkEditVariantId=null;
+let stkEditItemId=null,stkEditVariantId=null,stkEnsembles=[];
 
 function showStockView(){
   document.querySelector('.toolbar').style.display='none';
@@ -4211,6 +4239,10 @@ async function loadStockData(){
   stockItems=items||[];
   stockVariants=variants||[];
   stockLog=log||[];
+  if(!stkEnsembles.length){
+    const{data:ens}=await db.from('library_ensembles').select('name').order('sort_order');
+    stkEnsembles=(ens||[]).map(e=>e.name);
+  }
   showStockView();
   renderStockSidebar();
   renderStockMiddle();
@@ -4278,10 +4310,13 @@ function renderStockMiddle(){
   const header=`<div>
     <div style="padding:.75rem 1rem;background:var(--grey-50);border-bottom:1px solid var(--grey-200);position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;">
       <span style="font-weight:700;color:var(--navy);font-size:.95rem;">${esc(item.name)}</span>
-      <div style="display:flex;gap:.4rem;">
-        <button class="btn btn-ghost btn-sm" onclick="openStkRestockEmail('${item.id}')">✉ Generate restock email</button>
-        <button class="btn btn-ghost btn-sm" onclick="openEditStockItem('${item.id}')">Edit item</button>
-      </div>
+      <button class="btn btn-ghost btn-sm" onclick="openEditStockItem('${item.id}')">Edit item</button>
+    </div>
+    <div style="padding:.5rem 1rem;background:white;border-bottom:1px solid var(--grey-200);display:flex;gap:.4rem;flex-wrap:wrap;">
+      <button class="btn btn-primary btn-sm" onclick="openStkMove('${item.id}','issue')">− Issue to ensemble</button>
+      <button class="btn btn-ghost btn-sm" onclick="openStkMove('${item.id}','receive')">+ Receive stock</button>
+      <button class="btn btn-ghost btn-sm" onclick="openStkUsage('${item.id}')">Usage</button>
+      <button class="btn btn-ghost btn-sm" onclick="openStkRestockEmail('${item.id}')">✉ Generate restock email</button>
     </div>
     <div style="padding:.75rem 1rem;background:var(--grey-50);border-bottom:2px solid var(--grey-200);">
       <div style="display:flex;flex-direction:column;gap:.6rem;">
@@ -4554,6 +4589,11 @@ function openStkVariantEdit(itemId,variantId){
           <span id="stk-adj-preview" style="font-size:.82rem;color:var(--grey-500);white-space:nowrap;">= ${curQty}</span>
         </div>
       </div>
+      <div id="stk-adj-reason-wrap" style="display:none;">
+        <div class="fg"><label>Reason *</label><select id="stk-adj-move" onchange="stkAdjReasonUI()"></select></div>
+        <div class="fg" id="stk-adj-ens-wrap" style="display:none;"><label>Ensemble *</label>
+          <select id="stk-adj-ens"><option value="">Choose ensemble…</option>${stkEnsembles.map(e=>`<option>${esc(e)}</option>`).join('')}</select></div>
+      </div>
       <div class="fg"><label>Notes</label><textarea id="stk-adj-notes" placeholder="e.g. Found extra box in storeroom..." style="height:60px;resize:vertical;"></textarea></div>
       <div class="fg"><label>Unit Price (optional)</label><input type="number" id="stk-adj-price" placeholder="0.00" min="0" step="0.01"/></div>
     </div>`;
@@ -4573,6 +4613,7 @@ function openStkVariantEdit(itemId,variantId){
   if(delta)delta.addEventListener('input',()=>{
     const d=parseInt(delta.value)||0;
     document.getElementById('stk-adj-preview').textContent=`= ${Math.max(0,curQty+((window._stkSign||1)*d))}`;
+    stkAdjReasonUI();
   });
   // New variant: auto-fill SKU from name until the SKU is edited by hand
   const nameEl=document.getElementById('stk-v-name'),skuEl=document.getElementById('stk-v-sku');
@@ -4593,6 +4634,29 @@ function setStkSign(sign){
   const d=parseInt(document.getElementById('stk-adj-delta')?.value)||0;
   const preview=document.getElementById('stk-adj-preview');
   if(preview)preview.textContent=`= ${Math.max(0,window._stkOldQty+(sign*d))}`;
+  stkAdjReasonUI(true);
+}
+
+// Movement types. 'issue' and 'return' are tied to an ensemble and drive the usage report.
+const STK_MOVES={
+  issue:{label:'Issued to ensemble',sign:-1,ens:true},
+  writeoff:{label:'Lost / damaged / written off',sign:-1},
+  receive:{label:'Received (new stock)',sign:1},
+  return:{label:'Returned from ensemble',sign:1,ens:true},
+  correction:{label:'Stock-take correction',sign:0}
+};
+function stkAdjReasonUI(signChanged){
+  const wrap=document.getElementById('stk-adj-reason-wrap');
+  if(!wrap)return;
+  const d=parseInt(document.getElementById('stk-adj-delta')?.value)||0;
+  wrap.style.display=d>0?'':'none';
+  const sel=document.getElementById('stk-adj-move');
+  const sign=window._stkSign||1;
+  const keys=Object.keys(STK_MOVES).filter(k=>STK_MOVES[k].sign===sign||STK_MOVES[k].sign===0);
+  if(signChanged||!sel.options.length){
+    sel.innerHTML=keys.map(k=>`<option value="${k}">${STK_MOVES[k].label}</option>`).join('');
+  }
+  document.getElementById('stk-adj-ens-wrap').style.display=STK_MOVES[sel.value]?.ens?'':'none';
 }
 
 async function submitStkVariantEdit(){
@@ -4636,8 +4700,12 @@ async function submitStkVariantEdit(){
       const newQty=Math.max(0,oldQty+sign*delta);
       const notes=document.getElementById('stk-adj-notes').value.trim();
       const unitPrice=parseFloat(document.getElementById('stk-adj-price').value)||null;
+      const move=document.getElementById('stk-adj-move')?.value||'correction';
+      const ens=STK_MOVES[move]?.ens?document.getElementById('stk-adj-ens').value:null;
+      if(STK_MOVES[move]?.ens&&!ens){showToast('Choose which ensemble');return;}
+      if(sign===-1&&delta>oldQty){showToast(`Only ${oldQty} on hand`);return;}
       update.qty=newQty;
-      L(`qty (${sign===1?'+':'-'}${delta})`,oldQty,newQty,notes||'Qty adjusted',{unit_price:unitPrice});
+      L(stkMoveLabel(move,ens,sign*delta),oldQty,newQty,notes||STK_MOVES[move]?.label||'Qty adjusted',{unit_price:unitPrice,movement:move,ensemble:ens,qty_change:sign*delta});
     }
     if(!Object.keys(update).length){closeModal('stk-adj-modal');showToast('No changes');return;}
     const{error}=await db.from('stock_variants').update(update).eq('id',variantId);
@@ -4869,6 +4937,189 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Escape'&&document.getElementById('stk-email-modal')?.classList.contains('open')){e.preventDefault();closeStkEmail();}
 });
 
+// ── STOCK MOVEMENTS (batch issue / return / receive) ───────────
+function stkMoveLabel(move,ens,change){
+  const n=(change>0?'+':'−')+Math.abs(change);
+  if(move==='issue')return`Issued to ${ens} (${n})`;
+  if(move==='return')return`Returned from ${ens} (${n})`;
+  if(move==='receive')return`Received (${n})`;
+  if(move==='writeoff')return`Written off (${n})`;
+  return`Stock-take correction (${n})`;
+}
+function stkTodayStr(){const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+
+let stkMoveItemId=null,stkMoveMode='issue';
+function openStkMove(itemId,mode){
+  const item=stockItems.find(i=>i.id===itemId);
+  if(!item)return;
+  stkMoveItemId=itemId;stkMoveMode=mode||'issue';
+  const vars=stockVariants.filter(v=>v.item_id===itemId);
+  const isSimple=!vars.some(v=>v.variant_name!==null);
+  const td='padding:.4rem .6rem;border-bottom:1px solid var(--grey-100);font-size:.85rem;';
+  const th='padding:.4rem .6rem;font-size:.68rem;font-weight:700;color:var(--grey-500);text-transform:uppercase;letter-spacing:.04em;border-bottom:1.5px solid var(--grey-200);background:var(--grey-50);';
+  const seg=k=>`<button type="button" class="btn btn-sm ${stkMoveMode===k?'btn-primary':'btn-ghost'}" style="flex:1;justify-content:center;" onclick="stkMoveSetMode('${k}')">${{issue:'Issue',return:'Return',receive:'Receive'}[k]}</button>`;
+  document.getElementById('stk-move-title').textContent=item.name;
+  document.getElementById('stk-move-form').innerHTML=`
+    <div style="display:flex;gap:.35rem;margin-bottom:1rem;">${seg('issue')}${seg('return')}${seg('receive')}</div>
+    <div id="stk-move-hint" style="font-size:.8rem;color:var(--grey-500);margin-bottom:.9rem;"></div>
+    <div style="display:flex;gap:.6rem;">
+      <div class="fg" id="stk-move-ens-wrap" style="flex:2;"><label>Ensemble *</label>
+        <select id="stk-move-ens"><option value="">Choose ensemble…</option>${stkEnsembles.map(e=>`<option>${esc(e)}</option>`).join('')}</select></div>
+      <div class="fg" style="flex:1;"><label>Date</label><input type="date" id="stk-move-date" value="${stkTodayStr()}" max="${stkTodayStr()}"/></div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;border:1.5px solid var(--grey-200);margin-bottom:.4rem;">
+      <thead><tr><th style="${th}text-align:left;">${isSimple?'Item':'Variant'}</th><th style="${th}text-align:center;">On hand</th><th style="${th}text-align:center;width:90px;">Qty</th><th style="${th}text-align:center;">After</th></tr></thead>
+      <tbody>${vars.map(v=>`<tr>
+        <td style="${td}font-weight:600;">${esc(v.variant_name??item.name)}</td>
+        <td style="${td}text-align:center;color:var(--grey-600);">${v.qty||0}</td>
+        <td style="${td}text-align:center;"><input type="number" min="0" placeholder="0" class="stk-move-qty" data-vid="${v.id}" data-onhand="${v.qty||0}" oninput="stkMoveRecalc()" style="width:70px;text-align:center;font-weight:700;padding:.3rem;"/></td>
+        <td style="${td}text-align:center;" class="stk-move-after" data-vid="${v.id}">${v.qty||0}</td>
+      </tr>`).join('')}</tbody>
+    </table>
+    <div id="stk-move-total" style="font-size:.8rem;color:var(--grey-500);text-align:right;margin-bottom:.9rem;"></div>
+    <div class="fg" id="stk-move-price-wrap"><label>Unit price (optional)</label><input type="number" id="stk-move-price" placeholder="0.00" min="0" step="0.01"/></div>
+    <div class="fg"><label>Notes</label><input type="text" id="stk-move-notes" placeholder="e.g. 2027 new members, handed out at first rehearsal"/></div>
+    <div style="display:flex;gap:.5rem;">
+      <button class="btn btn-primary" id="stk-move-submit" style="flex:1;justify-content:center;" onclick="submitStkMove()">Save</button>
+      <button class="btn btn-ghost" style="flex:1;justify-content:center;" onclick="closeModal('stk-move-modal')">Cancel</button>
+    </div>`;
+  stkMoveRecalc();
+  document.getElementById('stk-move-modal').classList.add('open');
+}
+
+function stkMoveSetMode(mode){
+  // Keep typed quantities when switching mode
+  const keep={};document.querySelectorAll('.stk-move-qty').forEach(el=>keep[el.dataset.vid]=el.value);
+  const ens=document.getElementById('stk-move-ens')?.value,date=document.getElementById('stk-move-date')?.value,notes=document.getElementById('stk-move-notes')?.value;
+  openStkMove(stkMoveItemId,mode);
+  document.querySelectorAll('.stk-move-qty').forEach(el=>el.value=keep[el.dataset.vid]||'');
+  document.getElementById('stk-move-ens').value=ens||'';
+  document.getElementById('stk-move-date').value=date||stkTodayStr();
+  document.getElementById('stk-move-notes').value=notes||'';
+  stkMoveRecalc();
+}
+
+function stkMoveRecalc(){
+  const sign=stkMoveMode==='issue'?-1:1;
+  let total=0,over=false;
+  document.querySelectorAll('.stk-move-qty').forEach(el=>{
+    const q=Math.max(0,parseInt(el.value)||0),on=parseInt(el.dataset.onhand)||0;
+    total+=q;
+    const after=on+sign*q;
+    const cell=document.querySelector(`.stk-move-after[data-vid="${el.dataset.vid}"]`);
+    cell.textContent=after;
+    cell.style.color=after<0?'var(--danger)':q?'var(--navy)':'var(--grey-400)';
+    cell.style.fontWeight=q?'700':'400';
+    if(after<0)over=true;
+  });
+  const hint={issue:'Stock going out to an ensemble (e.g. shirts for new members). This is what the Usage report counts.',
+    return:'Stock coming back from an ensemble (e.g. a member hands back a shirt). Subtracted from that ensemble’s usage.',
+    receive:'New stock arriving from a supplier.'}[stkMoveMode];
+  document.getElementById('stk-move-hint').textContent=hint;
+  document.getElementById('stk-move-ens-wrap').style.display=stkMoveMode==='receive'?'none':'';
+  document.getElementById('stk-move-price-wrap').style.display=stkMoveMode==='receive'?'':'none';
+  document.getElementById('stk-move-total').innerHTML=over?'<span style="color:var(--danger);font-weight:600;">Can’t issue more than is on hand</span>':total?`Total: <strong>${total}</strong>`:'';
+  const btn=document.getElementById('stk-move-submit');
+  btn.disabled=over||!total;
+  btn.textContent=total?`${{issue:'Issue',return:'Return',receive:'Receive'}[stkMoveMode]} ${total}`:'Save';
+}
+
+async function submitStkMove(){
+  const item=stockItems.find(i=>i.id===stkMoveItemId);
+  const mode=stkMoveMode,sign=mode==='issue'?-1:1;
+  const ens=mode==='receive'?null:document.getElementById('stk-move-ens').value;
+  if(mode!=='receive'&&!ens){showToast('Choose which ensemble');return;}
+  const dateStr=document.getElementById('stk-move-date').value||stkTodayStr();
+  const ts=dateStr===stkTodayStr()?new Date().toISOString():new Date(dateStr+'T12:00:00').toISOString();
+  const notes=document.getElementById('stk-move-notes').value.trim();
+  const unitPrice=mode==='receive'?(parseFloat(document.getElementById('stk-move-price').value)||null):null;
+  const rows=[...document.querySelectorAll('.stk-move-qty')].map(el=>({vid:el.dataset.vid,q:Math.max(0,parseInt(el.value)||0)})).filter(r=>r.q>0);
+  if(!rows.length)return;
+  const btn=document.getElementById('stk-move-submit');btn.disabled=true;btn.textContent='Saving…';
+  const logs=[];
+  for(const r of rows){
+    const v=stockVariants.find(x=>x.id===r.vid);
+    const oldQty=v.qty||0,newQty=oldQty+sign*r.q;
+    if(newQty<0){showToast(`Not enough ${v.variant_name||item.name} on hand`);btn.disabled=false;return;}
+    const{error}=await db.from('stock_variants').update({qty:newQty}).eq('id',v.id);
+    if(error){showToast('Error: '+error.message);btn.disabled=false;return;}
+    v.qty=newQty;
+    logs.push({item_id:item.id,variant_id:v.id,user_email:currentUser.email,field:stkMoveLabel(mode,ens,sign*r.q),old_value:String(oldQty),new_value:String(newQty),reason:notes||STK_MOVES[mode].label,unit_price:unitPrice,movement:mode,ensemble:ens,qty_change:sign*r.q,timestamp:ts});
+  }
+  const{error}=await db.from('stock_log').insert(logs);
+  if(error){showToast('Quantities updated, but history failed to save: '+error.message);}
+  closeModal('stk-move-modal');
+  await loadStockData();
+  const total=rows.reduce((a,r)=>a+r.q,0);
+  showToast(mode==='issue'?`Issued ${total} to ${ens} ✓`:mode==='return'?`${total} returned from ${ens} ✓`:`Received ${total} ✓`);
+}
+
+// ── STOCK USAGE REPORT ────────────────────────────────────────
+let stkUsageItemId=null;
+function stkUsageRows(itemId){
+  return stockLog.filter(l=>l.item_id===itemId&&(l.movement==='issue'||l.movement==='return')&&l.ensemble);
+}
+function openStkUsage(itemId){
+  stkUsageItemId=itemId;
+  const item=stockItems.find(i=>i.id===itemId);
+  const rows=stkUsageRows(itemId);
+  const years=[...new Set(rows.map(r=>new Date(r.timestamp).getFullYear()))].sort((a,b)=>b-a);
+  document.getElementById('stk-usage-title').textContent=`Usage — ${item.name}`;
+  document.getElementById('stk-usage-controls').innerHTML=rows.length?`
+    <select id="stk-usage-period" onchange="renderStkUsage()" style="width:auto;">
+      ${years.map(y=>`<option value="${y}">${y}</option>`).join('')}
+      ${years.length>1?`<option value="avg">Average per year (${years[years.length-1]}–${years[0]})</option><option value="all">All years combined</option>`:''}
+    </select>`:'';
+  renderStkUsage();
+  document.getElementById('stk-usage-modal').classList.add('open');
+}
+function renderStkUsage(){
+  const item=stockItems.find(i=>i.id===stkUsageItemId);
+  const out=document.getElementById('stk-usage-body');
+  const all=stkUsageRows(item.id);
+  if(!all.length){
+    out.innerHTML=`<div style="padding:1.5rem;text-align:center;color:var(--grey-500);font-size:.88rem;line-height:1.5;">No usage recorded yet.<br>Use <strong>− Issue to ensemble</strong> when stock goes out, and it will build up here year by year.</div>`;
+    return;
+  }
+  const period=document.getElementById('stk-usage-period').value;
+  const years=[...new Set(all.map(r=>new Date(r.timestamp).getFullYear()))];
+  const rows=period==='avg'||period==='all'?all:all.filter(r=>new Date(r.timestamp).getFullYear()===+period);
+  const div=period==='avg'?years.length:1;
+  const vars=stockVariants.filter(v=>v.item_id===item.id);
+  const isSimple=!vars.some(v=>v.variant_name!==null);
+  // Variant columns: current variants, plus any deleted ones that appear in history
+  const cols=vars.map(v=>({id:v.id,name:v.variant_name??item.name}));
+  rows.forEach(r=>{if(!cols.some(c=>c.id===r.variant_id))cols.push({id:r.variant_id,name:'(deleted)'});});
+  const ensList=[...stkEnsembles.filter(e=>rows.some(r=>r.ensemble===e)),...new Set(rows.map(r=>r.ensemble).filter(e=>!stkEnsembles.includes(e)))];
+  const net=(e,vid)=>-rows.filter(r=>r.ensemble===e&&(vid==null||r.variant_id===vid)).reduce((a,r)=>a+(r.qty_change||0),0);
+  const fmt=n=>{const x=n/div;return x===0?'<span style="color:var(--grey-300);">–</span>':(Number.isInteger(x)?x:x.toFixed(1));};
+  const th='padding:.4rem .5rem;font-size:.68rem;font-weight:700;color:var(--grey-500);text-transform:uppercase;letter-spacing:.03em;border-bottom:1.5px solid var(--grey-200);background:var(--grey-50);text-align:center;white-space:nowrap;';
+  const td='padding:.45rem .5rem;border-bottom:1px solid var(--grey-100);font-size:.85rem;text-align:center;';
+  const shown=isSimple?[]:cols;
+  out.innerHTML=`
+    <div style="font-size:.78rem;color:var(--grey-500);margin-bottom:.5rem;">${period==='avg'?`Average issued per year (returns subtracted), across ${years.length} years.`:'Net issued (returns subtracted).'}</div>
+    <div style="overflow-x:auto;border:1.5px solid var(--grey-200);border-radius:var(--radius);">
+    <table style="width:100%;border-collapse:collapse;">
+      <thead><tr><th style="${th}text-align:left;">Ensemble</th>${shown.map(c=>`<th style="${th}">${esc(c.name)}</th>`).join('')}<th style="${th}color:var(--navy);">Total</th></tr></thead>
+      <tbody>${ensList.map(e=>`<tr><td style="${td}text-align:left;font-weight:600;white-space:nowrap;">${esc(e)}</td>${shown.map(c=>`<td style="${td}">${fmt(net(e,c.id))}</td>`).join('')}<td style="${td}font-weight:700;color:var(--navy);">${fmt(net(e,null))}</td></tr>`).join('')}
+      <tr style="background:var(--grey-50);"><td style="${td}text-align:left;font-weight:700;">Total</td>${shown.map(c=>`<td style="${td}font-weight:700;">${fmt(ensList.reduce((a,e)=>a+net(e,c.id),0))}</td>`).join('')}<td style="${td}font-weight:800;color:var(--navy);">${fmt(ensList.reduce((a,e)=>a+net(e,null),0))}</td></tr>
+      </tbody>
+    </table></div>`;
+}
+function exportStkUsageCsv(){
+  const rows=stockLog.filter(l=>l.movement).slice().sort((a,b)=>a.timestamp.localeCompare(b.timestamp));
+  const q=x=>`"${String(x??'').replace(/"/g,'""')}"`;
+  const lines=[['Date','Year','Item','Variant','Movement','Ensemble','Qty change','Unit price','Notes','By'].join(',')];
+  rows.forEach(l=>{
+    const item=stockItems.find(i=>i.id===l.item_id),v=stockVariants.find(x=>x.id===l.variant_id);
+    const d=new Date(l.timestamp);
+    lines.push([d.toISOString().slice(0,10),d.getFullYear(),item?.name,v?(v.variant_name??''):'(deleted)',l.movement,l.ensemble,l.qty_change,l.unit_price,l.reason,l.user_email].map(q).join(','));
+  });
+  const blob=new Blob([lines.join('\n')],{type:'text/csv'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`scyo-stock-movements-${stkTodayStr()}.csv`;a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+
 // ── STOCK DETAIL ──────────────────────────────────────────────
 function openStockDetail(itemId,variantId){
   const item=stockItems.find(i=>i.id===itemId);
@@ -4904,7 +5155,7 @@ function openStockDetail(itemId,variantId){
 }
 
 document.getElementById('stk-email-modal')?.addEventListener('click',e=>{if(e.target===e.currentTarget)closeStkEmail();});
-['stk-item-modal','stk-detail-modal','stk-adj-modal'].forEach(id=>{
+['stk-item-modal','stk-detail-modal','stk-adj-modal','stk-move-modal','stk-usage-modal'].forEach(id=>{
   document.getElementById(id)?.addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal(id);});
 });
 
