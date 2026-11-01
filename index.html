@@ -811,7 +811,7 @@
       <span class="modal-title" id="stk-adj-title">Adjust Quantity</span>
       <button class="btn-close" onclick="closeModal('stk-adj-modal')">✕</button>
     </div>
-    <div style="padding:1.25rem;" id="stk-adj-form"></div>
+    <div style="padding:1.25rem;max-height:80vh;overflow-y:auto;" id="stk-adj-form"></div>
   </div>
 </div>
 
@@ -4296,14 +4296,13 @@ function renderStockMiddle(){
     const rows=vars.map(v=>{
       const isLow=(v.qty||0)<(v.min_qty||0);
       const isActive=v.id===stkSelectedVariantId;
-      return`<tr onclick="selectStkVariant('${v.id}')" style="cursor:pointer;${isActive?'background:#eef2ff;border-right:3px solid var(--navy);':''}">
+      return`<tr onclick="selectStkVariant('${v.id}');openStkVariantEdit('${item.id}','${v.id}')" title="Click to edit" style="cursor:pointer;${isActive?'background:#eef2ff;border-right:3px solid var(--navy);':''}">
         <td style="padding:.7rem 1rem;font-size:.85rem;border-bottom:1px solid var(--grey-100);">
           <div style="font-weight:600;">${esc(v.variant_name)}</div>
           <div style="font-size:.72rem;color:var(--grey-400);font-family:monospace;">${esc(v.sku||'')}</div>
         </td>
         <td style="padding:.7rem 1rem;font-weight:700;color:${isLow?'var(--danger)':'var(--navy)'};border-bottom:1px solid var(--grey-100);text-align:center;">${v.qty||0}${isLow?' ⚠':''}</td>
         <td style="padding:.7rem 1rem;color:var(--grey-500);font-size:.82rem;border-bottom:1px solid var(--grey-100);text-align:center;">${v.min_qty||0}</td>
-        <td style="padding:.7rem 1rem;border-bottom:1px solid var(--grey-100);text-align:right;"><button class="btn btn-ghost btn-sm" style="font-size:.75rem;" onclick="event.stopPropagation();openStkAdj('${item.id}','${v.id}','${esc(v.variant_name)}',${v.qty||0})">Adjust</button></td>
       </tr>`;
     }).join('');
     mid.innerHTML=header+`<table style="width:100%;border-collapse:collapse;">
@@ -4311,7 +4310,6 @@ function renderStockMiddle(){
         <th style="${thStyle}">Variant</th>
         <th style="${thStyle}text-align:center;">Qty</th>
         <th style="${thStyle}text-align:center;">Target</th>
-        <th style="${thStyle}"></th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
@@ -4324,13 +4322,13 @@ function renderStockMiddle(){
     const minQty=v?.min_qty||0;
     const isLow=qty<minQty;
     mid.innerHTML=header+`<div style="padding:1.25rem;">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem;background:var(--grey-50);border-radius:var(--radius);border:1.5px solid var(--grey-200);margin-bottom:.75rem;">
+      <div ${v?`onclick="openStkVariantEdit('${item.id}','${v.id}')" title="Click to edit"`:''} style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:1rem;background:var(--grey-50);border-radius:var(--radius);border:1.5px solid var(--grey-200);margin-bottom:.75rem;">
         <div>
           <div style="font-size:.72rem;color:var(--grey-400);font-family:monospace;margin-bottom:.25rem;">${esc(v?.sku||'')}</div>
           <div style="font-size:2rem;font-weight:900;color:${isLow?'var(--danger)':'var(--navy)'};">${qty}${isLow?' ⚠':''}</div>
           <div style="font-size:.78rem;color:var(--grey-400);">of ${minQty} target</div>
         </div>
-        ${v?`<button class="btn btn-primary" onclick="openStkAdj('${item.id}','${v.id}','${esc(item.name)}',${qty})">Adjust Qty</button>`:''}
+        ${v?`<button class="btn btn-primary" onclick="event.stopPropagation();openStkVariantEdit('${item.id}','${v.id}')">Edit</button>`:''}
       </div>
     </div>`;
     if(v)selectStkVariant(v.id);
@@ -4469,10 +4467,8 @@ function addStkVariantRow(){
   list.appendChild(div);
 }
 
-async function openAddVariant(itemId){
-  stkEditItemId=itemId;
-  openEditStockItem(itemId);
-  setTimeout(()=>addStkVariantRow(),100);
+function openAddVariant(itemId){
+  openStkVariantEdit(itemId,null);
 }
 
 async function submitStkItem(){
@@ -4516,71 +4512,154 @@ async function deleteStkItem(itemId){
   showToast('Item deleted ✓');
 }
 
-// ── STOCK QTY ADJUST ──────────────────────────────────────────
-function openStkAdj(itemId,variantId,label,currentQty){
+// ── STOCK VARIANT EDIT (name / qty / target / delete) ─────────
+function openStkAdj(itemId,variantId){openStkVariantEdit(itemId,variantId);}
+
+function openStkVariantEdit(itemId,variantId){
   const item=stockItems.find(i=>i.id===itemId);
-  document.getElementById('stk-adj-title').textContent=`Adjust — ${label}`;
-  document.getElementById('stk-adj-form').innerHTML=`
-    <div style="font-size:.82rem;color:var(--grey-500);margin-bottom:.75rem;">Current qty: <strong>${currentQty}</strong></div>
-    <div class="fg">
-      <label>Change *</label>
-      <div style="display:flex;gap:.5rem;align-items:center;">
-        <button onclick="setStkSign(-1)" id="stk-sign-minus" class="btn btn-ghost btn-sm" style="font-size:1.1rem;font-weight:700;min-width:36px;">−</button>
-        <button onclick="setStkSign(1)" id="stk-sign-plus" class="btn btn-primary btn-sm" style="font-size:1.1rem;font-weight:700;min-width:36px;">+</button>
-        <input type="number" id="stk-adj-delta" min="0" placeholder="0" style="flex:1;font-size:1rem;font-weight:700;"/>
-        <span id="stk-adj-preview" style="font-size:.82rem;color:var(--grey-500);white-space:nowrap;">= ${currentQty}</span>
+  if(!item)return;
+  const v=variantId?stockVariants.find(x=>x.id===variantId):null;
+  const isNew=!v;
+  const isSimple=!!v&&v.variant_name===null;
+  stkEditItemId=itemId;
+  stkEditVariantId=v?v.id:null;
+  const curQty=v?.qty||0;
+  window._stkSign=1;
+  window._stkOldQty=curQty;
+  document.getElementById('stk-adj-title').textContent=isNew?`Add variant — ${item.name}`:isSimple?item.name:`${item.name} — ${v.variant_name}`;
+  const qtySection=isNew?`
+    <div class="fg"><label>Starting qty</label><input type="number" id="stk-v-startqty" min="0" placeholder="0"/></div>`:`
+    <div style="border-top:1px solid var(--grey-100);margin:.25rem 0 .75rem;padding-top:.75rem;">
+      <div style="font-size:.82rem;color:var(--grey-500);margin-bottom:.5rem;">Current qty: <strong>${curQty}</strong></div>
+      <div class="fg">
+        <label>Change qty</label>
+        <div style="display:flex;gap:.5rem;align-items:center;">
+          <button type="button" onclick="setStkSign(-1)" id="stk-sign-minus" class="btn btn-ghost btn-sm" style="font-size:1.1rem;font-weight:700;min-width:36px;">−</button>
+          <button type="button" onclick="setStkSign(1)" id="stk-sign-plus" class="btn btn-primary btn-sm" style="font-size:1.1rem;font-weight:700;min-width:36px;">+</button>
+          <input type="number" id="stk-adj-delta" min="0" placeholder="0" style="flex:1;font-size:1rem;font-weight:700;"/>
+          <span id="stk-adj-preview" style="font-size:.82rem;color:var(--grey-500);white-space:nowrap;">= ${curQty}</span>
+        </div>
       </div>
-    </div>
-    <div class="fg"><label>Supplier</label><input type="text" id="stk-adj-reason" placeholder="e.g. Officeworks, BCF..."/></div>
-    <div class="fg"><label>Notes</label><textarea id="stk-adj-notes" placeholder="e.g. Found extra box in storeroom..." style="height:60px;resize:vertical;"></textarea></div>
-    <div class="fg"><label>Unit Price (optional)</label><input type="number" id="stk-adj-price" placeholder="0.00" min="0" step="0.01"/></div>
+      <div class="fg"><label>Supplier</label><input type="text" id="stk-adj-reason" placeholder="e.g. Officeworks, BCF..."/></div>
+      <div class="fg"><label>Notes</label><textarea id="stk-adj-notes" placeholder="e.g. Found extra box in storeroom..." style="height:60px;resize:vertical;"></textarea></div>
+      <div class="fg"><label>Unit Price (optional)</label><input type="number" id="stk-adj-price" placeholder="0.00" min="0" step="0.01"/></div>
+    </div>`;
+  document.getElementById('stk-adj-form').innerHTML=`
+    ${isSimple?'':`
+    <div class="fg"><label>Variant name *</label><input type="text" id="stk-v-name" value="${esc(v?.variant_name||'')}" placeholder="e.g. Medium"/></div>
+    <div class="fg"><label>SKU</label><input type="text" id="stk-v-sku" value="${esc(v?.sku||'')}" style="font-family:monospace;"/></div>`}
+    <div class="fg"><label>Target qty</label><input type="number" id="stk-v-target" min="0" value="${v?.min_qty||0}"/></div>
+    ${qtySection}
     <div style="display:flex;gap:.5rem;">
-      <button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="submitStkAdj('${itemId}','${variantId}',${currentQty})">Save</button>
+      <button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="submitStkVariantEdit()">${isNew?'Add variant':'Save'}</button>
       <button class="btn btn-ghost" style="flex:1;justify-content:center;" onclick="closeModal('stk-adj-modal')">Cancel</button>
     </div>
+    ${!isNew&&!isSimple?`<button class="btn btn-ghost" style="width:100%;justify-content:center;margin-top:.35rem;color:var(--danger);" onclick="deleteStkVariantFromEdit()">Delete variant</button>`:''}
   `;
-  document.getElementById('stk-adj-delta').addEventListener('input',()=>{
-    const delta=parseInt(document.getElementById('stk-adj-delta').value)||0;
-    const sign=window._stkSign||1;
-    const newQty=Math.max(0,currentQty+(sign*delta));
-    document.getElementById('stk-adj-preview').textContent=`= ${newQty}`;
+  const delta=document.getElementById('stk-adj-delta');
+  if(delta)delta.addEventListener('input',()=>{
+    const d=parseInt(delta.value)||0;
+    document.getElementById('stk-adj-preview').textContent=`= ${Math.max(0,curQty+((window._stkSign||1)*d))}`;
   });
-  window._stkSign=1;
-  window._stkOldQty=currentQty;
+  // New variant: auto-fill SKU from name until the SKU is edited by hand
+  const nameEl=document.getElementById('stk-v-name'),skuEl=document.getElementById('stk-v-sku');
+  if(isNew&&nameEl&&skuEl){
+    skuEl.addEventListener('input',()=>{skuEl.dataset.touched='1';});
+    nameEl.addEventListener('input',()=>{if(!skuEl.dataset.touched)skuEl.value=nameEl.value.trim()?genSku(item.name,nameEl.value):'';});
+  }
   document.getElementById('stk-adj-modal').classList.add('open');
-  setTimeout(()=>document.getElementById('stk-adj-qty').focus(),100);
+  setTimeout(()=>(nameEl||document.getElementById('stk-v-target'))?.focus(),100);
 }
 
 function setStkSign(sign){
   window._stkSign=sign;
-  document.getElementById('stk-sign-plus').className=sign===1?'btn btn-primary btn-sm':'btn btn-ghost btn-sm';
-  document.getElementById('stk-sign-minus').className=sign===-1?'btn btn-primary btn-sm':'btn btn-ghost btn-sm';
-  document.getElementById('stk-sign-plus').style.cssText='font-size:1.1rem;font-weight:700;min-width:36px;';
-  document.getElementById('stk-sign-minus').style.cssText='font-size:1.1rem;font-weight:700;min-width:36px;';
-  const delta=parseInt(document.getElementById('stk-adj-delta')?.value)||0;
-  const currentQty=parseInt(document.getElementById('stk-adj-preview')?.textContent?.replace('= ',''))||0;
-  // Recalculate preview from stored old qty
+  const plus=document.getElementById('stk-sign-plus'),minus=document.getElementById('stk-sign-minus');
+  if(!plus||!minus)return;
+  plus.className=sign===1?'btn btn-primary btn-sm':'btn btn-ghost btn-sm';
+  minus.className=sign===-1?'btn btn-primary btn-sm':'btn btn-ghost btn-sm';
+  const d=parseInt(document.getElementById('stk-adj-delta')?.value)||0;
   const preview=document.getElementById('stk-adj-preview');
-  if(preview)preview.textContent=`= ${Math.max(0,window._stkOldQty+(sign*delta))}`;
+  if(preview)preview.textContent=`= ${Math.max(0,window._stkOldQty+(sign*d))}`;
 }
 
-async function submitStkAdj(itemId,variantId,oldQty){
-  window._stkOldQty=oldQty;
-  const delta=parseInt(document.getElementById('stk-adj-delta')?.value)||0;
-  const sign=window._stkSign||1;
-  const newQty=Math.max(0,oldQty+(sign*delta));
-  const supplier=document.getElementById('stk-adj-reason').value.trim();
-  const notes=document.getElementById('stk-adj-notes').value.trim();
-  const unitPrice=parseFloat(document.getElementById('stk-adj-price').value)||null;
-  if(delta===0){showToast('Enter a change amount');return;}
-  const changeStr=sign===1?`+${delta}`:`-${delta}`;
-  const reason=[supplier?`Supplier: ${supplier}`:'',notes].filter(Boolean).join(' — ')||'Qty adjusted';
-  await db.from('stock_variants').update({qty:newQty}).eq('id',variantId);
-  await db.from('stock_log').insert({item_id:itemId,variant_id:variantId,user_email:currentUser.email,field:`qty (${changeStr})`,old_value:String(oldQty),new_value:String(newQty),reason,unit_price:unitPrice});
+async function submitStkVariantEdit(){
+  const itemId=stkEditItemId,variantId=stkEditVariantId;
+  const item=stockItems.find(i=>i.id===itemId);
+  if(!item)return;
+  const v=variantId?stockVariants.find(x=>x.id===variantId):null;
+  const isNew=!v;
+  const isSimple=!!v&&v.variant_name===null;
+  const nameEl=document.getElementById('stk-v-name');
+  const name=nameEl?nameEl.value.trim():null;
+  const sku=document.getElementById('stk-v-sku')?.value.trim()||null;
+  const targetRaw=document.getElementById('stk-v-target').value;
+  const target=Math.max(0,parseInt(targetRaw)||0);
+  if(!isSimple){
+    if(!name){showToast('Variant name required');return;}
+    const dup=stockVariants.some(x=>x.item_id===itemId&&x.id!==variantId&&(x.variant_name||'').toLowerCase()===name.toLowerCase());
+    if(dup){showToast('A variant with that name already exists');return;}
+  }
+  const log=[];
+  const L=(field,oldV,newV,reason,extra={})=>log.push({item_id:itemId,variant_id:null,user_email:currentUser.email,field,old_value:oldV==null?null:String(oldV),new_value:newV==null?null:String(newV),reason,...extra});
+
+  if(isNew){
+    const startQty=Math.max(0,parseInt(document.getElementById('stk-v-startqty')?.value)||0);
+    const siblings=stockVariants.filter(x=>x.item_id===itemId);
+    const sortOrder=siblings.length?Math.max(...siblings.map(x=>x.sort_order||0))+1:0;
+    const{data,error}=await db.from('stock_variants').insert({item_id:itemId,variant_name:name,qty:startQty,min_qty:target,sort_order:sortOrder,sku:sku||genSku(item.name,name)}).select().single();
+    if(error){showToast('Error: '+error.message);return;}
+    stkEditVariantId=data.id;
+    L(`Variant added: ${name}`,null,name,`Target ${target}, starting qty ${startQty}`);
+    log.forEach(l=>l.variant_id=data.id);
+  }else{
+    const update={};
+    if(!isSimple&&name!==v.variant_name){update.variant_name=name;L(`Renamed: ${v.variant_name} → ${name}`,v.variant_name,name,'Variant renamed');}
+    if(!isSimple&&(sku||null)!==(v.sku||null)){update.sku=sku;L(`SKU: ${v.sku||'—'} → ${sku||'—'}`,v.sku,sku,'SKU changed');}
+    if(target!==(v.min_qty||0)){update.min_qty=target;L(`Target: ${v.min_qty||0} → ${target}`,v.min_qty||0,target,'Target changed');}
+    const delta=parseInt(document.getElementById('stk-adj-delta')?.value)||0;
+    if(delta>0){
+      const sign=window._stkSign||1;
+      const oldQty=v.qty||0;
+      const newQty=Math.max(0,oldQty+sign*delta);
+      const supplier=document.getElementById('stk-adj-reason').value.trim();
+      const notes=document.getElementById('stk-adj-notes').value.trim();
+      const unitPrice=parseFloat(document.getElementById('stk-adj-price').value)||null;
+      update.qty=newQty;
+      L(`qty (${sign===1?'+':'-'}${delta})`,oldQty,newQty,[supplier?`Supplier: ${supplier}`:'',notes].filter(Boolean).join(' — ')||'Qty adjusted',{unit_price:unitPrice});
+    }
+    if(!Object.keys(update).length){closeModal('stk-adj-modal');showToast('No changes');return;}
+    const{error}=await db.from('stock_variants').update(update).eq('id',variantId);
+    if(error){showToast('Error: '+error.message);return;}
+    log.forEach(l=>l.variant_id=variantId);
+  }
+  if(log.length){
+    const{error}=await db.from('stock_log').insert(log);
+    if(error)console.warn('stock_log insert failed',error);
+  }
   closeModal('stk-adj-modal');
+  const keepId=stkEditVariantId;
   await loadStockData();
-  if(stkSelectedVariantId)renderStockRight(stkSelectedVariantId);
-  showToast('Quantity updated ✓');
+  stkSelectedVariantId=keepId;
+  if(keepId)selectStkVariant(keepId);
+  showToast(isNew?'Variant added ✓':'Saved ✓');
+}
+
+async function deleteStkVariantFromEdit(){
+  const itemId=stkEditItemId,variantId=stkEditVariantId;
+  const v=stockVariants.find(x=>x.id===variantId);
+  if(!v)return;
+  const siblings=stockVariants.filter(x=>x.item_id===itemId);
+  if(siblings.length<=1){showToast('This is the only variant — delete the item instead');return;}
+  if(!confirm(`Delete variant "${v.variant_name}"${v.qty?` (qty ${v.qty})`:''}? This cannot be undone.`))return;
+  const{error}=await db.from('stock_variants').delete().eq('id',variantId);
+  if(error){showToast('Error: '+error.message);return;}
+  await db.from('stock_log').insert({item_id:itemId,variant_id:null,user_email:currentUser.email,field:`Variant deleted: ${v.variant_name}`,old_value:v.variant_name,new_value:null,reason:`Qty at deletion: ${v.qty||0}, target ${v.min_qty||0}`});
+  closeModal('stk-adj-modal');
+  stkSelectedVariantId=null;
+  stkEditVariantId=null;
+  await loadStockData();
+  document.getElementById('stk-right-content').innerHTML='<div style="color:var(--grey-400);font-size:.875rem;">Select a variant to see its history.</div>';
+  showToast('Variant deleted ✓');
 }
 
 // ── STOCK DETAIL ──────────────────────────────────────────────
@@ -4597,7 +4676,7 @@ function openStockDetail(itemId,variantId){
     <div class="field-row"><div class="field-label">Qty on Hand</div><div class="field-val"><strong>${variant?.qty||0}</strong></div></div>
     <div class="field-row"><div class="field-label">Target Qty</div><div class="field-val">${variant?.min_qty||0}</div></div>
     <div style="margin-top:1rem;display:flex;gap:.5rem;">
-      ${variant?`<button class="btn btn-primary btn-sm" onclick="closeModal('stk-detail-modal');openStkAdj('${itemId}','${variantId}','${esc(label)}',${variant?.qty||0})">Adjust Qty</button>`:''}
+      ${variant?`<button class="btn btn-primary btn-sm" onclick="closeModal('stk-detail-modal');openStkVariantEdit('${itemId}','${variantId}')">Edit</button>`:''}
       <button class="btn btn-ghost btn-sm" onclick="closeModal('stk-detail-modal');openEditStockItem('${itemId}')">Edit Item</button>
     </div>
   `;
